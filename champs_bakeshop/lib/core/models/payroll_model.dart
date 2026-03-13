@@ -41,21 +41,20 @@ class PayrollEntry {
   final String name;
   final String role;
   final int daysWorked;
-  final double grossSalary;   // base salary only — bonus is NOT included here
-  final double bonusTotal;    // total bonus earned (shown separately)
+  final double grossSalary;   // base salary + incentive (baker only) — bonus NOT included
+  final double bonusTotal;    // shown separately, never in payroll total
   final double ovenDeduction;
   final double gasDeduction;
   final double valeDeduction;
   final double wifiDeduction;
 
-  // Legacy param name kept so existing call sites don't break
   PayrollEntry({
     required this.userId,
     required this.name,
     required this.role,
     required this.daysWorked,
     required this.grossSalary,
-    double masterBonus = 0,   // legacy — maps to bonusTotal
+    double masterBonus = 0,  // legacy param name — maps to bonusTotal
     double bonusTotal = 0,
     this.ovenDeduction = 0,
     this.gasDeduction = 0,
@@ -63,24 +62,22 @@ class PayrollEntry {
     this.wifiDeduction = 0,
   }) : bonusTotal = bonusTotal != 0 ? bonusTotal : masterBonus;
 
-  // Legacy getter so existing reads of .masterBonus still compile
   double get masterBonus => bonusTotal;
 
   double get totalDeductions =>
       ovenDeduction + gasDeduction + valeDeduction + wifiDeduction;
 
-  /// Base salary minus deductions — bonus is excluded
-  double get totalSalary => grossSalary;
+  /// Gross salary (base + incentive) minus deductions. Bonus is NOT included.
   double get finalSalary => grossSalary - totalDeductions;
 
-  /// Final salary + bonus (for display purposes only — bonus paid separately)
+  /// For display only — final salary + bonus shown together
   double get finalSalaryWithBonus => finalSalary + bonusTotal;
 }
 
 class DailySalaryEntry {
   final String date;
-  final double baseSalary; // base only
-  final double bonus;      // shown separately, not added to base
+  final double baseSalary;  // includes baker incentive for master baker
+  final double bonus;       // shown separately
 
   DailySalaryEntry({
     required this.date,
@@ -88,28 +85,26 @@ class DailySalaryEntry {
     this.bonus = 0,
   });
 
-  /// Base salary only — use this for weekly/monthly payroll totals
-  double get total => baseSalary;
-
-  /// Base + bonus — use this only for display breakdown
-  double get totalWithBonus => baseSalary + bonus;
+  double get total => baseSalary;             // use for weekly/monthly sums
+  double get totalWithBonus => baseSalary + bonus; // use for display only
 }
 
 /// Result of computing one day's production salary.
 ///
 /// KEY RULES:
-/// • salaryPerWorker = totalValue / totalWorkers  (base only, NO bonus)
-/// • bonusPerWorker  = Σ(bonusPerSack × effectiveSacks) / totalWorkers
-///                     split equally among master baker AND helpers
-/// • Bonus is always displayed separately — never summed into salary
-/// • effectiveSacks  = sacks + extraKg / 25.0  (1 sack = 25 kg)
+/// • effectiveSacks    = sacks + extraKg / 25.0  (1 sack = 25 kg)
+/// • salaryPerWorker   = totalValue / totalWorkers      ← base, NO bonus, NO incentive
+/// • bonusPerWorker    = Σ(bonusPerSack × eff) / totalWorkers  ← split equally, paid separately
+/// • bakerIncentive    = totalEffectiveSacks × ₱100            ← ADDED to baker salary only
+///                       e.g. 2 sacks + 2 kg → 2.08 × ₱100 = ₱208
 class DailySalaryResult {
   final double totalValue;
   final int totalSacks;
-  final int totalExtraKg;    // extra kg across all items (0–24 per item)
+  final int totalExtraKg;
   final int totalWorkers;
-  final double salaryPerWorker; // base salary — no bonus
-  final double bonusPerWorker;  // bonus share — same for master baker & helpers
+  final double salaryPerWorker;   // base share for every worker
+  final double bonusPerWorker;    // same share for master baker AND helpers (separate)
+  final double bakerIncentive;    // added to baker salary only (₱100/sack)
 
   const DailySalaryResult({
     required this.totalValue,
@@ -118,8 +113,9 @@ class DailySalaryResult {
     required this.totalWorkers,
     required this.salaryPerWorker,
     required this.bonusPerWorker,
+    this.bakerIncentive = 0,
   });
 
-  // Legacy getter — keeps all existing reads of .masterBonus compiling
+  // Legacy getter
   double get masterBonus => bonusPerWorker;
 }

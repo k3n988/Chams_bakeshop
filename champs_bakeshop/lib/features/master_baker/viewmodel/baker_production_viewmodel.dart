@@ -43,13 +43,16 @@ class BakerProductionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Delegates to PayrollService so computation is always in one place.
   DailySalaryResult computeDaily(ProductionModel production) =>
       _payroll.computeDaily(production, _products);
 
   // ── Add ──────────────────────────────────────────────────────────────────
 
-  Future<bool> addProduction({
+  /// Returns:
+  ///  true  — saved successfully
+  ///  false — production already exists for this date
+  ///  null  — unexpected error (DB / network)
+  Future<bool?> addProduction({
     required String date,
     required String masterBakerId,
     required List<String> helperIds,
@@ -57,7 +60,7 @@ class BakerProductionViewModel extends ChangeNotifier {
   }) async {
     try {
       final exists = await _db.productionExistsForDate(date, masterBakerId);
-      if (exists) return false;
+      if (exists) return false; // already exists
 
       final computed = previewSalary(items, helperIds.length);
 
@@ -73,13 +76,14 @@ class BakerProductionViewModel extends ChangeNotifier {
         totalWorkers: computed.totalWorkers,
         salaryPerWorker: computed.salaryPerWorker,
         bonusPerWorker: computed.bonusPerWorker,
+        bakerIncentive: computed.bakerIncentive,
       );
 
       await _db.insertProduction(production);
       await loadData(masterBakerId);
       return true;
     } catch (e) {
-      return false;
+      return null; // unexpected error — distinguishable from "already exists"
     }
   }
 
@@ -87,7 +91,8 @@ class BakerProductionViewModel extends ChangeNotifier {
 
   Future<bool> updateProduction(ProductionModel updated) async {
     try {
-      final recomputed = previewSalary(updated.items, updated.helperIds.length);
+      final recomputed =
+          previewSalary(updated.items, updated.helperIds.length);
 
       final refreshed = updated.copyWith(
         totalValue: recomputed.totalValue,
@@ -96,6 +101,7 @@ class BakerProductionViewModel extends ChangeNotifier {
         totalWorkers: recomputed.totalWorkers,
         salaryPerWorker: recomputed.salaryPerWorker,
         bonusPerWorker: recomputed.bonusPerWorker,
+        bakerIncentive: recomputed.bakerIncentive,
       );
 
       await _db.updateProduction(refreshed);
@@ -112,18 +118,17 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Preview (also used by PayrollService via computeDaily) ───────────────
+  // ── Preview ───────────────────────────────────────────────────────────────
 
-  /// Computes salary preview from items + helperCount.
-  ///
-  /// • effectiveSacks  = sacks + extraKg / 25.0
-  /// • salaryPerWorker = totalValue / totalWorkers  ← base only, NO bonus
-  /// • bonusPerWorker  = Σ(bonusPerSack × effectiveSacks) / totalWorkers
-  ///                     same for master baker AND every helper
-  /// • Bonus is never added into salaryPerWorker
-  DailySalaryResult previewSalary(List<ProductionItem> items, int helperCount) {
+  /// • effectiveSacks    = sacks + extraKg / 25.0
+  /// • salaryPerWorker   = totalValue / totalWorkers  (base only)
+  /// • bonusPerWorker    = Σ(bonusPerSack × eff) / totalWorkers (all, separate)
+  /// • bakerIncentive    = totalEffectiveSacks × ₱100 (baker only, in salary)
+  DailySalaryResult previewSalary(
+      List<ProductionItem> items, int helperCount) {
     double totalValue = 0;
     double totalBonusAmount = 0;
+    double totalEffectiveSacks = 0;
     int totalSacks = 0;
     int totalExtraKg = 0;
 
@@ -131,9 +136,10 @@ class BakerProductionViewModel extends ChangeNotifier {
       final product =
           _products.where((p) => p.id == item.productId).firstOrNull;
       if (product != null) {
-        final effective = item.effectiveSacks; // sacks + extraKg/25
+        final effective = item.effectiveSacks;
         totalValue += product.pricePerSack * effective;
         totalBonusAmount += product.bonusPerSack * effective;
+        totalEffectiveSacks += effective;
         totalSacks += item.sacks;
         totalExtraKg += item.extraKg;
       }
@@ -144,6 +150,8 @@ class BakerProductionViewModel extends ChangeNotifier {
         totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
     final bonusPerWorker =
         totalWorkers > 0 ? totalBonusAmount / totalWorkers : 0.0;
+    final bakerIncentive =
+        totalEffectiveSacks * PayrollService.incentivePerSack;
 
     return DailySalaryResult(
       totalValue: totalValue,
@@ -152,6 +160,7 @@ class BakerProductionViewModel extends ChangeNotifier {
       totalWorkers: totalWorkers,
       salaryPerWorker: salaryPerWorker,
       bonusPerWorker: bonusPerWorker,
+      bakerIncentive: bakerIncentive,
     );
   }
 }

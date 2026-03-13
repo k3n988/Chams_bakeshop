@@ -114,15 +114,21 @@ class SupabaseService {
     return rows.map(_rowToProduction).toList();
   }
 
+  /// Uses a date-range check (gte + lte on the same date) so it works correctly
+  /// whether the `date` column is stored as DATE or TIMESTAMP in Supabase.
   Future<bool> productionExistsForDate(
       String date, String masterBakerId) async {
-    final row = await _db
-        .from('productions')
-        .select('id')
-        .eq('date', date)
-        .eq('master_baker_id', masterBakerId)
-        .maybeSingle();
-    return row != null;
+    try {
+      final rows = await _db
+          .from('productions')
+          .select('id')
+          .gte('date', date)          // >= '2026-03-13'
+          .lte('date', '${date}T23:59:59') // <= '2026-03-13T23:59:59'
+          .eq('master_baker_id', masterBakerId);
+      return rows.isNotEmpty;
+    } catch (_) {
+      return false; // on error, allow insert attempt
+    }
   }
 
   Future<void> insertProduction(ProductionModel production) async {
@@ -140,9 +146,6 @@ class SupabaseService {
     await _db.from('productions').delete().eq('id', id);
   }
 
-  /// Serialise a [ProductionModel] to a Supabase row map.
-  /// Writes both `bonus_per_worker` (new) and `master_bonus` (legacy column)
-  /// so older rows remain readable if the migration hasn't run yet.
   Map<String, dynamic> _productionToRow(ProductionModel p) => {
         'id': p.id,
         'date': p.date,
@@ -151,16 +154,14 @@ class SupabaseService {
         'items': p.items.map((i) => i.toMap()).toList(),
         'total_value': p.totalValue,
         'total_sacks': p.totalSacks,
-        'total_extra_kg': p.totalExtraKg,       // new: partial-kg across all items
+        'total_extra_kg': p.totalExtraKg,
         'total_workers': p.totalWorkers,
         'salary_per_worker': p.salaryPerWorker,
-        'bonus_per_worker': p.bonusPerWorker,   // new: shared equally among workers
-        'master_bonus': p.bonusPerWorker,        // legacy column kept in sync
+        'bonus_per_worker': p.bonusPerWorker,
+        'master_bonus': p.bonusPerWorker,   // legacy column kept in sync
+        'baker_incentive': p.bakerIncentive,
       };
 
-  /// Deserialise a Supabase row into a [ProductionModel].
-  /// Handles both new (`bonus_per_worker`) and legacy (`master_bonus`) columns,
-  /// and both JSONB-list and legacy pipe-delimited item formats.
   ProductionModel _rowToProduction(Map<String, dynamic> map) {
     final helperStr = (map['helper_ids'] as String? ?? '').trim();
     final rawItems = map['items'];
@@ -171,13 +172,11 @@ class SupabaseService {
           .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
           .toList();
     } else if (rawItems is String && rawItems.isNotEmpty) {
-      // Legacy pipe-delimited format
       items = rawItems.split('|').map((s) {
         final p = s.split(':');
         return ProductionItem(
           productId: p[0],
           sacks: int.tryParse(p[1]) ?? 0,
-          // extraKg not present in legacy format — defaults to 0
           cat60: p.length > 2 ? int.tryParse(p[2]) : null,
           cat36: p.length > 3 ? int.tryParse(p[3]) : null,
           cat48: p.length > 4 ? int.tryParse(p[4]) : null,
@@ -192,7 +191,6 @@ class SupabaseService {
     final rawDate = map['date']?.toString() ?? '';
     final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
 
-    // Prefer new column; fall back to legacy master_bonus for old rows
     final bonus =
         (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
 
@@ -204,10 +202,11 @@ class SupabaseService {
       items: items,
       totalValue: (map['total_value'] ?? 0).toDouble(),
       totalSacks: map['total_sacks'] ?? 0,
-      totalExtraKg: map['total_extra_kg'] ?? 0,       // new field, safe default
+      totalExtraKg: map['total_extra_kg'] ?? 0,
       totalWorkers: map['total_workers'] ?? 0,
       salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
       bonusPerWorker: bonus,
+      bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
     );
   }
 

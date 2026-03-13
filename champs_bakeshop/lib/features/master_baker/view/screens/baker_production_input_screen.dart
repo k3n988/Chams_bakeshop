@@ -14,15 +14,12 @@ class BakerProductionInputScreen extends StatefulWidget {
       _BakerProductionInputScreenState();
 }
 
-// Holds one product row: product + sacks + extra kg
 class _ItemData {
   String? productId;
   int sacks = 0;
   int extraKg = 0;
-
   final TextEditingController sacksCtrl = TextEditingController();
   final TextEditingController kgCtrl = TextEditingController();
-
   void dispose() {
     sacksCtrl.dispose();
     kgCtrl.dispose();
@@ -34,6 +31,17 @@ class _BakerProductionInputScreenState
   String _date = DateTime.now().toString().split(' ')[0];
   final Set<String> _selectedHelpers = {};
   final List<_ItemData> _items = [_ItemData()];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<AuthViewModel>().currentUser;
+      if (user != null) {
+        context.read<BakerProductionViewModel>().loadData(user.id);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -96,16 +104,17 @@ class _BakerProductionInputScreenState
     }
 
     final user = context.read<AuthViewModel>().currentUser!;
-    final ok = await context.read<BakerProductionViewModel>().addProduction(
-          date: _date,
-          masterBakerId: user.id,
-          helperIds: _selectedHelpers.toList(),
-          items: _validItems,
-        );
+    final result =
+        await context.read<BakerProductionViewModel>().addProduction(
+              date: _date,
+              masterBakerId: user.id,
+              helperIds: _selectedHelpers.toList(),
+              items: _validItems,
+            );
 
     if (!mounted) return;
 
-    if (ok) {
+    if (result == true) {
       messenger.showSnackBar(const SnackBar(
           content: Text('Production saved!'),
           backgroundColor: AppColors.success));
@@ -117,9 +126,13 @@ class _BakerProductionInputScreenState
         _items.clear();
         _items.add(_ItemData());
       });
-    } else {
+    } else if (result == false) {
       messenger.showSnackBar(const SnackBar(
           content: Text('Production already exists for this date'),
+          backgroundColor: AppColors.danger));
+    } else {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Failed to save. Check connection and try again.'),
           backgroundColor: AppColors.danger));
     }
   }
@@ -139,7 +152,8 @@ class _BakerProductionInputScreenState
         // ── Date ──────────────────────────────────────────────────────────
         Card(
           child: ListTile(
-            leading: const Icon(Icons.calendar_today, color: AppColors.primary),
+            leading:
+                const Icon(Icons.calendar_today, color: AppColors.primary),
             title: Text(_date,
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: const Text('Production Date'),
@@ -153,7 +167,8 @@ class _BakerProductionInputScreenState
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('SELECT HELPERS',
                   style: TextStyle(
                       fontSize: 11,
@@ -161,7 +176,9 @@ class _BakerProductionInputScreenState
                       color: AppColors.textHint,
                       letterSpacing: 0.8)),
               const SizedBox(height: 12),
-              if (vm.helpers.isEmpty)
+              if (vm.isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (vm.helpers.isEmpty)
                 const Text('No helpers found',
                     style: TextStyle(color: AppColors.textHint))
               else
@@ -175,7 +192,8 @@ class _BakerProductionInputScreenState
                       label: Text(h.name),
                       labelStyle: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: sel ? Colors.white : AppColors.textSecondary),
+                          color:
+                              sel ? Colors.white : AppColors.textSecondary),
                       selectedColor: AppColors.success,
                       checkmarkColor: Colors.white,
                       backgroundColor: AppColors.surface,
@@ -194,7 +212,8 @@ class _BakerProductionInputScreenState
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('PRODUCTS PRODUCED',
                     style: TextStyle(
@@ -205,37 +224,35 @@ class _BakerProductionInputScreenState
                 TextButton.icon(
                     onPressed: _addItem,
                     icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add')),
+                    label: const Text('+ Add')),
               ]),
 
               // Column headers
               Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 4, top: 2),
                 child: Row(children: [
                   const Expanded(flex: 3, child: SizedBox()),
                   Expanded(
                     flex: 2,
-                    child: Row(children: [
+                    child: Row(children: const [
                       Expanded(
-                        child: Text('Sacks',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textHint)),
-                      ),
-                      const SizedBox(width: 6),
+                          child: Text('Sacks',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textHint))),
+                      SizedBox(width: 6),
                       Expanded(
-                        child: Text('+ KG',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textHint)),
-                      ),
+                          child: Text('+ KG',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textHint))),
                     ]),
                   ),
-                  const SizedBox(width: 32),
+                  const SizedBox(width: 40),
                 ]),
               ),
 
@@ -243,108 +260,143 @@ class _BakerProductionInputScreenState
                 final item = _items[i];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                    // Product dropdown
-                    Expanded(
-                      flex: 3,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: item.productId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                            hintText: 'Select product',
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10)),
-                        items: vm.products
-                            .map((p) => DropdownMenuItem(
-                                  value: p.id,
-                                  child: Text(
-                                    '${p.name} (${formatCurrency(p.pricePerSack)})',
-                                    style: const TextStyle(fontSize: 13),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Product dropdown
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: item.productId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                                hintText: 'Select product',
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10)),
+                            items: vm.products
+                                .map((p) => DropdownMenuItem(
+                                      value: p.id,
+                                      child: Text(
+                                        '${p.name} (${formatCurrency(p.pricePerSack)})',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => item.productId = v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Sacks counter — compact to avoid overflow
+                        SizedBox(
+                          width: 90,
+                          child: Row(
+                            children: [
+                              _CounterBtn(
+                                icon: Icons.remove,
+                                onTap: () {
+                                  if (item.sacks > 0) {
+                                    setState(() {
+                                      item.sacks--;
+                                      item.sacksCtrl.text = item.sacks.toString();
+                                    });
+                                  }
+                                },
+                                isLeft: true,
+                              ),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 36,
+                                  child: TextField(
+                                    controller: item.sacksCtrl,
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600),
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.zero,
+                                        borderSide: BorderSide(color: AppColors.border),
+                                      ),
+                                      contentPadding: EdgeInsets.zero,
+                                      isDense: true,
+                                    ),
+                                    onChanged: (v) => setState(
+                                        () => item.sacks = int.tryParse(v) ?? 0),
                                   ),
-                                ))
-                            .toList(),
-                        onChanged: (v) => setState(() => item.productId = v),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Sacks input
-                    Expanded(
-                      child: TextField(
-                        controller: item.sacksCtrl,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          labelText: 'Sacks',
-                          labelStyle: const TextStyle(fontSize: 11),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              _CounterBtn(
+                                icon: Icons.add,
+                                onTap: () {
+                                  setState(() {
+                                    item.sacks++;
+                                    item.sacksCtrl.text = item.sacks.toString();
+                                  });
+                                },
+                                isLeft: false,
+                              ),
+                            ],
+                          ),
                         ),
-                        onChanged: (v) =>
-                            setState(() => item.sacks = int.tryParse(v) ?? 0),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
+                        const SizedBox(width: 6),
 
-                    // Extra KG input
-                    Expanded(
-                      child: TextField(
-                        controller: item.kgCtrl,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          labelText: 'KG',
-                          labelStyle: const TextStyle(fontSize: 11),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 10),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          suffix: Text('kg',
-                              style: TextStyle(
-                                  fontSize: 10, color: AppColors.textHint)),
+                        // KG input
+                        Expanded(
+                          child: TextField(
+                            controller: item.kgCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              suffixText: 'kg',
+                              suffixStyle: TextStyle(
+                                  fontSize: 10, color: AppColors.textHint),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 10),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onChanged: (v) {
+                              final kg =
+                                  (int.tryParse(v) ?? 0).clamp(0, 24);
+                              setState(() => item.extraKg = kg);
+                              if ((int.tryParse(v) ?? 0) > 24) {
+                                item.kgCtrl.text = '24';
+                                item.kgCtrl.selection =
+                                    TextSelection.fromPosition(
+                                        TextPosition(
+                                            offset:
+                                                item.kgCtrl.text.length));
+                              }
+                            },
+                          ),
                         ),
-                        onChanged: (v) {
-                          final kg = int.tryParse(v) ?? 0;
-                          // Guard: kg must be 0–24 (anything >= 25 should be a full sack)
-                          setState(() => item.extraKg = kg.clamp(0, 24));
-                          if (kg >= 25) {
-                            item.kgCtrl.text = '${kg.clamp(0, 24)}';
-                            item.kgCtrl.selection = TextSelection.fromPosition(
-                                TextPosition(
-                                    offset: item.kgCtrl.text.length));
-                          }
-                        },
-                      ),
-                    ),
 
-                    // Delete row
-                    if (_items.length > 1) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline,
-                            color: AppColors.danger, size: 22),
-                        onPressed: () => _removeItem(i),
-                      ),
-                    ] else
-                      const SizedBox(width: 40),
-                  ]),
+                        // Delete
+                        if (_items.length > 1) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: AppColors.danger, size: 22),
+                            onPressed: () => _removeItem(i),
+                          ),
+                        ] else
+                          const SizedBox(width: 40),
+                      ]),
                 );
               }),
 
-              // Hint
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '1 sack = 25 kg  •  e.g. 3 sacks + 10 kg = 3.4 effective sacks',
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textHint,
-                      fontStyle: FontStyle.italic),
-                ),
+              const SizedBox(height: 4),
+              Text(
+                '1 sack = 25 kg  •  e.g. 3 sacks + 10 kg = 3.4 effective sacks',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textHint,
+                    fontStyle: FontStyle.italic),
               ),
             ]),
           ),
@@ -355,7 +407,8 @@ class _BakerProductionInputScreenState
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('PRODUCTION PREVIEW',
                   style: TextStyle(
                       fontSize: 11,
@@ -364,7 +417,6 @@ class _BakerProductionInputScreenState
                       letterSpacing: 0.8)),
               const SizedBox(height: 14),
 
-              // Total value & quantity
               BreakdownRow(
                   label: 'Total Value',
                   value: formatCurrency(preview.totalValue),
@@ -377,58 +429,54 @@ class _BakerProductionInputScreenState
               BreakdownRow(
                   label: 'Total Workers',
                   value: '${preview.totalWorkers}'),
-
-              const Divider(height: 20),
-
-              // Base salary section
-              const Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Text('BASE SALARY',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textHint,
-                        letterSpacing: 0.6)),
-              ),
               BreakdownRow(
                   label: 'Per Worker (base)',
                   value: formatCurrency(preview.salaryPerWorker)),
+
+              const Divider(height: 20),
+
+              // Baker incentive
+              const Text('BAKER INCENTIVE (IN SALARY)',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textHint,
+                      letterSpacing: 0.6)),
+              const SizedBox(height: 8),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text('₱100 / effective sack',
+                    style: TextStyle(fontSize: 13)),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(formatCurrency(preview.bakerIncentive),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryDark,
+                          fontSize: 13)),
+                  Text(
+                    '${(preview.totalSacks + preview.totalExtraKg / 25.0).toStringAsFixed(2)} eff. sacks × ₱100',
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.textHint),
+                  ),
+                ]),
+              ]),
+
+              const Divider(height: 20),
               BreakdownRow(
                   label: 'Your Salary (est.)',
-                  value: formatCurrency(preview.salaryPerWorker),
+                  value: formatCurrency(
+                      preview.salaryPerWorker + preview.bakerIncentive),
                   color: AppColors.primaryDark),
 
               const Divider(height: 20),
 
-              // Bonus section — shared equally, shown separately
-              const Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Text('BONUS (SEPARATE)',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textHint,
-                        letterSpacing: 0.6)),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Bonus per Worker',
-                      style: TextStyle(fontSize: 13)),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(formatCurrency(preview.bonusPerWorker),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.masterBaker,
-                            fontSize: 13)),
-                    Text(
-                      'Split equally among ${preview.totalWorkers} worker${preview.totalWorkers > 1 ? "s" : ""}',
-                      style: TextStyle(fontSize: 10, color: AppColors.textHint),
-                    ),
-                  ]),
-                ],
-              ),
-              const SizedBox(height: 4),
+              // Bonus (separate)
+              const Text('BONUS (PAID SEPARATELY)',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textHint,
+                      letterSpacing: 0.6)),
+              const SizedBox(height: 8),
               BreakdownRow(
                   label: 'Master Baker Bonus',
                   value: formatCurrency(preview.bonusPerWorker),
@@ -438,9 +486,8 @@ class _BakerProductionInputScreenState
                   value: formatCurrency(preview.bonusPerWorker),
                   color: AppColors.success),
 
-              // Note
+              const SizedBox(height: 10),
               Container(
-                margin: const EdgeInsets.only(top: 10),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.amber.shade50,
@@ -453,7 +500,7 @@ class _BakerProductionInputScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Bonus is paid separately from salary and is not included in the weekly/monthly payroll total.',
+                      'Bonus is paid separately and is not included in the weekly/monthly payroll total.',
                       style: TextStyle(
                           fontSize: 11, color: Colors.amber.shade800),
                     ),
@@ -468,7 +515,7 @@ class _BakerProductionInputScreenState
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _submit,
+            onPressed: vm.isLoading ? null : _submit,
             icon: const Icon(Icons.check),
             label: const Text('Save Production',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -478,6 +525,36 @@ class _BakerProductionInputScreenState
         ),
         const SizedBox(height: 20),
       ]),
+    );
+  }
+}
+
+
+/// Compact +/− button used in the sacks counter
+class _CounterBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isLeft;
+  const _CounterBtn(
+      {required this.icon, required this.onTap, required this.isLeft});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 26,
+        height: 36,
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.horizontal(
+            left: isLeft ? const Radius.circular(8) : Radius.zero,
+            right: isLeft ? Radius.zero : const Radius.circular(8),
+          ),
+          color: AppColors.surface,
+        ),
+        child: Icon(icon, size: 14, color: AppColors.textSecondary),
+      ),
     );
   }
 }

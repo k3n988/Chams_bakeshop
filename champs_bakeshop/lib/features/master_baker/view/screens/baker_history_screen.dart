@@ -76,7 +76,7 @@ class BakerHistoryScreen extends StatelessWidget {
 
                       const SizedBox(height: 8),
 
-                      // ── Salary line (base only, no bonus) ─────────────────
+                      // ── Salary line (base + incentive, no bonus) ──────────
                       RichText(
                         text: TextSpan(
                           style: const TextStyle(
@@ -84,11 +84,16 @@ class BakerHistoryScreen extends StatelessWidget {
                           children: [
                             const TextSpan(text: 'Salary: '),
                             TextSpan(
-                              text: formatCurrency(calc.salaryPerWorker),
+                              text: formatCurrency(calc.salaryPerWorker + calc.bakerIncentive),
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: Colors.black87),
                             ),
+                            if (calc.bakerIncentive > 0)
+                              TextSpan(
+                                text: ' (${formatCurrency(calc.salaryPerWorker)} + ${formatCurrency(calc.bakerIncentive)} incentive)',
+                                style: const TextStyle(fontSize: 11),
+                              ),
                           ],
                         ),
                       ),

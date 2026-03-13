@@ -21,7 +21,7 @@ class ProductionItem {
     this.saka,
   });
 
-  /// Effective sacks including partial kg (e.g. 3 sacks + 10 kg = 3.4 effective sacks)
+  /// Effective sacks including partial kg (e.g. 3 sacks + 10 kg = 3.4)
   double get effectiveSacks => sacks + (extraKg / 25.0);
 
   ProductionItem copyWith({
@@ -75,13 +75,14 @@ class ProductionModel {
   final List<String> helperIds;
   final List<ProductionItem> items;
 
-  // Computed fields saved to DB
+  // All computed fields saved to DB
   final double totalValue;
   final int totalSacks;
-  final int totalExtraKg;      // total extra kg across all items
+  final int totalExtraKg;
   final int totalWorkers;
-  final double salaryPerWorker; // base salary only, NO bonus
-  final double bonusPerWorker;  // bonus split equally among all workers
+  final double salaryPerWorker;  // base share per worker
+  final double bonusPerWorker;   // split equally, paid separately
+  final double bakerIncentive;   // ₱100/sack — added to baker salary only
 
   ProductionModel({
     required this.id,
@@ -95,9 +96,10 @@ class ProductionModel {
     this.totalWorkers = 0,
     this.salaryPerWorker = 0.0,
     this.bonusPerWorker = 0.0,
+    this.bakerIncentive = 0.0,
   });
 
-  // Keep masterBonus as a getter so existing code that reads it doesn't break
+  // Legacy getter
   double get masterBonus => bonusPerWorker;
 
   ProductionModel copyWith({
@@ -112,6 +114,7 @@ class ProductionModel {
     int? totalWorkers,
     double? salaryPerWorker,
     double? bonusPerWorker,
+    double? bakerIncentive,
   }) =>
       ProductionModel(
         id: id ?? this.id,
@@ -125,6 +128,7 @@ class ProductionModel {
         totalWorkers: totalWorkers ?? this.totalWorkers,
         salaryPerWorker: salaryPerWorker ?? this.salaryPerWorker,
         bonusPerWorker: bonusPerWorker ?? this.bonusPerWorker,
+        bakerIncentive: bakerIncentive ?? this.bakerIncentive,
       );
 
   Map<String, dynamic> toMap() => {
@@ -139,8 +143,8 @@ class ProductionModel {
         'total_workers': totalWorkers,
         'salary_per_worker': salaryPerWorker,
         'bonus_per_worker': bonusPerWorker,
-        // keep master_bonus column in sync for any legacy reads
-        'master_bonus': bonusPerWorker,
+        'master_bonus': bonusPerWorker, // legacy column kept in sync
+        'baker_incentive': bakerIncentive,
       };
 
   factory ProductionModel.fromMap(Map<String, dynamic> map) {
@@ -162,8 +166,8 @@ class ProductionModel {
           .toList();
     }
 
-    // Support both old (master_bonus) and new (bonus_per_worker) column names
-    final bonus = (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
+    final bonus =
+        (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
 
     return ProductionModel(
       id: map['id'],
@@ -177,6 +181,7 @@ class ProductionModel {
       totalWorkers: map['total_workers'] ?? 0,
       salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
       bonusPerWorker: bonus,
+      bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
     );
   }
 }

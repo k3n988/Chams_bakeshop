@@ -59,7 +59,6 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
   }
 
-  // FIX: removed messenger variable and _ = messenger hack entirely
   void _pickMonth() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -99,7 +98,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                  'Oven is auto-calculated (₱15/day for helpers).',
+                  'Oven is auto-calculated (₱20/day for helpers).',
                   style: TextStyle(fontSize: 12, color: AppColors.textHint)),
               const SizedBox(height: 16),
               TextField(
@@ -190,6 +189,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Header ──────────────────────────────────────────
                         Row(children: [
                           CircleAvatar(
                             radius: 18,
@@ -224,6 +224,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                           Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
+                                // FIX: finalSalary = grossSalary - deductions (bonus excluded)
                                 Text(formatCurrency(e.finalSalary),
                                     style: const TextStyle(
                                         fontSize: 18,
@@ -235,19 +236,27 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                                         color: AppColors.textHint)),
                               ]),
                         ]),
+
                         const Divider(height: 24),
+
+                        // ── Breakdown ────────────────────────────────────────
+                        // FIX: was e.totalSalary (undefined) → e.grossSalary
+                        // grossSalary = base + baker incentive (master) or base only (helper)
                         BreakdownRow(
                             label: 'Gross Salary',
-                            value: formatCurrency(e.totalSalary),
+                            value: formatCurrency(e.grossSalary),
                             color: AppColors.success),
-                        if (e.masterBonus > 0)
+
+                        // bonusTotal is shown separately — NOT part of gross or final
+                        if (e.bonusTotal > 0)
                           BreakdownRow(
-                              label: 'Sack Bonus (incl.)',
-                              value: formatCurrency(e.masterBonus),
+                              label: 'Sack Bonus (separate)',
+                              value: formatCurrency(e.bonusTotal),
                               color: AppColors.masterBaker),
+
                         if (e.ovenDeduction > 0)
                           BreakdownRow(
-                              label: 'Oven (₱15/day)',
+                              label: 'Oven (₱20/day)',
                               value: '-${formatCurrency(e.ovenDeduction)}',
                               color: AppColors.danger),
                         if (e.gasDeduction > 0)
@@ -265,6 +274,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                               label: 'Wifi',
                               value: '-${formatCurrency(e.wifiDeduction)}',
                               color: AppColors.danger),
+
                         const SizedBox(height: 10),
                         Align(
                           alignment: Alignment.centerRight,
@@ -280,6 +290,8 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                       ]),
                 ),
               )),
+
+          // ── Total payroll ────────────────────────────────────────────────
           Card(
             color: AppColors.primaryDark,
             child: Padding(
