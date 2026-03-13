@@ -140,20 +140,27 @@ class SupabaseService {
     await _db.from('productions').delete().eq('id', id);
   }
 
-  // 🔥 UPDATED METHODS PARA PUMASOK ANG COMPUTATIONS SA SUPABASE 🔥
+  /// Serialise a [ProductionModel] to a Supabase row map.
+  /// Writes both `bonus_per_worker` (new) and `master_bonus` (legacy column)
+  /// so older rows remain readable if the migration hasn't run yet.
   Map<String, dynamic> _productionToRow(ProductionModel p) => {
         'id': p.id,
         'date': p.date,
         'master_baker_id': p.masterBakerId,
         'helper_ids': p.helperIds.join(','),
-        'items': p.items.map((i) => i.toMap()).toList(), // FIX PARA SA JSONB NULL ERROR
-        'total_value': p.totalValue,                     // BAGONG COMPUTED FIELD
-        'total_sacks': p.totalSacks,                     // BAGONG COMPUTED FIELD
-        'total_workers': p.totalWorkers,                 // BAGONG COMPUTED FIELD
-        'salary_per_worker': p.salaryPerWorker,          // BAGONG COMPUTED FIELD
-        'master_bonus': p.masterBonus,                   // BAGONG COMPUTED FIELD
+        'items': p.items.map((i) => i.toMap()).toList(),
+        'total_value': p.totalValue,
+        'total_sacks': p.totalSacks,
+        'total_extra_kg': p.totalExtraKg,       // new: partial-kg across all items
+        'total_workers': p.totalWorkers,
+        'salary_per_worker': p.salaryPerWorker,
+        'bonus_per_worker': p.bonusPerWorker,   // new: shared equally among workers
+        'master_bonus': p.bonusPerWorker,        // legacy column kept in sync
       };
 
+  /// Deserialise a Supabase row into a [ProductionModel].
+  /// Handles both new (`bonus_per_worker`) and legacy (`master_bonus`) columns,
+  /// and both JSONB-list and legacy pipe-delimited item formats.
   ProductionModel _rowToProduction(Map<String, dynamic> map) {
     final helperStr = (map['helper_ids'] as String? ?? '').trim();
     final rawItems = map['items'];
@@ -164,16 +171,18 @@ class SupabaseService {
           .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
           .toList();
     } else if (rawItems is String && rawItems.isNotEmpty) {
+      // Legacy pipe-delimited format
       items = rawItems.split('|').map((s) {
         final p = s.split(':');
         return ProductionItem(
           productId: p[0],
           sacks: int.tryParse(p[1]) ?? 0,
+          // extraKg not present in legacy format — defaults to 0
           cat60: p.length > 2 ? int.tryParse(p[2]) : null,
           cat36: p.length > 3 ? int.tryParse(p[3]) : null,
           cat48: p.length > 4 ? int.tryParse(p[4]) : null,
           subra: p.length > 5 ? int.tryParse(p[5]) : null,
-          saka: p.length > 6 ? int.tryParse(p[6]) : null,
+          saka:  p.length > 6 ? int.tryParse(p[6]) : null,
         );
       }).toList();
     } else {
@@ -183,17 +192,22 @@ class SupabaseService {
     final rawDate = map['date']?.toString() ?? '';
     final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
 
+    // Prefer new column; fall back to legacy master_bonus for old rows
+    final bonus =
+        (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
+
     return ProductionModel(
       id: map['id'],
       date: date,
       masterBakerId: map['master_baker_id'],
       helperIds: helperStr.isEmpty ? [] : helperStr.split(','),
       items: items,
-      totalValue: (map['total_value'] ?? 0).toDouble(),           // LOAD BAGONG COMPUTED FIELD
-      totalSacks: map['total_sacks'] ?? 0,                        // LOAD BAGONG COMPUTED FIELD
-      totalWorkers: map['total_workers'] ?? 0,                    // LOAD BAGONG COMPUTED FIELD
-      salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),// LOAD BAGONG COMPUTED FIELD
-      masterBonus: (map['master_bonus'] ?? 0).toDouble(),         // LOAD BAGONG COMPUTED FIELD
+      totalValue: (map['total_value'] ?? 0).toDouble(),
+      totalSacks: map['total_sacks'] ?? 0,
+      totalExtraKg: map['total_extra_kg'] ?? 0,       // new field, safe default
+      totalWorkers: map['total_workers'] ?? 0,
+      salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
+      bonusPerWorker: bonus,
     );
   }
 

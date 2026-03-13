@@ -15,7 +15,6 @@ class BakerProductionViewModel extends ChangeNotifier {
   List<ProductModel> _products = [];
   List<UserModel> _helpers = [];
   bool _isLoading = false;
-  String? _lastMasterBakerId;
 
   BakerProductionViewModel(this._db, this._payroll);
 
@@ -26,10 +25,8 @@ class BakerProductionViewModel extends ChangeNotifier {
 
   Future<void> loadData(String masterBakerId) async {
     _isLoading = true;
-    _lastMasterBakerId = masterBakerId;
     notifyListeners();
 
-    // Run independently so one failing table doesn't block the others
     await Future.wait([
       _db.getProductionsByMasterBaker(masterBakerId)
           .then((v) => _productions = v)
@@ -46,8 +43,11 @@ class BakerProductionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Delegates to PayrollService so computation is always in one place.
   DailySalaryResult computeDaily(ProductionModel production) =>
       _payroll.computeDaily(production, _products);
+
+  // ── Add ──────────────────────────────────────────────────────────────────
 
   Future<bool> addProduction({
     required String date,
@@ -59,7 +59,7 @@ class BakerProductionViewModel extends ChangeNotifier {
       final exists = await _db.productionExistsForDate(date, masterBakerId);
       if (exists) return false;
 
-      final computedSalary = previewSalary(items, helperIds.length);
+      final computed = previewSalary(items, helperIds.length);
 
       final production = ProductionModel(
         id: generateId('prod'),
@@ -67,11 +67,12 @@ class BakerProductionViewModel extends ChangeNotifier {
         masterBakerId: masterBakerId,
         helperIds: helperIds,
         items: items,
-        totalValue: computedSalary.totalValue,
-        totalSacks: computedSalary.totalSacks,
-        totalWorkers: computedSalary.totalWorkers,
-        salaryPerWorker: computedSalary.salaryPerWorker,
-        masterBonus: computedSalary.masterBonus,
+        totalValue: computed.totalValue,
+        totalSacks: computed.totalSacks,
+        totalExtraKg: computed.totalExtraKg,
+        totalWorkers: computed.totalWorkers,
+        salaryPerWorker: computed.salaryPerWorker,
+        bonusPerWorker: computed.bonusPerWorker,
       );
 
       await _db.insertProduction(production);
@@ -82,23 +83,23 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
   }
 
-  /// Recomputes salary from updated items, persists to DB, refreshes local list.
+  // ── Update ───────────────────────────────────────────────────────────────
+
   Future<bool> updateProduction(ProductionModel updated) async {
     try {
-      // Recompute all salary fields so stored values stay consistent with items
       final recomputed = previewSalary(updated.items, updated.helperIds.length);
 
       final refreshed = updated.copyWith(
         totalValue: recomputed.totalValue,
         totalSacks: recomputed.totalSacks,
+        totalExtraKg: recomputed.totalExtraKg,
         totalWorkers: recomputed.totalWorkers,
         salaryPerWorker: recomputed.salaryPerWorker,
-        masterBonus: recomputed.masterBonus,
+        bonusPerWorker: recomputed.bonusPerWorker,
       );
 
       await _db.updateProduction(refreshed);
 
-      // Swap in-memory entry immediately — no full reload needed
       final index = _productions.indexWhere((p) => p.id == refreshed.id);
       if (index != -1) {
         _productions[index] = refreshed;
@@ -111,30 +112,46 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
   }
 
-  /// Preview salary using bonusPerSack from each ProductModel — aligned with PayrollService
+  // ── Preview (also used by PayrollService via computeDaily) ───────────────
+
+  /// Computes salary preview from items + helperCount.
+  ///
+  /// • effectiveSacks  = sacks + extraKg / 25.0
+  /// • salaryPerWorker = totalValue / totalWorkers  ← base only, NO bonus
+  /// • bonusPerWorker  = Σ(bonusPerSack × effectiveSacks) / totalWorkers
+  ///                     same for master baker AND every helper
+  /// • Bonus is never added into salaryPerWorker
   DailySalaryResult previewSalary(List<ProductionItem> items, int helperCount) {
     double totalValue = 0;
-    double totalBonus = 0;
+    double totalBonusAmount = 0;
     int totalSacks = 0;
+    int totalExtraKg = 0;
 
     for (final item in items) {
-      final product = _products.where((p) => p.id == item.productId).firstOrNull;
+      final product =
+          _products.where((p) => p.id == item.productId).firstOrNull;
       if (product != null) {
-        totalValue += product.pricePerSack * item.sacks;
-        totalBonus += product.bonusPerSack * item.sacks;
+        final effective = item.effectiveSacks; // sacks + extraKg/25
+        totalValue += product.pricePerSack * effective;
+        totalBonusAmount += product.bonusPerSack * effective;
         totalSacks += item.sacks;
+        totalExtraKg += item.extraKg;
       }
     }
 
     final totalWorkers = 1 + helperCount;
-    final salaryPerWorker = totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
+    final salaryPerWorker =
+        totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
+    final bonusPerWorker =
+        totalWorkers > 0 ? totalBonusAmount / totalWorkers : 0.0;
 
     return DailySalaryResult(
       totalValue: totalValue,
       totalSacks: totalSacks,
+      totalExtraKg: totalExtraKg,
       totalWorkers: totalWorkers,
       salaryPerWorker: salaryPerWorker,
-      masterBonus: totalBonus,
+      bonusPerWorker: bonusPerWorker,
     );
   }
 }
