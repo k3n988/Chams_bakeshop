@@ -15,6 +15,7 @@ class BakerProductionViewModel extends ChangeNotifier {
   List<ProductModel> _products = [];
   List<UserModel> _helpers = [];
   bool _isLoading = false;
+  String? _lastMasterBakerId;
 
   BakerProductionViewModel(this._db, this._payroll);
 
@@ -25,6 +26,7 @@ class BakerProductionViewModel extends ChangeNotifier {
 
   Future<void> loadData(String masterBakerId) async {
     _isLoading = true;
+    _lastMasterBakerId = masterBakerId;
     notifyListeners();
 
     // Run independently so one failing table doesn't block the others
@@ -47,7 +49,7 @@ class BakerProductionViewModel extends ChangeNotifier {
   DailySalaryResult computeDaily(ProductionModel production) =>
       _payroll.computeDaily(production, _products);
 
-Future<bool> addProduction({
+  Future<bool> addProduction({
     required String date,
     required String masterBakerId,
     required List<String> helperIds,
@@ -57,7 +59,6 @@ Future<bool> addProduction({
       final exists = await _db.productionExistsForDate(date, masterBakerId);
       if (exists) return false;
 
-      // COMPUTE MUNA BAGO I-SAVE
       final computedSalary = previewSalary(items, helperIds.length);
 
       final production = ProductionModel(
@@ -72,7 +73,7 @@ Future<bool> addProduction({
         salaryPerWorker: computedSalary.salaryPerWorker,
         masterBonus: computedSalary.masterBonus,
       );
-      
+
       await _db.insertProduction(production);
       await loadData(masterBakerId);
       return true;
@@ -80,6 +81,36 @@ Future<bool> addProduction({
       return false;
     }
   }
+
+  /// Recomputes salary from updated items, persists to DB, refreshes local list.
+  Future<bool> updateProduction(ProductionModel updated) async {
+    try {
+      // Recompute all salary fields so stored values stay consistent with items
+      final recomputed = previewSalary(updated.items, updated.helperIds.length);
+
+      final refreshed = updated.copyWith(
+        totalValue: recomputed.totalValue,
+        totalSacks: recomputed.totalSacks,
+        totalWorkers: recomputed.totalWorkers,
+        salaryPerWorker: recomputed.salaryPerWorker,
+        masterBonus: recomputed.masterBonus,
+      );
+
+      await _db.updateProduction(refreshed);
+
+      // Swap in-memory entry immediately — no full reload needed
+      final index = _productions.indexWhere((p) => p.id == refreshed.id);
+      if (index != -1) {
+        _productions[index] = refreshed;
+        notifyListeners();
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Preview salary using bonusPerSack from each ProductModel — aligned with PayrollService
   DailySalaryResult previewSalary(List<ProductionItem> items, int helperCount) {
     double totalValue = 0;
@@ -90,7 +121,7 @@ Future<bool> addProduction({
       final product = _products.where((p) => p.id == item.productId).firstOrNull;
       if (product != null) {
         totalValue += product.pricePerSack * item.sacks;
-        totalBonus += product.bonusPerSack * item.sacks; // FIX: per-product bonus
+        totalBonus += product.bonusPerSack * item.sacks;
         totalSacks += item.sacks;
       }
     }
@@ -103,7 +134,7 @@ Future<bool> addProduction({
       totalSacks: totalSacks,
       totalWorkers: totalWorkers,
       salaryPerWorker: salaryPerWorker,
-      masterBonus: totalBonus, // FIX: from product, not hardcoded ₱100
+      masterBonus: totalBonus,
     );
   }
 }

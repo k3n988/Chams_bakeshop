@@ -19,7 +19,25 @@ class ProductionItem {
     this.saka,
   });
 
-  // TAMANG JSON FORMAT
+  ProductionItem copyWith({
+    String? productId,
+    int? sacks,
+    int? cat60,
+    int? cat36,
+    int? cat48,
+    int? subra,
+    int? saka,
+  }) =>
+      ProductionItem(
+        productId: productId ?? this.productId,
+        sacks: sacks ?? this.sacks,
+        cat60: cat60 ?? this.cat60,
+        cat36: cat36 ?? this.cat36,
+        cat48: cat48 ?? this.cat48,
+        subra: subra ?? this.subra,
+        saka: saka ?? this.saka,
+      );
+
   Map<String, dynamic> toMap() => {
         'product_id': productId,
         'sacks': sacks,
@@ -43,12 +61,10 @@ class ProductionItem {
 
 class ProductionModel {
   final String id;
-  final String date; 
+  final String date;
   final String masterBakerId;
   final List<String> helperIds;
   final List<ProductionItem> items;
-  
-  // MGA BAGONG FIELDS PARA NAKA-SAVE NA ANG COMPUTATION
   final double totalValue;
   final int totalSacks;
   final int totalWorkers;
@@ -68,12 +84,37 @@ class ProductionModel {
     this.masterBonus = 0.0,
   });
 
+  ProductionModel copyWith({
+    String? id,
+    String? date,
+    String? masterBakerId,
+    List<String>? helperIds,
+    List<ProductionItem>? items,
+    double? totalValue,
+    int? totalSacks,
+    int? totalWorkers,
+    double? salaryPerWorker,
+    double? masterBonus,
+  }) =>
+      ProductionModel(
+        id: id ?? this.id,
+        date: date ?? this.date,
+        masterBakerId: masterBakerId ?? this.masterBakerId,
+        helperIds: helperIds ?? this.helperIds,
+        items: items ?? this.items,
+        totalValue: totalValue ?? this.totalValue,
+        totalSacks: totalSacks ?? this.totalSacks,
+        totalWorkers: totalWorkers ?? this.totalWorkers,
+        salaryPerWorker: salaryPerWorker ?? this.salaryPerWorker,
+        masterBonus: masterBonus ?? this.masterBonus,
+      );
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'date': date,
         'master_baker_id': masterBakerId,
-        'helper_ids': helperIds, // Pwedeng ipasa as list kung jsonb ang Supabase field
-        'items': items.map((i) => i.toMap()).toList(), // TAMA NA ANG JSON
+        'helper_ids': helperIds,
+        'items': items.map((i) => i.toMap()).toList(),
         'total_value': totalValue,
         'total_sacks': totalSacks,
         'total_workers': totalWorkers,
@@ -82,20 +123,22 @@ class ProductionModel {
       };
 
   factory ProductionModel.fromMap(Map<String, dynamic> map) {
-    // Handling ng helperIds kung string (luma) o list (bago)
     List<String> parsedHelpers = [];
     if (map['helper_ids'] != null) {
       if (map['helper_ids'] is String) {
-        parsedHelpers = (map['helper_ids'] as String).isEmpty ? [] : (map['helper_ids'] as String).split(',');
+        parsedHelpers = (map['helper_ids'] as String).isEmpty
+            ? []
+            : (map['helper_ids'] as String).split(',');
       } else if (map['helper_ids'] is List) {
         parsedHelpers = List<String>.from(map['helper_ids']);
       }
     }
 
-    // Handling ng items
     List<ProductionItem> parsedItems = [];
     if (map['items'] != null && map['items'] is List) {
-       parsedItems = (map['items'] as List).map((e) => ProductionItem.fromMap(e as Map<String, dynamic>)).toList();
+      parsedItems = (map['items'] as List)
+          .map((e) => ProductionItem.fromMap(e as Map<String, dynamic>))
+          .toList();
     }
 
     return ProductionModel(
