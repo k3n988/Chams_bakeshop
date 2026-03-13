@@ -47,7 +47,7 @@ class BakerProductionViewModel extends ChangeNotifier {
   DailySalaryResult computeDaily(ProductionModel production) =>
       _payroll.computeDaily(production, _products);
 
-  Future<bool> addProduction({
+Future<bool> addProduction({
     required String date,
     required String masterBakerId,
     required List<String> helperIds,
@@ -57,13 +57,22 @@ class BakerProductionViewModel extends ChangeNotifier {
       final exists = await _db.productionExistsForDate(date, masterBakerId);
       if (exists) return false;
 
+      // COMPUTE MUNA BAGO I-SAVE
+      final computedSalary = previewSalary(items, helperIds.length);
+
       final production = ProductionModel(
         id: generateId('prod'),
         date: date,
         masterBakerId: masterBakerId,
         helperIds: helperIds,
         items: items,
+        totalValue: computedSalary.totalValue,
+        totalSacks: computedSalary.totalSacks,
+        totalWorkers: computedSalary.totalWorkers,
+        salaryPerWorker: computedSalary.salaryPerWorker,
+        masterBonus: computedSalary.masterBonus,
       );
+      
       await _db.insertProduction(production);
       await loadData(masterBakerId);
       return true;
@@ -71,7 +80,6 @@ class BakerProductionViewModel extends ChangeNotifier {
       return false;
     }
   }
-
   /// Preview salary using bonusPerSack from each ProductModel — aligned with PayrollService
   DailySalaryResult previewSalary(List<ProductionItem> items, int helperCount) {
     double totalValue = 0;

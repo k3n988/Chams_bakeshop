@@ -140,12 +140,18 @@ class SupabaseService {
     await _db.from('productions').delete().eq('id', id);
   }
 
+  // 🔥 UPDATED METHODS PARA PUMASOK ANG COMPUTATIONS SA SUPABASE 🔥
   Map<String, dynamic> _productionToRow(ProductionModel p) => {
         'id': p.id,
         'date': p.date,
         'master_baker_id': p.masterBakerId,
         'helper_ids': p.helperIds.join(','),
-        'items': p.items.map((i) => i.toMap()).toList(),
+        'items': p.items.map((i) => i.toMap()).toList(), // FIX PARA SA JSONB NULL ERROR
+        'total_value': p.totalValue,                     // BAGONG COMPUTED FIELD
+        'total_sacks': p.totalSacks,                     // BAGONG COMPUTED FIELD
+        'total_workers': p.totalWorkers,                 // BAGONG COMPUTED FIELD
+        'salary_per_worker': p.salaryPerWorker,          // BAGONG COMPUTED FIELD
+        'master_bonus': p.masterBonus,                   // BAGONG COMPUTED FIELD
       };
 
   ProductionModel _rowToProduction(Map<String, dynamic> map) {
@@ -183,6 +189,11 @@ class SupabaseService {
       masterBakerId: map['master_baker_id'],
       helperIds: helperStr.isEmpty ? [] : helperStr.split(','),
       items: items,
+      totalValue: (map['total_value'] ?? 0).toDouble(),           // LOAD BAGONG COMPUTED FIELD
+      totalSacks: map['total_sacks'] ?? 0,                        // LOAD BAGONG COMPUTED FIELD
+      totalWorkers: map['total_workers'] ?? 0,                    // LOAD BAGONG COMPUTED FIELD
+      salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),// LOAD BAGONG COMPUTED FIELD
+      masterBonus: (map['master_bonus'] ?? 0).toDouble(),         // LOAD BAGONG COMPUTED FIELD
     );
   }
 
@@ -190,7 +201,6 @@ class SupabaseService {
   //  DEDUCTION OPERATIONS
   // ──────────────────────────────────────────────────
 
-  /// NEW: Fetch every deduction row (used by AdminPayrollViewModel)
   Future<List<DeductionModel>> getAllDeductions() async {
     final rows = await _db
         .from('deductions')
@@ -234,7 +244,6 @@ class SupabaseService {
     );
   }
 
-  /// NEW: Delete a deduction by id (used by AdminPayrollViewModel)
   Future<void> deleteDeduction(String id) async {
     await _db.from('deductions').delete().eq('id', id);
   }
