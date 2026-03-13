@@ -25,12 +25,17 @@ class AdminProductViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> addProduct({required String name, required double pricePerSack}) async {
+  Future<bool> addProduct({
+    required String name,
+    required double pricePerSack,
+    double bonusPerSack = 0,
+  }) async {
     try {
       final product = ProductModel(
         id: generateId('p'),
         name: name.trim(),
         pricePerSack: pricePerSack,
+        bonusPerSack: bonusPerSack,
       );
       await _db.insertProduct(product);
       await loadProducts();

@@ -42,8 +42,9 @@ class ManageUsersScreen extends StatelessWidget {
                   decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
                 ),
                 const SizedBox(height: 14),
+                // FIX 1: 'value' → 'initialValue'
                 DropdownButtonFormField<String>(
-                  value: role,
+                  initialValue: role,
                   decoration: const InputDecoration(labelText: 'Role', prefixIcon: Icon(Icons.badge_outlined)),
                   items: const [
                     DropdownMenuItem(value: 'master_baker', child: Text('Master Baker')),
@@ -64,9 +65,12 @@ class ManageUsersScreen extends StatelessWidget {
                   return;
                 }
                 final vm = context.read<AdminUserViewModel>();
+                // FIX 2: Capture messenger before async gap to avoid use_build_context_synchronously
+                final messenger = ScaffoldMessenger.of(context);
                 bool ok;
                 if (isEdit) {
-                  ok = await vm.updateUser(user!.copyWith(
+                  // FIX 3: Remove unnecessary '!' — Dart already knows user is non-null here
+                  ok = await vm.updateUser(user.copyWith(
                     name: nameCtrl.text.trim().toUpperCase(),
                     email: emailCtrl.text.trim().toLowerCase(),
                     password: passCtrl.text,
@@ -77,7 +81,7 @@ class ManageUsersScreen extends StatelessWidget {
                 }
                 if (ok && ctx.mounted) {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(isEdit ? 'User updated!' : 'User added!'), backgroundColor: AppColors.success));
                 }
               },
@@ -137,7 +141,10 @@ class ManageUsersScreen extends StatelessWidget {
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 leading: CircleAvatar(
-                  backgroundColor: u.isMasterBaker ? AppColors.masterBaker.withOpacity(0.12) : AppColors.helper.withOpacity(0.12),
+                  // FIX 4: withOpacity → withValues()
+                  backgroundColor: u.isMasterBaker
+                      ? AppColors.masterBaker.withValues(alpha: 0.12)
+                      : AppColors.helper.withValues(alpha: 0.12),
                   child: Text(u.name[0], style: TextStyle(fontWeight: FontWeight.w700, color: u.isMasterBaker ? AppColors.masterBaker : AppColors.helper)),
                 ),
                 title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w700)),

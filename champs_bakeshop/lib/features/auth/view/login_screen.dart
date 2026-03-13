@@ -45,10 +45,24 @@ class _LoginScreenState extends State<LoginScreen>
     if (role == null) return;
     setState(() => _selectedRole = role);
     context.read<AuthViewModel>().clearError();
+
     if (role.isNotEmpty) {
       _animCtrl.forward();
+      // ── ADDED AUTO-FILL LOGIC HERE ──
+      if (role == 'admin') {
+        _emailCtrl.text = 'admin@champs.com';
+        _passCtrl.text = 'admin123';
+      } else if (role == 'master_baker') {
+        _emailCtrl.text = 'mica@baker.com';
+        _passCtrl.text = 'mica123';
+      } else if (role == 'helper') {
+        _emailCtrl.text = 'kenjeternal@helper.com';
+        _passCtrl.text = 'ken123';
+      }
     } else {
       _animCtrl.reverse();
+      _emailCtrl.clear();
+      _passCtrl.clear();
     }
   }
 
@@ -60,27 +74,21 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    final auth = context.read<AuthViewModel>();
-
-    // SECRET INJECTION: Ignore the text fields and pass the valid demo credentials
-    // directly to the ViewModel based on the selected role.
-    // This populates auth.currentUser and prevents the Null check operator error.
-    String mockEmail = '';
-    String mockPass = '';
-
-    if (_selectedRole == 'admin') {
-      mockEmail = 'admin@champs.com';
-      mockPass = 'admin123';
-    } else if (_selectedRole == 'master_baker') {
-      mockEmail = 'jeje@champs.com';
-      mockPass = 'jeje123';
-    } else {
-      mockEmail = 'talyo@champs.com';
-      mockPass = 'pass123';
+    if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email and password')),
+      );
+      return;
     }
 
-    // Call the ViewModel with the mocked credentials instead of controller text
-    final success = await auth.login(mockEmail, mockPass, _selectedRole);
+    final auth = context.read<AuthViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    final success = await auth.login(
+      _emailCtrl.text.trim().toLowerCase(),
+      _passCtrl.text,
+      _selectedRole,
+    );
 
     if (success && mounted) {
       final user = auth.currentUser!;
@@ -95,6 +103,15 @@ class _LoginScreenState extends State<LoginScreen>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => destination),
+      );
+    } else if (!mounted) {
+      return;
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Invalid credentials or wrong role selected'),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -124,7 +141,8 @@ class _LoginScreenState extends State<LoginScreen>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.text.withOpacity(0.1),
+                      // FIX: withOpacity → withValues()
+                      color: AppColors.text.withValues(alpha: 0.1),
                       blurRadius: 40,
                       offset: const Offset(0, 16),
                     ),
@@ -144,7 +162,8 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.35),
+                            // FIX: withOpacity → withValues()
+                            color: AppColors.primary.withValues(alpha: 0.35),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -176,16 +195,21 @@ class _LoginScreenState extends State<LoginScreen>
                     const SizedBox(height: 36),
 
                     // ── Role Dropdown ──
-                    _label('SELECT YOUR ROLE'),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _label('SELECT YOUR ROLE'),
+                    ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedRole.isEmpty ? null : _selectedRole,
+                      // FIX: value → initialValue
+                      initialValue: _selectedRole.isEmpty ? null : _selectedRole,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.person_outline,
                             color: AppColors.textHint, size: 20),
                         filled: true,
                         fillColor: _selectedRole.isNotEmpty
-                            ? AppColors.primaryLight.withOpacity(0.15)
+                            // FIX: withOpacity → withValues()
+                            ? AppColors.primaryLight.withValues(alpha: 0.15)
                             : AppColors.background,
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -259,56 +283,57 @@ class _LoginScreenState extends State<LoginScreen>
                               onSubmitted: (_) => _handleLogin(),
                             ),
                             const SizedBox(height: 18),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                            // Error
-                            if (auth.errorMessage != null)
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: AppColors.danger.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(10),
+                    // ── Error Message ──
+                    if (auth.errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          // FIX: withOpacity → withValues()
+                          color: AppColors.danger.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: AppColors.danger, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                auth.errorMessage!,
+                                style: const TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline,
-                                        color: AppColors.danger, size: 18),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        auth.errorMessage!,
-                                        style: const TextStyle(
-                                          color: AppColors.danger,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                            // Sign In
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: auth.isLoading ? null : _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 16)),
-                                child: auth.isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : const Text('Sign In',
-                                        style: TextStyle(
-                                            fontSize: 16, fontWeight: FontWeight.w700)),
                               ),
                             ),
                           ],
                         ),
+                      ),
+
+                    // ── Sign In Button ──
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: auth.isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16)),
+                        child: auth.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Sign In',
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],

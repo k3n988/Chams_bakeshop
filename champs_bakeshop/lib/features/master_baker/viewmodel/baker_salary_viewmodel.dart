@@ -4,7 +4,6 @@ import '../../../../core/services/database_service.dart';
 import '../../../../core/services/payroll_service.dart';
 import '../../../../core/utils/helpers.dart';
 
-// Helper class for the Dashboard UI to read daily record data easily
 class BakerDashboardRecord {
   final String date;
   final int totalWorkers;
@@ -25,99 +24,105 @@ class BakerSalaryViewModel extends ChangeNotifier {
 
   String _weekStart = '';
   String _weekEnd = '';
+  bool _isLoading = false;
 
-  // Existing lists
   List<DailySalaryEntry> _dailyEntries = [];
-  double _grossTotal = 0;
-
-  // Dashboard variables
   List<BakerDashboardRecord> _dailyRecords = [];
+  double _grossTotal = 0;
+  double _finalSalary = 0;
   int _daysWorked = 0;
-  double _finalSalary = 0.0;
 
   BakerSalaryViewModel(this._db, this._payroll) {
     _weekStart = getWeekStart(DateTime.now());
     _weekEnd = getWeekEnd(_weekStart);
   }
 
-  // Existing getters
+  // ─── Getters ──────────────────────────────────────────────────────────────
+
   String get weekStart => _weekStart;
   String get weekEnd => _weekEnd;
+  bool get isLoading => _isLoading;
   List<DailySalaryEntry> get dailyEntries => _dailyEntries;
-
-  // Dashboard getters
   List<BakerDashboardRecord> get dailyRecords => _dailyRecords;
   int get daysWorked => _daysWorked;
   double get grossSalary => _grossTotal;
   double get finalSalary => _finalSalary;
 
-  // ── 1. Load data for the "Recent Daily Records" List ──
-  Future<void> loadDailyRecords(String userId) async {
-    final productions = await _db.getProductionsByMasterBaker(userId);
-    final products = await _db.getAllProducts();
+  // ─── Load all records (for history screen) ────────────────────────────────
 
-    // Sort to show the most recent records first
+  Future<void> loadDailyRecords(String userId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final productions = await _db.getProductionsByMasterBaker(userId);
+    final products    = await _db.getAllProducts();
+
     productions.sort((a, b) => b.date.compareTo(a.date));
 
-    _dailyRecords = [];
-    for (final prod in productions) {
+    _dailyRecords = productions.map((prod) {
       final calc = _payroll.computeDaily(prod, products);
-      final totalSalary = calc.salaryPerWorker + calc.masterBonus;
-
-      _dailyRecords.add(BakerDashboardRecord(
+      return BakerDashboardRecord(
         date: prod.date,
         totalWorkers: prod.totalWorkers,
         totalSacks: prod.totalSacks,
-        salary: totalSalary,
-      ));
-    }
+        salary: calc.salaryPerWorker + calc.masterBonus,
+      );
+    }).toList();
+
+    _isLoading = false;
     notifyListeners();
   }
 
-  // ── 2. Load data for the Weekly Overview Cards ──
-  Future<void> loadWeeklySalary(String userId) async {
-    final productions = await _db.getProductionsByMasterBaker(userId);
-    final products = await _db.getAllProducts();
+  // ─── Load weekly salary (for salary + dashboard screens) ─────────────────
 
-    final weekProds = productions
-        .where((p) =>
-            p.date.compareTo(_weekStart) >= 0 &&
-            p.date.compareTo(_weekEnd) <= 0)
-        .toList();
+  Future<void> loadWeeklySalary(String userId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final productions = await _db.getProductionsByMasterBaker(userId);
+    final products    = await _db.getAllProducts();
+
+    final weekProds = productions.where((p) =>
+        p.date.compareTo(_weekStart) >= 0 &&
+        p.date.compareTo(_weekEnd) <= 0).toList();
 
     _dailyEntries = [];
-    _grossTotal = 0;
-    _daysWorked = weekProds.length;
+    _grossTotal   = 0;
+    _daysWorked   = weekProds.length;
 
     for (final prod in weekProds) {
-      final calc = _payroll.computeDaily(prod, products);
+      final calc  = _payroll.computeDaily(prod, products);
       final total = calc.salaryPerWorker + calc.masterBonus;
       _grossTotal += total;
 
       _dailyEntries.add(DailySalaryEntry(
         date: prod.date,
         baseSalary: calc.salaryPerWorker,
-        bonus: calc.masterBonus,
+        bonus: calc.masterBonus, // now comes from product.bonusPerSack
       ));
     }
 
-    // Master Baker is EXEMPTED from oven deduction
-    double valeDeduction = 0.0;
-    _finalSalary = _grossTotal - valeDeduction;
+    // Deductions for master baker: fetch gas/vale/wifi from deductions table
+    final deduction = await _db.getDeductionForUser(userId, _weekStart);
+    final totalDeductions = (deduction?.gas ?? 0) +
+        (deduction?.vale ?? 0) +
+        (deduction?.wifi ?? 0);
 
+    _finalSalary = _grossTotal - totalDeductions;
+
+    _isLoading = false;
     notifyListeners();
   }
 
-  // ── 3. Keep existing loadSalary to prevent breaking other screens ──
-  Future<void> loadSalary(String userId) async {
-    await loadWeeklySalary(userId);
-  }
+  // Alias for backward compatibility
+  Future<void> loadSalary(String userId) => loadWeeklySalary(userId);
 
-  // ── 4. Change week function ──
+  // ─── Week navigation ──────────────────────────────────────────────────────
+
   void changeWeek(int direction, String userId) {
-    final d = DateTime.parse(_weekStart);
-    _weekStart = d.add(Duration(days: direction * 7)).toString().split(' ')[0];
-    _weekEnd = getWeekEnd(_weekStart);
+    final d = DateTime.parse(_weekStart).add(Duration(days: direction * 7));
+    _weekStart = d.toString().split(' ')[0];
+    _weekEnd   = getWeekEnd(_weekStart);
     loadWeeklySalary(userId);
   }
 }

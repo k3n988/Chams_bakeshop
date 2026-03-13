@@ -5,47 +5,34 @@ import '../../../core/services/database_service.dart';
 class AuthViewModel extends ChangeNotifier {
   final DatabaseService _db;
 
+  AuthViewModel(this._db);
+
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
 
-  AuthViewModel(this._db);
-
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
-  bool get isLoggedIn => _currentUser != null;
   String? get errorMessage => _errorMessage;
+  bool get isLoggedIn => _currentUser != null;
 
-  Future<bool> login(String email, String password, String role) async {
+  /// Authenticates against the public.users table directly.
+  /// No Supabase Auth required — perfect for internal staff apps.
+  Future<bool> login(String email, String password, String selectedRole) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      if (role.isEmpty) {
-        _errorMessage = 'Please select a role first.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-      if (email.trim().isEmpty) {
-        _errorMessage = 'Please enter your email.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-      if (password.isEmpty) {
-        _errorMessage = 'Please enter your password.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
+      // Query public.users — matches email + password + role in one call
       final user = await _db.authenticateUser(
-          email.trim().toLowerCase(), password, role);
+        email.trim().toLowerCase(),
+        password,
+        selectedRole,
+      );
 
       if (user == null) {
-        _errorMessage = 'Invalid credentials or role mismatch.';
+        _errorMessage = 'Invalid credentials or wrong role selected.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -55,8 +42,9 @@ class AuthViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+
     } catch (e) {
-      _errorMessage = 'Login failed. Please try again.';
+      _errorMessage = 'Something went wrong. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;

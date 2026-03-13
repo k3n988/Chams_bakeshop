@@ -10,36 +10,95 @@ class ManageProductsScreen extends StatelessWidget {
   const ManageProductsScreen({super.key});
 
   void _showDialog(BuildContext context, {ProductModel? product}) {
-    final nameCtrl = TextEditingController(text: product?.name ?? '');
-    final priceCtrl = TextEditingController(text: product != null ? product.pricePerSack.toStringAsFixed(0) : '');
+    final nameCtrl  = TextEditingController(text: product?.name ?? '');
+    final priceCtrl = TextEditingController(
+        text: product != null ? product.pricePerSack.toStringAsFixed(0) : '');
+    final bonusCtrl = TextEditingController(
+        text: product != null ? product.bonusPerSack.toStringAsFixed(0) : '');
     final isEdit = product != null;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isEdit ? 'Edit Product' : 'Add Product',
-            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+        title: Text(
+          isEdit ? 'Edit Product' : 'Add Product',
+          style: const TextStyle(
+              fontWeight: FontWeight.w700, color: AppColors.primaryDark),
+        ),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name', hintText: 'e.g. Otap', prefixIcon: Icon(Icons.bakery_dining_outlined))),
+          // ── Product Name ──
+          TextField(
+            controller: nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Product Name',
+              hintText: 'e.g. Otap',
+              prefixIcon: Icon(Icons.bakery_dining_outlined),
+            ),
+          ),
           const SizedBox(height: 14),
-          TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price per Sack (₱)', hintText: '580', prefixIcon: Icon(Icons.attach_money))),
+
+          // ── Price per Sack ──
+          TextField(
+            controller: priceCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Price per Sack (₱)',
+              hintText: '580',
+              prefixIcon: Icon(Icons.attach_money),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Bonus per Sack (new) ──
+          TextField(
+            controller: bonusCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: ' Bonus per Sack (₱)',
+              hintText: '32',
+              prefixIcon: Icon(Icons.card_giftcard_outlined),
+              helperText: 'Added to helper and baker salary per sack produced',
+              helperStyle: TextStyle(fontSize: 11),
+            ),
+          ),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final price = double.tryParse(priceCtrl.text);
+              final bonus = double.tryParse(bonusCtrl.text) ?? 0;
+
               if (nameCtrl.text.trim().isEmpty || price == null || price <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid input'), backgroundColor: AppColors.danger));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Product name and price are required'),
+                    backgroundColor: AppColors.danger));
                 return;
               }
+
               final vm = context.read<AdminProductViewModel>();
+              final messenger = ScaffoldMessenger.of(context);
+
               bool ok = isEdit
-                  ? await vm.updateProduct(product!.copyWith(name: nameCtrl.text.trim(), pricePerSack: price))
-                  : await vm.addProduct(name: nameCtrl.text.trim(), pricePerSack: price);
+                  ? await vm.updateProduct(product.copyWith(
+                      name: nameCtrl.text.trim(),
+                      pricePerSack: price,
+                      bonusPerSack: bonus,
+                    ))
+                  : await vm.addProduct(
+                      name: nameCtrl.text.trim(),
+                      pricePerSack: price,
+                      bonusPerSack: bonus,
+                    );
+
               if (ok && ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? 'Updated!' : 'Added!'), backgroundColor: AppColors.success));
+                messenger.showSnackBar(SnackBar(
+                    content: Text(isEdit ? 'Updated!' : 'Added!'),
+                    backgroundColor: AppColors.success));
               }
             },
             child: Text(isEdit ? 'Save' : 'Add'),
@@ -58,26 +117,68 @@ class ManageProductsScreen extends StatelessWidget {
         SectionHeader(
           title: 'Products',
           subtitle: 'Manage bakery products & pricing',
-          trailing: ElevatedButton.icon(onPressed: () => _showDialog(context), icon: const Icon(Icons.add, size: 18), label: const Text('Add Product')),
+          trailing: ElevatedButton.icon(
+              onPressed: () => _showDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Product')),
         ),
         if (vm.products.isEmpty)
           const EmptyState(message: 'No products yet')
         else
           ...vm.products.map((p) => Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Center(child: Text('🍞', style: TextStyle(fontSize: 22)))),
-              title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('${formatCurrency(p.pricePerSack)} / sack', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 15)),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(icon: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 20), onPressed: () => _showDialog(context, product: p)),
-                IconButton(icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20), onPressed: () async {
-                  await context.read<AdminProductViewModel>().deleteProduct(p.id);
-                }),
-              ]),
-            ),
-          )),
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                        child: Text('🍞', style: TextStyle(fontSize: 22))),
+                  ),
+                  title: Text(p.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${formatCurrency(p.pricePerSack)} / sack',
+                        style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14),
+                      ),
+                      // Show bonus badge only if set
+                      if (p.bonusPerSack > 0)
+                        Text(
+                          '+ ${formatCurrency(p.bonusPerSack)} baker bonus / sack',
+                          style: const TextStyle(
+                              color: AppColors.masterBaker,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12),
+                        ),
+                    ],
+                  ),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(
+                        icon: const Icon(Icons.edit_outlined,
+                            color: AppColors.primary, size: 20),
+                        onPressed: () => _showDialog(context, product: p)),
+                    IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            color: AppColors.danger, size: 20),
+                        onPressed: () async {
+                          await context
+                              .read<AdminProductViewModel>()
+                              .deleteProduct(p.id);
+                        }),
+                  ]),
+                ),
+              )),
       ]),
     );
   }

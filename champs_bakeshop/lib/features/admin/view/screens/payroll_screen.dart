@@ -49,7 +49,6 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
         _selectedMonth.month + dir,
       );
     });
-    // Jump to the first week of the selected month
     final firstDay = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final monday = firstDay.subtract(Duration(days: firstDay.weekday - 1));
     final ws = monday.toString().split(' ')[0];
@@ -60,6 +59,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
   }
 
+  // FIX: removed messenger variable and _ = messenger hack entirely
   void _pickMonth() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -70,7 +70,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
       initialEntryMode: DatePickerEntryMode.calendarOnly,
       helpText: 'SELECT MONTH',
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedMonth = DateTime(picked.year, picked.month);
       });
@@ -107,8 +107,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                       labelText: 'Gas (₱)',
-                      prefixIcon:
-                          Icon(Icons.local_fire_department_outlined))),
+                      prefixIcon: Icon(Icons.local_fire_department_outlined))),
               const SizedBox(height: 12),
               TextField(
                   controller: valeCtrl,
@@ -131,6 +130,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
           ElevatedButton(
             onPressed: () async {
               final payVM = context.read<AdminPayrollViewModel>();
+              final messenger = ScaffoldMessenger.of(context);
               await payVM.saveDeduction(
                 userId: entry.userId,
                 weekStart: payVM.weekStart,
@@ -141,7 +141,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                messenger.showSnackBar(const SnackBar(
                     content: Text('Deductions saved!'),
                     backgroundColor: AppColors.success));
               }
@@ -170,25 +170,19 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
         const SectionHeader(
             title: 'Weekly Payroll',
             subtitle: 'Automated salary computation with deductions'),
-
-        // ── Month Filter ──
         _buildMonthSelector(monthLabel),
         const SizedBox(height: 10),
-
-        // ── Week Selector ──
         WeekSelector(
             weekStart: payVM.weekStart,
             weekEnd: payVM.weekEnd,
             onPrev: () => _changeWeek(-1),
             onNext: () => _changeWeek(1)),
         const SizedBox(height: 16),
-
         if (payVM.isLoading)
           const Center(child: CircularProgressIndicator())
         else if (payVM.entries.isEmpty)
           const EmptyState(message: 'No production data for this week')
         else ...[
-          // ── Payroll Entries ──
           ...payVM.entries.map((e) => Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: Padding(
@@ -200,8 +194,8 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                           CircleAvatar(
                             radius: 18,
                             backgroundColor: e.role == 'master_baker'
-                                ? AppColors.masterBaker.withOpacity(0.12)
-                                : AppColors.helper.withOpacity(0.12),
+                                ? AppColors.masterBaker.withValues(alpha: 0.12)
+                                : AppColors.helper.withValues(alpha: 0.12),
                             child: Text(e.name[0],
                                 style: TextStyle(
                                     fontWeight: FontWeight.w700,
@@ -212,8 +206,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                               child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                 Text(e.name,
                                     style: const TextStyle(
@@ -282,14 +275,11 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
                               style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
-                                  textStyle:
-                                      const TextStyle(fontSize: 12))),
+                                  textStyle: const TextStyle(fontSize: 12))),
                         ),
                       ]),
                 ),
               )),
-
-          // ── Total Payroll Card ──
           Card(
             color: AppColors.primaryDark,
             child: Padding(
@@ -321,7 +311,7 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

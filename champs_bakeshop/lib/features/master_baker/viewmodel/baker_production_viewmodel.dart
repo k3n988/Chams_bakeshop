@@ -26,9 +26,20 @@ class BakerProductionViewModel extends ChangeNotifier {
   Future<void> loadData(String masterBakerId) async {
     _isLoading = true;
     notifyListeners();
-    _productions = await _db.getProductionsByMasterBaker(masterBakerId);
-    _products = await _db.getAllProducts();
-    _helpers = await _db.getUsersByRole('helper');
+
+    // Run independently so one failing table doesn't block the others
+    await Future.wait([
+      _db.getProductionsByMasterBaker(masterBakerId)
+          .then((v) => _productions = v)
+          .catchError((_) => _productions = []),
+      _db.getAllProducts()
+          .then((v) => _products = v)
+          .catchError((_) => _products = []),
+      _db.getUsersByRole('helper')
+          .then((v) => _helpers = v)
+          .catchError((_) => _helpers = []),
+    ]);
+
     _isLoading = false;
     notifyListeners();
   }
@@ -61,28 +72,30 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
   }
 
-  /// Preview computation for the production input form
-  DailySalaryResult previewSalary(
-      List<ProductionItem> items, int helperCount) {
+  /// Preview salary using bonusPerSack from each ProductModel — aligned with PayrollService
+  DailySalaryResult previewSalary(List<ProductionItem> items, int helperCount) {
     double totalValue = 0;
+    double totalBonus = 0;
     int totalSacks = 0;
+
     for (final item in items) {
       final product = _products.where((p) => p.id == item.productId).firstOrNull;
       if (product != null) {
         totalValue += product.pricePerSack * item.sacks;
+        totalBonus += product.bonusPerSack * item.sacks; // FIX: per-product bonus
         totalSacks += item.sacks;
       }
     }
+
     final totalWorkers = 1 + helperCount;
     final salaryPerWorker = totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
-    final masterBonus = totalSacks * 100.0;
 
     return DailySalaryResult(
       totalValue: totalValue,
       totalSacks: totalSacks,
       totalWorkers: totalWorkers,
       salaryPerWorker: salaryPerWorker,
-      masterBonus: masterBonus,
+      masterBonus: totalBonus, // FIX: from product, not hardcoded ₱100
     );
   }
 }

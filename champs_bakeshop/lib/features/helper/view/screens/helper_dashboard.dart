@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';

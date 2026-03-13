@@ -4,16 +4,6 @@ import '../models/product_model.dart';
 import '../models/production_model.dart';
 import '../models/payroll_model.dart';
 
-// ═══════════════════════════════════════════════════════════════════
-//  SUPABASE SERVICE
-//  Drop-in replacement for DatabaseService.
-//  Same public API — just swap the provider in main.dart.
-//
-//  Setup:
-//   1. Add to pubspec.yaml:  supabase_flutter: ^2.5.0
-//   2. In main.dart call:    await Supabase.initialize(url: '...', anonKey: '...');
-//   3. Replace DatabaseService() with SupabaseService() in providers.
-// ═══════════════════════════════════════════════════════════════════
 class SupabaseService {
   SupabaseClient get _db => Supabase.instance.client;
 
@@ -150,8 +140,6 @@ class SupabaseService {
     await _db.from('productions').delete().eq('id', id);
   }
 
-  // ── ProductionModel ↔ Supabase row conversion ──────────
-
   Map<String, dynamic> _productionToRow(ProductionModel p) => {
         'id': p.id,
         'date': p.date,
@@ -166,12 +154,10 @@ class SupabaseService {
 
     final List<ProductionItem> items;
     if (rawItems is List) {
-      // Proper JSONB from Supabase
       items = rawItems
           .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
           .toList();
     } else if (rawItems is String && rawItems.isNotEmpty) {
-      // Legacy pipe-delimited fallback (SQLite migration)
       items = rawItems.split('|').map((s) {
         final p = s.split(':');
         return ProductionItem(
@@ -181,14 +167,13 @@ class SupabaseService {
           cat36: p.length > 3 ? int.tryParse(p[3]) : null,
           cat48: p.length > 4 ? int.tryParse(p[4]) : null,
           subra: p.length > 5 ? int.tryParse(p[5]) : null,
-          saka:  p.length > 6 ? int.tryParse(p[6]) : null,
+          saka: p.length > 6 ? int.tryParse(p[6]) : null,
         );
       }).toList();
     } else {
       items = [];
     }
 
-    // Supabase returns dates as "2026-03-01T00:00:00" — keep only YYYY-MM-DD
     final rawDate = map['date']?.toString() ?? '';
     final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
 
@@ -204,6 +189,15 @@ class SupabaseService {
   // ──────────────────────────────────────────────────
   //  DEDUCTION OPERATIONS
   // ──────────────────────────────────────────────────
+
+  /// NEW: Fetch every deduction row (used by AdminPayrollViewModel)
+  Future<List<DeductionModel>> getAllDeductions() async {
+    final rows = await _db
+        .from('deductions')
+        .select()
+        .order('week_start', ascending: false);
+    return rows.map((r) => DeductionModel.fromMap(r)).toList();
+  }
 
   Future<DeductionModel?> getDeduction(
       String userId, String weekStart) async {
@@ -224,8 +218,6 @@ class SupabaseService {
     return rows.map((r) => DeductionModel.fromMap(r)).toList();
   }
 
-  /// All deductions for one user — used by monthly summary to avoid
-  /// N+1 queries (one DB call for all weeks in the month).
   Future<List<DeductionModel>> getUserDeductions(String userId) async {
     final rows = await _db
         .from('deductions')
@@ -240,6 +232,11 @@ class SupabaseService {
       deduction.toMap(),
       onConflict: 'user_id,week_start',
     );
+  }
+
+  /// NEW: Delete a deduction by id (used by AdminPayrollViewModel)
+  Future<void> deleteDeduction(String id) async {
+    await _db.from('deductions').delete().eq('id', id);
   }
 
   // ──────────────────────────────────────────────────

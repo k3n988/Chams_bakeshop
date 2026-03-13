@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
-import '../../../helper/view/screens/profile.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/admin_product_viewmodel.dart';
 import '../../viewmodel/admin_production_viewmodel.dart';
@@ -49,7 +48,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       );
     }
 
-    final payrollVm = context.watch<AdminPayrollViewModel>();
+    // Read payroll vm — no profile page needed for admin
+    context.watch<AdminPayrollViewModel>();
 
     final pages = [
       AdminHomeScreen(onNavigate: (i) => setState(() => _index = i)),
@@ -57,56 +57,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const ManageProductsScreen(),
       const ProductionReportsScreen(),
       const AdminPayrollScreen(),
-      ProfileScreen(
-        userName: user.name,
-        userRole: user.role,
-        userId: user.id,
-        accentColor: AppColors.primary,
-        grossSalary: payrollVm.totalPayroll,
-        netSalary: payrollVm.totalPayroll,
-        daysWorked: payrollVm.entries.length,
-        totalRecords: payrollVm.entries.length,
-        onLogout: _logout,
-      ),
     ];
 
     return Scaffold(
-      appBar: _index == 5
-          ? null
-          : AppBar(
-              title: Row(children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                        colors: [AppColors.primary, AppColors.accent]),
-                  ),
-                  child: const Center(
-                      child: Text('🧁', style: TextStyle(fontSize: 18))),
-                ),
-                const SizedBox(width: 10),
-                const Text('CHAMPS BAKESHOP'),
-              ]),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout,
-                      color: AppColors.textSecondary),
-                  onPressed: _logout,
-                ),
-              ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Container(height: 1, color: AppColors.border),
+      appBar: AppBar(
+        title: Row(children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.accent]),
+            ),
+            child: const Center(
+                child: Text('🧁', style: TextStyle(fontSize: 18))),
+          ),
+          const SizedBox(width: 10),
+          const Text('CHAMPS BAKESHOP'),
+        ]),
+        actions: [
+          // Admin name chip
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: Text(
+                user.name,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary),
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: AppColors.textSecondary),
+            onPressed: _logout,
+            tooltip: 'Logout',
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.border),
+        ),
+      ),
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         backgroundColor: Colors.white,
-        indicatorColor: AppColors.primary.withOpacity(0.12),
+        // FIX: withOpacity → withValues()
+        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),
@@ -128,10 +129,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               icon: Icon(Icons.payments_outlined),
               selectedIcon: Icon(Icons.payments, color: AppColors.primary),
               label: 'Payroll'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person, color: AppColors.primary),
-              label: 'Profile'),
         ],
       ),
     );
