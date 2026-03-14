@@ -7,7 +7,7 @@ import '../../../auth/viewmodel/auth_viewmodel.dart';
 import 'helper_dashboard.dart' show DashColors;
 
 // ─────────────────────────────────────────────────────────
-//  ADD PRODUCTION BOTTOM SHEET  (public – used by dashboard)
+//  ADD PRODUCTION BOTTOM SHEET  (used by helper dashboard)
 // ─────────────────────────────────────────────────────────
 class AddProductionSheet extends StatefulWidget {
   const AddProductionSheet({super.key});
@@ -17,16 +17,13 @@ class AddProductionSheet extends StatefulWidget {
 }
 
 class _AddProductionSheetState extends State<AddProductionSheet> {
-  // Global form state
   DateTime _selectedDate = DateTime.now();
   String? _selectedBakerId;
 
-  // Data
   List<Map<String, String>> _masterBakers = [];
   List<Map<String, String>> _products = [];
   final List<_BatchItem> _batches = [];
 
-  // Current batch inputs
   String? _currentProductId;
   int _currentSacks = 1;
   final _cat60Ctrl = TextEditingController();
@@ -55,11 +52,9 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
     super.dispose();
   }
 
-  // ── Data Loading ──────────────────────────────────────
   Future<void> _loadData() async {
     try {
       final db = context.read<DatabaseService>();
-
       final allUsers = await db.getAllUsers();
       _masterBakers = allUsers
           .where((u) => u.role == 'master_baker')
@@ -67,21 +62,15 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
           .toList();
 
       final allProducts = await db.getAllProducts();
-      _products =
-          allProducts.map((p) => {'id': p.id, 'name': p.name}).toList();
-
+      _products = allProducts.map((p) => {'id': p.id, 'name': p.name}).toList();
       if (_products.isNotEmpty) _currentProductId = _products.first['id'];
     } catch (e) {
-      debugPrint('Error loading production data: $e');
-      if (mounted) {
-        _showSnack('Error loading data: $e', isError: true);
-      }
+      if (mounted) _showSnack('Error loading data: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ── Date Picker ───────────────────────────────────────
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -104,13 +93,11 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
     }
   }
 
-  // ── Batch CRUD ────────────────────────────────────────
   void _addOrUpdateBatch() {
     if (_currentProductId == null) {
       _showSnack('Please select a product first.');
       return;
     }
-
     final batch = _BatchItem(
       productId: _currentProductId!,
       sacks: _currentSacks,
@@ -167,7 +154,6 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
     _sakaCtrl.clear();
   }
 
-  // ── Save ──────────────────────────────────────────────
   Future<void> _save() async {
     if (_selectedBakerId == null) {
       _showSnack('Please select a Master Baker');
@@ -195,7 +181,7 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
           existing.cat36 = (existing.cat36 ?? 0) + (b.cat36 ?? 0);
           existing.cat48 = (existing.cat48 ?? 0) + (b.cat48 ?? 0);
           existing.subra = (existing.subra ?? 0) + (b.subra ?? 0);
-          existing.saka = (existing.saka ?? 0) + (b.saka ?? 0);
+          existing.saka  = (existing.saka ?? 0)  + (b.saka ?? 0);
         } else {
           combined[b.productId] = _BatchItem(
             productId: b.productId,
@@ -214,6 +200,7 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
           .map((e) => ProductionItem(
                 productId: e.productId,
                 sacks: e.sacks,
+                // extraKg not collected in helper batch form (full sacks only)
                 cat60: e.cat60,
                 cat36: e.cat36,
                 cat48: e.cat48,
@@ -222,12 +209,15 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
               ))
           .toList();
 
+      // totalWorkers = 1 (master baker) + 1 (this helper logging)
+      // Salary/bonus/incentive will be 0 — admin recomputes via payroll service
       final production = ProductionModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         date: formattedDate,
         masterBakerId: _selectedBakerId!,
         helperIds: [currentUser.id],
         items: items,
+        totalWorkers: 2, // baker + helper
       );
 
       await db.insertProduction(production);
@@ -243,7 +233,6 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────
   void _showSnack(String msg, {bool isError = false, bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
@@ -262,12 +251,8 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
       .firstWhere((p) => p['id'] == id, orElse: () => {'name': 'Unknown'})['name']!;
 
   String get _formattedDate => _selectedDate.toString().split(' ')[0];
-
   int get _totalSacks => _batches.fold(0, (s, b) => s + b.sacks);
 
-  // ─────────────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
@@ -283,28 +268,18 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
       child: _isLoading
           ? const _LoadingState()
           : Column(children: [
-              // Handle
               _SheetHandle(),
-
-              // Header
               _SheetHeader(onClose: () => Navigator.pop(context)),
-
-              // Scrollable body
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Global Inputs ──
+                      // ── Global inputs ──
                       _SectionCard(children: [
-                        // Date row
-                        _DateRow(
-                          date: _formattedDate,
-                          onTap: _pickDate,
-                        ),
+                        _DateRow(date: _formattedDate, onTap: _pickDate),
                         const SizedBox(height: 12),
-                        // Baker dropdown
                         _masterBakers.isEmpty
                             ? _NoBakersWarning()
                             : _BakerDropdown(
@@ -316,7 +291,7 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
                       ]),
                       const SizedBox(height: 14),
 
-                      // ── Batch Form ──
+                      // ── Batch form ──
                       _BatchFormSection(
                         editingIndex: _editingIndex,
                         products: _products,
@@ -338,7 +313,7 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Batch List ──
+                      // ── Batch list ──
                       _BatchListSection(
                         batches: _batches,
                         editingIndex: _editingIndex,
@@ -351,7 +326,6 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
                 ),
               ),
 
-              // ── Save Bar ──
               _SaveBar(
                 batchCount: _batches.length,
                 totalSacks: _totalSacks,
@@ -369,31 +343,25 @@ class _AddProductionSheetState extends State<AddProductionSheet> {
 
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
-
   @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 200,
-      child: Center(
-        child: CircularProgressIndicator(color: DashColors.primary),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const SizedBox(
+        height: 200,
+        child: Center(
+            child: CircularProgressIndicator(color: DashColors.primary)),
+      );
 }
 
 class _SheetHandle extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 4),
-      width: 40,
-      height: 4,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 12, bottom: 4),
+        width: 40,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
 }
 
 class _SheetHeader extends StatelessWidget {
@@ -401,51 +369,38 @@ class _SheetHeader extends StatelessWidget {
   const _SheetHeader({required this.onClose});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: DashColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: DashColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.add_chart_outlined,
+                color: DashColors.primary, size: 22),
           ),
-          child: const Icon(
-            Icons.add_chart_outlined,
-            color: DashColors.primary,
-            size: 22,
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Add Production',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: DashColors.textPrimary,
+                      letterSpacing: -0.3)),
+              Text('Log your batches & categories',
+                  style: TextStyle(fontSize: 12, color: DashColors.textHint)),
+            ]),
           ),
-        ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Add Production',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: DashColors.textPrimary,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Text(
-                'Log your batches & categories',
-                style: TextStyle(fontSize: 12, color: DashColors.textHint),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.close, size: 22),
+            color: DashColors.textHint,
+            onPressed: onClose,
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.close, size: 22),
-          color: DashColors.textHint,
-          onPressed: onClose,
-        ),
-      ]),
-    );
-  }
+        ]),
+      );
 }
 
 class _SectionCard extends StatelessWidget {
@@ -453,27 +408,22 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.children});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DashColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: DashColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      );
 }
 
 class _DateRow extends StatelessWidget {
@@ -482,120 +432,100 @@ class _DateRow extends StatelessWidget {
   const _DateRow({required this.date, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: DashColors.background,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: DashColors.border),
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: DashColors.background,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: DashColors.border),
+          ),
+          child: Row(children: [
+            const Icon(Icons.calendar_today_outlined,
+                size: 17, color: DashColors.textHint),
+            const SizedBox(width: 10),
+            Text(date,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: DashColors.textPrimary)),
+            const Spacer(),
+            const Text('Change',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: DashColors.primary,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right,
+                size: 16, color: DashColors.primary),
+          ]),
         ),
-        child: Row(children: [
-          const Icon(Icons.calendar_today_outlined,
-              size: 17, color: DashColors.textHint),
-          const SizedBox(width: 10),
-          Text(
-            date,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: DashColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          const Text(
-            'Change',
-            style: TextStyle(
-              fontSize: 12,
-              color: DashColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: DashColors.primary),
-        ]),
-      ),
-    );
-  }
+      );
 }
 
 class _NoBakersWarning extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
-      ),
-      child: const Row(children: [
-        Icon(Icons.warning_amber_outlined, color: AppColors.danger, size: 18),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'No master bakers found. Contact admin.',
-            style: TextStyle(color: AppColors.danger, fontSize: 13),
-          ),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
         ),
-      ]),
-    );
-  }
+        child: const Row(children: [
+          Icon(Icons.warning_amber_outlined, color: AppColors.danger, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text('No master bakers found. Contact admin.',
+                style: TextStyle(color: AppColors.danger, fontSize: 13)),
+          ),
+        ]),
+      );
 }
 
 class _BakerDropdown extends StatelessWidget {
   final String? value;
   final List<Map<String, String>> bakers;
   final ValueChanged<String?> onChanged;
-
-  const _BakerDropdown({
-    required this.value,
-    required this.bakers,
-    required this.onChanged,
-  });
+  const _BakerDropdown(
+      {required this.value, required this.bakers, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        hintText: 'Select Master Baker',
-        hintStyle:
-            const TextStyle(fontSize: 13, color: DashColors.textHint),
-        prefixIcon: const Icon(Icons.person_outline, color: DashColors.primary),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: DashColors.border),
+  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+        value: value,
+        decoration: InputDecoration(
+          hintText: 'Select Master Baker',
+          hintStyle: const TextStyle(fontSize: 13, color: DashColors.textHint),
+          prefixIcon:
+              const Icon(Icons.person_outline, color: DashColors.primary),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: DashColors.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: DashColors.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide:
+                  const BorderSide(color: DashColors.primary, width: 1.5)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: DashColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: DashColors.primary, width: 1.5),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        filled: true,
-        fillColor: Colors.white,
-        isDense: true,
-      ),
-      items: bakers
-          .map((b) => DropdownMenuItem(
-                value: b['id'],
-                child: Text(b['name']!,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14)),
-              ))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
+        items: bakers
+            .map((b) => DropdownMenuItem(
+                  value: b['id'],
+                  child: Text(b['name']!,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                ))
+            .toList(),
+        onChanged: onChanged,
+      );
 }
 
 // ── Batch Form ───────────────────────────────────────────
@@ -633,27 +563,25 @@ class _BatchFormSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEditing = editingIndex != null;
+    final accentColor =
+        isEditing ? const Color(0xFF1976D2) : DashColors.primary;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Label
       Row(children: [
         Container(
           width: 3,
           height: 14,
           decoration: BoxDecoration(
-            color: isEditing ? const Color(0xFF1976D2) : DashColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
+              color: accentColor, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
         Text(
           isEditing ? 'EDITING BATCH #${editingIndex! + 1}' : 'NEW BATCH',
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: isEditing ? const Color(0xFF1976D2) : DashColors.primary,
-            letterSpacing: 0.8,
-          ),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: accentColor,
+              letterSpacing: 0.8),
         ),
       ]),
       const SizedBox(height: 8),
@@ -676,8 +604,8 @@ class _BatchFormSection extends StatelessWidget {
                 borderSide: const BorderSide(color: DashColors.border)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: DashColors.primary, width: 1.5)),
+                borderSide:
+                    const BorderSide(color: DashColors.primary, width: 1.5)),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             isDense: true,
@@ -685,8 +613,8 @@ class _BatchFormSection extends StatelessWidget {
           items: products
               .map((p) => DropdownMenuItem(
                     value: p['id'],
-                    child: Text(p['name']!,
-                        style: const TextStyle(fontSize: 14)),
+                    child:
+                        Text(p['name']!, style: const TextStyle(fontSize: 14)),
                   ))
               .toList(),
           onChanged: onProductChanged,
@@ -695,14 +623,11 @@ class _BatchFormSection extends StatelessWidget {
 
         // Sacks counter
         Row(children: [
-          const Text(
-            'Total Sacks',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: DashColors.textPrimary,
-            ),
-          ),
+          const Text('Total Sacks',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: DashColors.textPrimary)),
           const Spacer(),
           Container(
             decoration: BoxDecoration(
@@ -712,70 +637,59 @@ class _BatchFormSection extends StatelessWidget {
             ),
             child: Row(children: [
               _CounterButton(
-                icon: Icons.remove,
-                onPressed: onSacksDecrement,
-              ),
+                  icon: Icons.remove, onPressed: onSacksDecrement),
               Container(
                 width: 46,
                 alignment: Alignment.center,
-                child: Text(
-                  '$currentSacks',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    color: DashColors.textPrimary,
-                  ),
-                ),
+                child: Text('$currentSacks',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: DashColors.textPrimary)),
               ),
               _CounterButton(
-                icon: Icons.add,
-                onPressed: onSacksIncrement,
-              ),
+                  icon: Icons.add, onPressed: onSacksIncrement),
             ]),
           ),
         ]),
         const SizedBox(height: 14),
 
         // Categories
-        const Text(
-          'Categories (Optional)',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: DashColors.textHint,
-            letterSpacing: 0.3,
-          ),
-        ),
+        const Text('Categories (Optional)',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: DashColors.textHint,
+                letterSpacing: 0.3)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _CategoryField(label: '60', controller: cat60Ctrl),
-            _CategoryField(label: '36', controller: cat36Ctrl),
-            _CategoryField(label: '48', controller: cat48Ctrl),
+            _CategoryField(label: '60',    controller: cat60Ctrl),
+            _CategoryField(label: '36',    controller: cat36Ctrl),
+            _CategoryField(label: '48',    controller: cat48Ctrl),
             _CategoryField(label: 'Subra', controller: subraCtrl),
-            _CategoryField(label: 'Saka', controller: sakaCtrl),
+            _CategoryField(label: 'Saka',  controller: sakaCtrl),
           ],
         ),
         const SizedBox(height: 14),
 
-        // Action button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: onAddOrUpdate,
             icon: Icon(
-                isEditing ? Icons.check_circle_outline : Icons.add_circle_outline,
+                isEditing
+                    ? Icons.check_circle_outline
+                    : Icons.add_circle_outline,
                 size: 18),
             label: Text(
               isEditing ? 'Update Batch' : 'Add to List',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 14),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  isEditing ? const Color(0xFF1976D2) : DashColors.primary,
+              backgroundColor: accentColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 13),
               elevation: 0,
@@ -795,15 +709,13 @@ class _CounterButton extends StatelessWidget {
   const _CounterButton({required this.icon, required this.onPressed});
 
   @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon, size: 18),
-      onPressed: onPressed,
-      color: onPressed == null ? DashColors.textHint : DashColors.primary,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      padding: EdgeInsets.zero,
-    );
-  }
+  Widget build(BuildContext context) => IconButton(
+        icon: Icon(icon, size: 18),
+        onPressed: onPressed,
+        color: onPressed == null ? DashColors.textHint : DashColors.primary,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        padding: EdgeInsets.zero,
+      );
 }
 
 class _CategoryField extends StatelessWidget {
@@ -812,38 +724,34 @@ class _CategoryField extends StatelessWidget {
   const _CategoryField({required this.label, required this.controller});
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 65,
-      child: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle:
-              const TextStyle(fontSize: 11, color: DashColors.textHint),
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: DashColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: DashColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide:
-                const BorderSide(color: DashColors.primary, width: 1.5),
+  Widget build(BuildContext context) => SizedBox(
+        width: 65,
+        child: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          style:
+              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle:
+                const TextStyle(fontSize: 11, color: DashColors.textHint),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: DashColors.border)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: DashColors.border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: DashColors.primary, width: 1.5)),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 // ── Batch List ───────────────────────────────────────────
@@ -870,25 +778,20 @@ class _BatchListSection extends StatelessWidget {
           width: 3,
           height: 14,
           decoration: BoxDecoration(
-            color: DashColors.textHint,
-            borderRadius: BorderRadius.circular(2),
-          ),
+              color: DashColors.textHint,
+              borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
-        const Text(
-          'BATCH LIST',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: DashColors.textHint,
-            letterSpacing: 0.8,
-          ),
-        ),
+        const Text('BATCH LIST',
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: DashColors.textHint,
+                letterSpacing: 0.8)),
         const Spacer(),
         if (batches.isNotEmpty)
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: DashColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
@@ -896,10 +799,9 @@ class _BatchListSection extends StatelessWidget {
             child: Text(
               '${batches.length} batch${batches.length > 1 ? 'es' : ''}',
               style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: DashColors.primary,
-              ),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: DashColors.primary),
             ),
           ),
       ]),
@@ -927,34 +829,27 @@ class _BatchListSection extends StatelessWidget {
 
 class _EmptyBatchList extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DashColors.border),
-      ),
-      child: Column(children: [
-        Icon(Icons.layers_outlined, size: 40, color: Colors.grey[300]),
-        const SizedBox(height: 10),
-        const Text(
-          'No batches added yet',
-          style: TextStyle(
-            color: DashColors.textHint,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: DashColors.border),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Fill the form above and tap "Add to List"',
-          style: TextStyle(color: DashColors.textHint, fontSize: 11),
-        ),
-      ]),
-    );
-  }
+        child: Column(children: [
+          Icon(Icons.layers_outlined, size: 40, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          const Text('No batches added yet',
+              style: TextStyle(
+                  color: DashColors.textHint,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 4),
+          const Text('Fill the form above and tap "Add to List"',
+              style: TextStyle(color: DashColors.textHint, fontSize: 11)),
+        ]),
+      );
 }
 
 class _BatchTile extends StatelessWidget {
@@ -981,8 +876,10 @@ class _BatchTile extends StatelessWidget {
       if (batch.cat36 != null) '36: ${batch.cat36}',
       if (batch.cat48 != null) '48: ${batch.cat48}',
       if (batch.subra != null) 'Subra: ${batch.subra}',
-      if (batch.saka != null) 'Saka: ${batch.saka}',
+      if (batch.saka  != null) 'Saka: ${batch.saka}',
     ];
+    final accentColor =
+        isEditing ? const Color(0xFF1976D2) : DashColors.primary;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -990,105 +887,72 @@ class _BatchTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isEditing
-              ? const Color(0xFF1976D2)
-              : DashColors.border,
-          width: isEditing ? 1.5 : 1,
-        ),
+            color: isEditing ? const Color(0xFF1976D2) : DashColors.border,
+            width: isEditing ? 1.5 : 1),
         boxShadow: [
           if (isEditing)
             BoxShadow(
-              color: const Color(0xFF1976D2).withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+                color: const Color(0xFF1976D2).withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
         ],
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         child: Row(children: [
-          // Batch number chip
           Container(
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: isEditing
-                  ? const Color(0xFF1976D2).withValues(alpha: 0.1)
-                  : DashColors.primary.withValues(alpha: 0.1),
+              color: accentColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Text(
-              '${index + 1}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isEditing
-                    ? const Color(0xFF1976D2)
-                    : DashColors.primary,
-              ),
-            ),
+            child: Text('${index + 1}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: accentColor)),
           ),
           const SizedBox(width: 12),
-
-          // Content
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  productName,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(productName,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: DashColors.textPrimary,
-                  ),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: DashColors.textPrimary)),
+              const SizedBox(height: 3),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: DashColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                const SizedBox(height: 3),
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: DashColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${batch.sacks} sacks',
-                      style: const TextStyle(
+                child: Text('${batch.sacks} sacks',
+                    style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: DashColors.primary,
-                      ),
-                    ),
-                  ),
-                ]),
-                if (cats.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    cats.join(' · '),
+                        color: DashColors.primary)),
+              ),
+              if (cats.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(cats.join(' · '),
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: DashColors.textHint,
-                    ),
-                  ),
-                ],
+                        fontSize: 11, color: DashColors.textHint)),
               ],
-            ),
+            ]),
           ),
-
-          // Actions
           Row(mainAxisSize: MainAxisSize.min, children: [
             _IconBtn(
-              icon: Icons.edit_outlined,
-              color: const Color(0xFF1976D2),
-              onTap: onEdit,
-            ),
+                icon: Icons.edit_outlined,
+                color: const Color(0xFF1976D2),
+                onTap: onEdit),
             _IconBtn(
-              icon: Icons.delete_outline,
-              color: AppColors.danger,
-              onTap: onRemove,
-            ),
+                icon: Icons.delete_outline,
+                color: AppColors.danger,
+                onTap: onRemove),
           ]),
         ]),
       ),
@@ -1100,19 +964,16 @@ class _IconBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _IconBtn(
-      {required this.icon, required this.color, required this.onTap});
+  const _IconBtn({required this.icon, required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon, size: 20),
-      color: color,
-      onPressed: onTap,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      padding: EdgeInsets.zero,
-    );
-  }
+  Widget build(BuildContext context) => IconButton(
+        icon: Icon(icon, size: 20),
+        color: color,
+        onPressed: onTap,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        padding: EdgeInsets.zero,
+      );
 }
 
 // ── Save Bar ─────────────────────────────────────────────
@@ -1130,29 +991,25 @@ class _SaveBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        16, 12, 16, 16 + MediaQuery.of(context).padding.bottom,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (batchCount > 0)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.fromLTRB(
+            16, 12, 16, 16 + MediaQuery.of(context).padding.bottom),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, -3)),
+          ],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (batchCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
@@ -1163,62 +1020,51 @@ class _SaveBar extends StatelessWidget {
                     child: Text(
                       '$batchCount batch${batchCount > 1 ? 'es' : ''}',
                       style: const TextStyle(
-                        fontSize: 12,
-                        color: DashColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                          fontSize: 12,
+                          color: DashColors.primary,
+                          fontWeight: FontWeight.w700),
                     ),
                   ),
-                ]),
-                Text(
-                  '$totalSacks total sacks',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: DashColors.primaryDark,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: isSaving || onSave == null ? null : onSave,
-            icon: isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.check_circle_outline, size: 20),
-            label: Text(
-              isSaving ? 'Saving…' : 'Save Production',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
+                  Text('$totalSacks total sacks',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: DashColors.primaryDark,
+                          fontWeight: FontWeight.w800)),
+                ],
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: DashColors.primary,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.grey[200],
-              disabledForegroundColor: Colors.grey[400],
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: isSaving || onSave == null ? null : onSave,
+              icon: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_outline, size: 20),
+              label: Text(isSaving ? 'Saving…' : 'Save Production',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 15)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DashColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[200],
+                disabledForegroundColor: Colors.grey[400],
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
             ),
           ),
-        ),
-      ]),
-    );
-  }
+        ]),
+      );
 }
 
 // ─────────────────────────────────────────────────────────
-//  BATCH ITEM MODEL  (file-local)
+//  BATCH ITEM MODEL
 // ─────────────────────────────────────────────────────────
 class _BatchItem {
   String productId;

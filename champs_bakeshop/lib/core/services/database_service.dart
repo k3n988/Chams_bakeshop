@@ -8,7 +8,7 @@ import 'supabase_service.dart';
 /// that all ViewModels depend on.
 class DatabaseService {
   final SupabaseService _supa;
-
+SupabaseService get supa => _supa;
   DatabaseService(this._supa);
 
   // ─── USERS ────────────────────────────────────────────────────────────────

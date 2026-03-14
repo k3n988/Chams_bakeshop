@@ -426,7 +426,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                           BorderRadius.circular(8)),
                                 ),
                                 onChanged: (v) {
-                                  final kg =
+                                  
                                       (int.tryParse(v) ?? 0).clamp(0, 24);
                                   setState(() {});
                                   if ((int.tryParse(v) ?? 0) > 24) {

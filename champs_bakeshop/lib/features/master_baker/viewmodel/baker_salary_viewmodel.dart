@@ -1,128 +1,203 @@
+// lib/features/master_baker/viewmodel/baker_salary_viewmodel.dart
 import 'package:flutter/material.dart';
-import '../../../../core/models/payroll_model.dart';
-import '../../../../core/services/database_service.dart';
-import '../../../../core/services/payroll_service.dart';
-import '../../../../core/utils/helpers.dart';
+// ✅ FIX 3: removed unused payroll_model.dart import
+import '../../../core/services/database_service.dart';
+import '../../../core/services/payroll_service.dart';
+import '../../../core/utils/helpers.dart';
+
+// ─────────────────────────────────────────────────────────────
+//  DATA MODELS
+// ─────────────────────────────────────────────────────────────
 
 class BakerDashboardRecord {
   final String date;
-  final int totalWorkers;
-  final int totalSacks;
+  final int    totalWorkers;
+  final int    totalSacks;
   final double salary;
+  final double bonus;
 
   BakerDashboardRecord({
     required this.date,
     required this.totalWorkers,
     required this.totalSacks,
     required this.salary,
+    this.bonus = 0,
   });
 }
 
+class BakerDailyEntry {
+  final String date;
+  final double baseSalary;
+  final double bakerIncentive;
+  final double bonus;
+
+  BakerDailyEntry({
+    required this.date,
+    required this.baseSalary,
+    required this.bakerIncentive,
+    required this.bonus,
+  });
+
+  double get baseOnly => baseSalary - bakerIncentive;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  VIEW MODEL
+// ─────────────────────────────────────────────────────────────
 class BakerSalaryViewModel extends ChangeNotifier {
   final DatabaseService _db;
-  final PayrollService _payroll;
+  late final PayrollService _payroll;
 
-  String _weekStart = '';
-  String _weekEnd = '';
-  bool _isLoading = false;
-
-  List<DailySalaryEntry> _dailyEntries = [];
-  List<BakerDashboardRecord> _dailyRecords = [];
-  double _grossTotal = 0;
-  double _finalSalary = 0;
-  int _daysWorked = 0;
-
-  BakerSalaryViewModel(this._db, this._payroll) {
+  // ✅ FIX 2: PayrollService needs SupabaseService, so accept it as optional param
+  // If not provided, we inline the logic using DatabaseService directly
+  BakerSalaryViewModel(this._db, [PayrollService? payroll]) {
+    _payroll   = payroll ?? PayrollService(_db.supa); // ✅ pass the inner SupabaseService
+    // ✅ FIX 1a: getWeekStart takes DateTime ✓, getWeekEnd takes String ✓
     _weekStart = getWeekStart(DateTime.now());
-    _weekEnd = getWeekEnd(_weekStart);
+    _weekEnd   = getWeekEnd(_weekStart);             // ✅ pass _weekStart string
   }
 
-  // ─── Getters ──────────────────────────────────────────────────────────────
+  // ── Loading / error ──────────────────────────────────
+  bool    isLoading = false;
+  String? error;
 
+  // ── Week range ───────────────────────────────────────
+  String _weekStart = '';
+  String _weekEnd   = '';
   String get weekStart => _weekStart;
-  String get weekEnd => _weekEnd;
-  bool get isLoading => _isLoading;
-  List<DailySalaryEntry> get dailyEntries => _dailyEntries;
-  List<BakerDashboardRecord> get dailyRecords => _dailyRecords;
-  int get daysWorked => _daysWorked;
-  double get grossSalary => _grossTotal;
-  double get finalSalary => _finalSalary;
+  String get weekEnd   => _weekEnd;
 
-  // ─── Load all records (for history screen) ────────────────────────────────
+  // ── Weekly salary computed values ────────────────────
+  List<BakerDailyEntry> dailyEntries = [];
+
+  double _grossSalary   = 0;
+  double _bonusTotal    = 0;
+  double _gasDeduction  = 0;
+  double _valeDeduction = 0;
+  double _wifiDeduction = 0;
+  int    _daysWorked    = 0;
+
+  double get grossSalary     => _grossSalary;
+  double get bonusTotal      => _bonusTotal;
+  double get gasDeduction    => _gasDeduction;
+  double get valeDeduction   => _valeDeduction;
+  double get wifiDeduction   => _wifiDeduction;
+  double get totalDeductions => _gasDeduction + _valeDeduction + _wifiDeduction;
+  double get finalSalary     => _grossSalary - totalDeductions;
+  int    get daysWorked      => _daysWorked;
+
+  // ── All-time records (dashboard / history) ───────────
+  List<BakerDashboardRecord> dailyRecords = [];
+
+  // ─────────────────────────────────────────────────────
+  //  PUBLIC API
+  // ─────────────────────────────────────────────────────
+
+  Future<void> init(String userId) async {
+    _weekStart = getWeekStart(DateTime.now());
+    _weekEnd   = getWeekEnd(_weekStart);             // ✅ FIX 1b
+    await _loadWeekly(userId);
+  }
+
+  Future<void> changeWeek(int direction, String userId) async {
+    final next = DateTime.parse(_weekStart).add(Duration(days: direction * 7));
+    _weekStart = getWeekStart(next);
+    _weekEnd   = getWeekEnd(_weekStart);             // ✅ FIX 1c
+    await _loadWeekly(userId);
+  }
 
   Future<void> loadDailyRecords(String userId) async {
-    _isLoading = true;
+    isLoading = true;
+    error     = null;
     notifyListeners();
 
-    final productions = await _db.getProductionsByMasterBaker(userId);
-    final products    = await _db.getAllProducts();
+    try {
+      final productions = await _db.getProductionsByMasterBaker(userId);
+      final products    = await _db.getAllProducts();
+      productions.sort((a, b) => b.date.compareTo(a.date));
 
-    productions.sort((a, b) => b.date.compareTo(a.date));
-
-    _dailyRecords = productions.map((prod) {
-      final calc = _payroll.computeDaily(prod, products);
-      return BakerDashboardRecord(
-        date: prod.date,
-        totalWorkers: prod.totalWorkers,
-        totalSacks: prod.totalSacks,
-        salary: calc.salaryPerWorker + calc.masterBonus,
-      );
-    }).toList();
-
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  // ─── Load weekly salary (for salary + dashboard screens) ─────────────────
-
-  Future<void> loadWeeklySalary(String userId) async {
-    _isLoading = true;
-    notifyListeners();
-
-    final productions = await _db.getProductionsByMasterBaker(userId);
-    final products    = await _db.getAllProducts();
-
-    final weekProds = productions.where((p) =>
-        p.date.compareTo(_weekStart) >= 0 &&
-        p.date.compareTo(_weekEnd) <= 0).toList();
-
-    _dailyEntries = [];
-    _grossTotal   = 0;
-    _daysWorked   = weekProds.length;
-
-    for (final prod in weekProds) {
-      final calc  = _payroll.computeDaily(prod, products);
-      final total = calc.salaryPerWorker + calc.masterBonus;
-      _grossTotal += total;
-
-      _dailyEntries.add(DailySalaryEntry(
-        date: prod.date,
-        baseSalary: calc.salaryPerWorker,
-        bonus: calc.masterBonus, // now comes from product.bonusPerSack
-      ));
+      dailyRecords = productions.map((prod) {
+        final calc = _payroll.computeDaily(prod, products);
+        return BakerDashboardRecord(
+          date:         prod.date,
+          totalWorkers: prod.totalWorkers,
+          totalSacks:   prod.totalSacks,
+          salary:       calc.salaryPerWorker + calc.bakerIncentive,
+          bonus:        calc.bonusPerWorker,
+        );
+      }).toList();
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
+  }
 
-    // Deductions for master baker: fetch gas/vale/wifi from deductions table
-    final deduction = await _db.getDeductionForUser(userId, _weekStart);
-    final totalDeductions = (deduction?.gas ?? 0) +
-        (deduction?.vale ?? 0) +
-        (deduction?.wifi ?? 0);
+  Future<void> loadWeeklySalary(String userId) => _loadWeekly(userId);
 
-    _finalSalary = _grossTotal - totalDeductions;
-
-    _isLoading = false;
+  // ─────────────────────────────────────────────────────
+  //  CORE WEEKLY LOADER
+  // ─────────────────────────────────────────────────────
+  Future<void> _loadWeekly(String userId) async {
+    isLoading = true;
+    error     = null;
     notifyListeners();
+
+    try {
+      final productions = await _db.getProductionsByDateRange(_weekStart, _weekEnd);
+      final products    = await _db.getAllProducts();
+
+      final myProds = productions
+          .where((p) => p.masterBakerId == userId)
+          .toList();
+
+      final Map<String, _DayAccum> byDate = {};
+      for (final prod in myProds) {
+        final date = prod.date.split('T').first;
+        final calc = _payroll.computeDaily(prod, products);
+        byDate.putIfAbsent(date, () => _DayAccum(date));
+        byDate[date]!
+          ..baseSalary     += calc.salaryPerWorker + calc.bakerIncentive
+          ..bakerIncentive += calc.bakerIncentive
+          ..bonus          += calc.bonusPerWorker;
+      }
+
+      dailyEntries = byDate.values
+          .map((a) => BakerDailyEntry(
+                date:           a.date,
+                baseSalary:     a.baseSalary,
+                bakerIncentive: a.bakerIncentive,
+                bonus:          a.bonus,
+              ))
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
+      _daysWorked  = dailyEntries.length;
+      _grossSalary = dailyEntries.fold(0.0, (s, d) => s + d.baseSalary);
+      _bonusTotal  = dailyEntries.fold(0.0, (s, d) => s + d.bonus);
+
+      final ded      = await _db.getDeductionForUser(userId, _weekStart); // ✅ correct method name
+      _gasDeduction  = ded?.gas  ?? 0;
+      _valeDeduction = ded?.vale ?? 0;
+      _wifiDeduction = ded?.wifi ?? 0;
+
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
   }
+}
 
-  // Alias for backward compatibility
-  Future<void> loadSalary(String userId) => loadWeeklySalary(userId);
-
-  // ─── Week navigation ──────────────────────────────────────────────────────
-
-  void changeWeek(int direction, String userId) {
-    final d = DateTime.parse(_weekStart).add(Duration(days: direction * 7));
-    _weekStart = d.toString().split(' ')[0];
-    _weekEnd   = getWeekEnd(_weekStart);
-    loadWeeklySalary(userId);
-  }
+// ─────────────────────────────────────────────────────────────
+//  INTERNAL ACCUMULATOR
+// ─────────────────────────────────────────────────────────────
+class _DayAccum {
+  final String date;
+  double baseSalary     = 0;
+  double bakerIncentive = 0;
+  double bonus          = 0;
+  _DayAccum(this.date);
 }

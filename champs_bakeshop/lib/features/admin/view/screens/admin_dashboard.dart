@@ -12,6 +12,7 @@ import 'manage_users_screen.dart';
 import 'manage_products_screen.dart';
 import 'production_reports_screen.dart';
 import 'payroll_screen.dart';
+import 'christmas_bonus_screen.dart'; // ✅ NEW
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -44,11 +45,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final user = context.watch<AuthViewModel>().currentUser;
     if (user == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(
+            child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
-    // Read payroll vm — no profile page needed for admin
     context.watch<AdminPayrollViewModel>();
 
     final pages = [
@@ -57,6 +58,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const ManageProductsScreen(),
       const ProductionReportsScreen(),
       const AdminPayrollScreen(),
+      const ChristmasBonusScreen(), // ✅ NEW
     ];
 
     return Scaffold(
@@ -77,7 +79,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const Text('CHAMPS BAKESHOP'),
         ]),
         actions: [
-          // Admin name chip
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Center(
@@ -106,7 +107,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         backgroundColor: Colors.white,
-        // FIX: withOpacity → withValues()
         indicatorColor: AppColors.primary.withValues(alpha: 0.12),
         destinations: const [
           NavigationDestination(
@@ -119,16 +119,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
               label: 'Users'),
           NavigationDestination(
               icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2, color: AppColors.primary),
+              selectedIcon:
+                  Icon(Icons.inventory_2, color: AppColors.primary),
               label: 'Products'),
           NavigationDestination(
               icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart, color: AppColors.primary),
+              selectedIcon:
+                  Icon(Icons.bar_chart, color: AppColors.primary),
               label: 'Reports'),
           NavigationDestination(
               icon: Icon(Icons.payments_outlined),
-              selectedIcon: Icon(Icons.payments, color: AppColors.primary),
+              selectedIcon:
+                  Icon(Icons.payments, color: AppColors.primary),
               label: 'Payroll'),
+          // ✅ NEW
+          NavigationDestination(
+              icon: Icon(Icons.card_giftcard_outlined),
+              selectedIcon: Icon(Icons.card_giftcard,
+                  color: Color(0xFFC62828)),
+              label: 'Bonus'),
         ],
       ),
     );

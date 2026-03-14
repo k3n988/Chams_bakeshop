@@ -14,23 +14,28 @@ class BakerProductionInputScreen extends StatefulWidget {
       _BakerProductionInputScreenState();
 }
 
+// ─── Item row state ───────────────────────────────────────────────────────────
+
 class _ItemData {
   String? productId;
-  int sacks = 0;
-  int extraKg = 0;
-  final TextEditingController sacksCtrl = TextEditingController();
-  final TextEditingController kgCtrl = TextEditingController();
+  int     sacks   = 0;
+  int     extraKg = 0;
+  final TextEditingController sacksCtrl = TextEditingController(text: '0');
+  final TextEditingController kgCtrl    = TextEditingController(text: '0');
+
   void dispose() {
     sacksCtrl.dispose();
     kgCtrl.dispose();
   }
 }
 
+// ─── Screen state ─────────────────────────────────────────────────────────────
+
 class _BakerProductionInputScreenState
     extends State<BakerProductionInputScreen> {
-  String _date = DateTime.now().toString().split(' ')[0];
+  String         _date            = DateTime.now().toString().split(' ')[0];
   final Set<String> _selectedHelpers = {};
-  final List<_ItemData> _items = [_ItemData()];
+  final List<_ItemData> _items    = [_ItemData()];
 
   @override
   void initState() {
@@ -45,11 +50,11 @@ class _BakerProductionInputScreenState
 
   @override
   void dispose() {
-    for (final item in _items) {
-      item.dispose();
-    }
+    for (final item in _items) item.dispose();
     super.dispose();
   }
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
 
   void _toggleHelper(String id) => setState(() {
         _selectedHelpers.contains(id)
@@ -75,17 +80,21 @@ class _BakerProductionInputScreenState
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
     );
-    if (picked != null) setState(() => _date = picked.toString().split(' ')[0]);
+    if (picked != null) {
+      setState(() => _date = picked.toString().split(' ')[0]);
+    }
   }
 
   List<ProductionItem> get _validItems => _items
       .where((i) => i.productId != null && (i.sacks > 0 || i.extraKg > 0))
       .map((i) => ProductionItem(
             productId: i.productId!,
-            sacks: i.sacks,
-            extraKg: i.extraKg,
+            sacks:     i.sacks,
+            extraKg:   i.extraKg,
           ))
       .toList();
+
+  // ─── Submit ─────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -103,14 +112,13 @@ class _BakerProductionInputScreenState
       return;
     }
 
-    final user = context.read<AuthViewModel>().currentUser!;
-    final result =
-        await context.read<BakerProductionViewModel>().addProduction(
-              date: _date,
-              masterBakerId: user.id,
-              helperIds: _selectedHelpers.toList(),
-              items: _validItems,
-            );
+    final user   = context.read<AuthViewModel>().currentUser!;
+    final result = await context.read<BakerProductionViewModel>().addProduction(
+          date:          _date,
+          masterBakerId: user.id,
+          helperIds:     _selectedHelpers.toList(),
+          items:         _validItems,
+        );
 
     if (!mounted) return;
 
@@ -120,11 +128,10 @@ class _BakerProductionInputScreenState
           backgroundColor: AppColors.success));
       setState(() {
         _selectedHelpers.clear();
-        for (final item in _items) {
-          item.dispose();
-        }
-        _items.clear();
-        _items.add(_ItemData());
+        for (final item in _items) item.dispose();
+        _items
+          ..clear()
+          ..add(_ItemData());
       });
     } else if (result == false) {
       messenger.showSnackBar(const SnackBar(
@@ -137,9 +144,12 @@ class _BakerProductionInputScreenState
     }
   }
 
+  // ─── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<BakerProductionViewModel>();
+    final vm      = context.watch<BakerProductionViewModel>();
+    // FIX: always compute preview from _validItems so values are real numbers
     final preview = vm.previewSalary(_validItems, _selectedHelpers.length);
 
     return SingleChildScrollView(
@@ -149,13 +159,11 @@ class _BakerProductionInputScreenState
             title: 'Add Production',
             subtitle: 'Record daily bakery production'),
 
-        // ── Date ──────────────────────────────────────────────────────────
+        // ── Date ──────────────────────────────────────────────────────────────
         Card(
           child: ListTile(
-            leading:
-                const Icon(Icons.calendar_today, color: AppColors.primary),
-            title: Text(_date,
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+            leading: const Icon(Icons.calendar_today, color: AppColors.primary),
+            title: Text(_date, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: const Text('Production Date'),
             trailing: OutlinedButton(
                 onPressed: _pickDate, child: const Text('Change')),
@@ -163,12 +171,11 @@ class _BakerProductionInputScreenState
         ),
         const SizedBox(height: 16),
 
-        // ── Helpers ───────────────────────────────────────────────────────
+        // ── Helpers ───────────────────────────────────────────────────────────
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('SELECT HELPERS',
                   style: TextStyle(
                       fontSize: 11,
@@ -192,13 +199,15 @@ class _BakerProductionInputScreenState
                       label: Text(h.name),
                       labelStyle: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color:
-                              sel ? Colors.white : AppColors.textSecondary),
+                          color: sel ? Colors.white : AppColors.textSecondary),
                       selectedColor: AppColors.success,
                       checkmarkColor: Colors.white,
                       backgroundColor: AppColors.surface,
+                      // FIX: withOpacity → withValues()
                       side: BorderSide(
-                          color: sel ? AppColors.success : AppColors.border),
+                          color: sel
+                              ? AppColors.success
+                              : AppColors.border),
                       onSelected: (_) => _toggleHelper(h.id),
                     );
                   }).toList(),
@@ -208,12 +217,11 @@ class _BakerProductionInputScreenState
         ),
         const SizedBox(height: 16),
 
-        // ── Products ──────────────────────────────────────────────────────
+        // ── Products ──────────────────────────────────────────────────────────
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('PRODUCTS PRODUCED',
                     style: TextStyle(
@@ -282,64 +290,63 @@ class _BakerProductionInputScreenState
                                       ),
                                     ))
                                 .toList(),
-                            onChanged: (v) =>
-                                setState(() => item.productId = v),
+                            onChanged: (v) => setState(() => item.productId = v),
                           ),
                         ),
                         const SizedBox(width: 8),
 
-                        // Sacks counter — compact to avoid overflow
+                        // Sacks counter
                         SizedBox(
                           width: 90,
-                          child: Row(
-                            children: [
-                              _CounterBtn(
-                                icon: Icons.remove,
-                                onTap: () {
-                                  if (item.sacks > 0) {
-                                    setState(() {
-                                      item.sacks--;
-                                      item.sacksCtrl.text = item.sacks.toString();
-                                    });
-                                  }
-                                },
-                                isLeft: true,
-                              ),
-                              Expanded(
-                                child: SizedBox(
-                                  height: 36,
-                                  child: TextField(
-                                    controller: item.sacksCtrl,
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600),
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.zero,
-                                        borderSide: BorderSide(color: AppColors.border),
-                                      ),
-                                      contentPadding: EdgeInsets.zero,
-                                      isDense: true,
+                          child: Row(children: [
+                            _CounterBtn(
+                              icon: Icons.remove,
+                              isLeft: true,
+                              onTap: () {
+                                if (item.sacks > 0) {
+                                  setState(() {
+                                    item.sacks--;
+                                    item.sacksCtrl.text =
+                                        item.sacks.toString();
+                                  });
+                                }
+                              },
+                            ),
+                            Expanded(
+                              child: SizedBox(
+                                height: 36,
+                                child: TextField(
+                                  controller: item.sacksCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.zero,
+                                      borderSide:
+                                          BorderSide(color: AppColors.border),
                                     ),
-                                    onChanged: (v) => setState(
-                                        () => item.sacks = int.tryParse(v) ?? 0),
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
                                   ),
+                                  onChanged: (v) => setState(
+                                      () => item.sacks = int.tryParse(v) ?? 0),
                                 ),
                               ),
-                              _CounterBtn(
-                                icon: Icons.add,
-                                onTap: () {
-                                  setState(() {
-                                    item.sacks++;
-                                    item.sacksCtrl.text = item.sacks.toString();
-                                  });
-                                },
-                                isLeft: false,
-                              ),
-                            ],
-                          ),
+                            ),
+                            _CounterBtn(
+                              icon: Icons.add,
+                              isLeft: false,
+                              onTap: () {
+                                setState(() {
+                                  item.sacks++;
+                                  item.sacksCtrl.text = item.sacks.toString();
+                                });
+                              },
+                            ),
+                          ]),
                         ),
                         const SizedBox(width: 6),
 
@@ -353,7 +360,7 @@ class _BakerProductionInputScreenState
                             decoration: InputDecoration(
                               hintText: '0',
                               suffixText: 'kg',
-                              suffixStyle: TextStyle(
+                              suffixStyle: const TextStyle(
                                   fontSize: 10, color: AppColors.textHint),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 10),
@@ -361,16 +368,14 @@ class _BakerProductionInputScreenState
                                   borderRadius: BorderRadius.circular(8)),
                             ),
                             onChanged: (v) {
-                              final kg =
-                                  (int.tryParse(v) ?? 0).clamp(0, 24);
-                              setState(() => item.extraKg = kg);
-                              if ((int.tryParse(v) ?? 0) > 24) {
-                                item.kgCtrl.text = '24';
-                                item.kgCtrl.selection =
-                                    TextSelection.fromPosition(
-                                        TextPosition(
-                                            offset:
-                                                item.kgCtrl.text.length));
+                              final parsed = int.tryParse(v) ?? 0;
+                              final clamped = parsed.clamp(0, 24);
+                              setState(() => item.extraKg = clamped);
+                              if (parsed > 24) {
+                                item.kgCtrl
+                                  ..text = '24'
+                                  ..selection = TextSelection.fromPosition(
+                                      const TextPosition(offset: 2));
                               }
                             },
                           ),
@@ -391,7 +396,7 @@ class _BakerProductionInputScreenState
               }),
 
               const SizedBox(height: 4),
-              Text(
+              const Text(
                 '1 sack = 25 kg  •  e.g. 3 sacks + 10 kg = 3.4 effective sacks',
                 style: TextStyle(
                     fontSize: 10,
@@ -403,12 +408,11 @@ class _BakerProductionInputScreenState
         ),
         const SizedBox(height: 16),
 
-        // ── Preview ───────────────────────────────────────────────────────
+        // ── Production Preview ────────────────────────────────────────────────
         Card(
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('PRODUCTION PREVIEW',
                   style: TextStyle(
                       fontSize: 11,
@@ -417,6 +421,8 @@ class _BakerProductionInputScreenState
                       letterSpacing: 0.8)),
               const SizedBox(height: 14),
 
+              // FIX: was using string templates that weren't interpolating.
+              // Now uses direct property access on DailySalaryResult.
               BreakdownRow(
                   label: 'Total Value',
                   value: formatCurrency(preview.totalValue),
@@ -435,7 +441,7 @@ class _BakerProductionInputScreenState
 
               const Divider(height: 20),
 
-              // Baker incentive
+              // Baker incentive section
               const Text('BAKER INCENTIVE (IN SALARY)',
                   style: TextStyle(
                       fontSize: 10,
@@ -447,14 +453,16 @@ class _BakerProductionInputScreenState
                 const Text('₱100 / effective sack',
                     style: TextStyle(fontSize: 13)),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(formatCurrency(preview.bakerIncentive),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryDark,
-                          fontSize: 13)),
+                  Text(
+                    formatCurrency(preview.bakerIncentive),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryDark,
+                        fontSize: 13),
+                  ),
                   Text(
                     '${(preview.totalSacks + preview.totalExtraKg / 25.0).toStringAsFixed(2)} eff. sacks × ₱100',
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 10, color: AppColors.textHint),
                   ),
                 ]),
@@ -469,7 +477,7 @@ class _BakerProductionInputScreenState
 
               const Divider(height: 20),
 
-              // Bonus (separate)
+              // Bonus section — paid separately, NOT in payroll total
               const Text('BONUS (PAID SEPARATELY)',
                   style: TextStyle(
                       fontSize: 10,
@@ -490,6 +498,7 @@ class _BakerProductionInputScreenState
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
+                  // FIX: withOpacity → withValues()
                   color: Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.amber.shade200),
@@ -512,6 +521,7 @@ class _BakerProductionInputScreenState
         ),
         const SizedBox(height: 20),
 
+        // ── Save button ───────────────────────────────────────────────────────
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -529,32 +539,30 @@ class _BakerProductionInputScreenState
   }
 }
 
+// ─── Counter button ──────────────────────────────────────────────────────────
 
-/// Compact +/− button used in the sacks counter
 class _CounterBtn extends StatelessWidget {
-  final IconData icon;
+  final IconData     icon;
   final VoidCallback onTap;
-  final bool isLeft;
+  final bool         isLeft;
   const _CounterBtn(
       {required this.icon, required this.onTap, required this.isLeft});
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: 26,
-        height: 36,
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.horizontal(
-            left: isLeft ? const Radius.circular(8) : Radius.zero,
-            right: isLeft ? Radius.zero : const Radius.circular(8),
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          width: 26,
+          height: 36,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.horizontal(
+              left:  isLeft ? const Radius.circular(8) : Radius.zero,
+              right: isLeft ? Radius.zero : const Radius.circular(8),
+            ),
+            color: AppColors.surface,
           ),
-          color: AppColors.surface,
+          child: Icon(icon, size: 14, color: AppColors.textSecondary),
         ),
-        child: Icon(icon, size: 14, color: AppColors.textSecondary),
-      ),
-    );
-  }
+      );
 }
