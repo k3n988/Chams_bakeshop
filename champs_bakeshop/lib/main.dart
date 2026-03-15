@@ -18,8 +18,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://fmkjhqgjgpglvagszixr.supabase.co', // ← replace
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pocWdqZ3BnbHZhZ3N6aXhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzQwMDcsImV4cCI6MjA4ODgxMDAwN30.ZmJpYk0LCX9bDQG1fr0No3vNPB4RwHDJ07Z_1D8PJhQ',                   // ← replace
+    url: 'https://fmkjhqgjgpglvagszixr.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pocWdqZ3BnbHZhZ3N6aXhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzQwMDcsImV4cCI6MjA4ODgxMDAwN30.ZmJpYk0LCX9bDQG1fr0No3vNPB4RwHDJ07Z_1D8PJhQ',
   );
 
   runApp(const ChampsBakeshopApp());
@@ -36,6 +36,11 @@ class ChampsBakeshopApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        // ── Services (exposed so screens can read them directly) ──
+        Provider<DatabaseService>(create: (_) => db),
+        Provider<PayrollService>(create:  (_) => payrollSvc),
+
+        // ── ViewModels ──
         ChangeNotifierProvider(create: (_) => AuthViewModel(db)),
         ChangeNotifierProvider(create: (_) => AdminUserViewModel(db)),
         ChangeNotifierProvider(create: (_) => AdminProductViewModel(db)),
@@ -43,7 +48,6 @@ class ChampsBakeshopApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AdminPayrollViewModel(db, payrollSvc)),
         ChangeNotifierProvider(create: (_) => BakerProductionViewModel(db, payrollSvc)),
         ChangeNotifierProvider(create: (_) => BakerSalaryViewModel(db, payrollSvc)),
-        // FIX 3: HelperSalaryViewModel expects SupabaseService — pass supa directly
         ChangeNotifierProvider(create: (_) => HelperSalaryViewModel(supa, payrollSvc)),
       ],
       child: MaterialApp(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/services/database_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
@@ -66,11 +67,18 @@ class _HelperDashboardState extends State<HelperDashboard>
   }
 
   void _openAddProduction() {
+    // Read providers HERE — before the sheet opens in a new context
+    final db          = context.read<DatabaseService>();
+    final currentUser = context.read<AuthViewModel>().currentUser!;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const AddProductionSheet(),
+      builder: (_) => AddProductionSheet(
+        db:            db,
+        currentUserId: currentUser.id,
+      ),
     ).then((_) => _refreshData());
   }
 
@@ -389,7 +397,6 @@ class _HeroBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Decorative dots
           Row(children: [
             _Dot(opacity: 0.3, size: 8),
             const SizedBox(width: 6),
@@ -720,12 +727,12 @@ class _SectionLabel extends StatelessWidget {
 //  DESIGN TOKENS
 // ─────────────────────────────────────────────────────────
 class DashColors {
-  static const primary = Color(0xFFD48135);
+  static const primary      = Color(0xFFD48135);
   static const primaryLight = Color(0xFFE5A663);
-  static const primaryDark = Color(0xFFB86A1E);
-  static const background = Color(0xFFF7F7F8);
-  static const border = Color(0xFFEEEEEE);
-  static const textPrimary = Color(0xFF1A1A1A);
+  static const primaryDark  = Color(0xFFB86A1E);
+  static const background   = Color(0xFFF7F7F8);
+  static const border       = Color(0xFFEEEEEE);
+  static const textPrimary   = Color(0xFF1A1A1A);
   static const textSecondary = Color(0xFF666666);
-  static const textHint = Color(0xFF9E9E9E);
+  static const textHint      = Color(0xFF9E9E9E);
 }

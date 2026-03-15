@@ -4,21 +4,10 @@ class ProductionItem {
   final String productId;
   final int sacks;
   final int extraKg; // extra kg on top of full sacks (1 sack = 25 kg)
-  final int? cat60;
-  final int? cat36;
-  final int? cat48;
-  final int? subra;
-  final int? saka;
-
   ProductionItem({
     required this.productId,
     required this.sacks,
     this.extraKg = 0,
-    this.cat60,
-    this.cat36,
-    this.cat48,
-    this.subra,
-    this.saka,
   });
 
   /// Effective sacks including partial kg (e.g. 3 sacks + 10 kg = 3.4)
@@ -28,43 +17,23 @@ class ProductionItem {
     String? productId,
     int? sacks,
     int? extraKg,
-    int? cat60,
-    int? cat36,
-    int? cat48,
-    int? subra,
-    int? saka,
   }) =>
       ProductionItem(
         productId: productId ?? this.productId,
         sacks: sacks ?? this.sacks,
         extraKg: extraKg ?? this.extraKg,
-        cat60: cat60 ?? this.cat60,
-        cat36: cat36 ?? this.cat36,
-        cat48: cat48 ?? this.cat48,
-        subra: subra ?? this.subra,
-        saka: saka ?? this.saka,
       );
 
   Map<String, dynamic> toMap() => {
         'product_id': productId,
         'sacks': sacks,
         'extra_kg': extraKg,
-        'cat60': cat60,
-        'cat36': cat36,
-        'cat48': cat48,
-        'subra': subra,
-        'saka': saka,
       };
 
   factory ProductionItem.fromMap(Map<String, dynamic> map) => ProductionItem(
         productId: map['product_id'],
         sacks: map['sacks'] as int,
         extraKg: (map['extra_kg'] as int?) ?? 0,
-        cat60: map['cat60'] as int?,
-        cat36: map['cat36'] as int?,
-        cat48: map['cat48'] as int?,
-        subra: map['subra'] as int?,
-        saka: map['saka'] as int?,
       );
 }
 

@@ -114,20 +114,18 @@ class SupabaseService {
     return rows.map(_rowToProduction).toList();
   }
 
-  /// Uses a date-range check (gte + lte on the same date) so it works correctly
-  /// whether the `date` column is stored as DATE or TIMESTAMP in Supabase.
   Future<bool> productionExistsForDate(
       String date, String masterBakerId) async {
     try {
       final rows = await _db
           .from('productions')
           .select('id')
-          .gte('date', date)          // >= '2026-03-13'
-          .lte('date', '${date}T23:59:59') // <= '2026-03-13T23:59:59'
+          .gte('date', date)
+          .lte('date', '${date}T23:59:59')
           .eq('master_baker_id', masterBakerId);
       return rows.isNotEmpty;
     } catch (_) {
-      return false; // on error, allow insert attempt
+      return false;
     }
   }
 
@@ -158,7 +156,7 @@ class SupabaseService {
         'total_workers': p.totalWorkers,
         'salary_per_worker': p.salaryPerWorker,
         'bonus_per_worker': p.bonusPerWorker,
-        'master_bonus': p.bonusPerWorker,   // legacy column kept in sync
+        'master_bonus': p.bonusPerWorker,
         'baker_incentive': p.bakerIncentive,
       };
 
@@ -177,11 +175,6 @@ class SupabaseService {
         return ProductionItem(
           productId: p[0],
           sacks: int.tryParse(p[1]) ?? 0,
-          cat60: p.length > 2 ? int.tryParse(p[2]) : null,
-          cat36: p.length > 3 ? int.tryParse(p[3]) : null,
-          cat48: p.length > 4 ? int.tryParse(p[4]) : null,
-          subra: p.length > 5 ? int.tryParse(p[5]) : null,
-          saka:  p.length > 6 ? int.tryParse(p[6]) : null,
         );
       }).toList();
     } else {
@@ -190,7 +183,6 @@ class SupabaseService {
 
     final rawDate = map['date']?.toString() ?? '';
     final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
-
     final bonus =
         (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
 
@@ -208,6 +200,45 @@ class SupabaseService {
       bonusPerWorker: bonus,
       bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
     );
+  }
+
+  // ──────────────────────────────────────────────────
+  //  HELPER BATCHES OPERATIONS
+  // ──────────────────────────────────────────────────
+
+  /// Inserts one row into helper_batches per batch item.
+  Future<void> insertHelperBatch(Map<String, dynamic> batch) async {
+    await _db.from('helper_batches').insert(batch);
+  }
+
+  /// Fetches all batches for a specific helper, ordered by date descending.
+  Future<List<Map<String, dynamic>>> getHelperBatches(String helperId) async {
+    final rows = await _db
+        .from('helper_batches')
+        .select()
+        .eq('helper_id', helperId)
+        .order('date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Fetches batches within a date range for a helper.
+  Future<List<Map<String, dynamic>>> getHelperBatchesByDateRange(
+    String helperId,
+    String start,
+    String end,
+  ) async {
+    final rows = await _db
+        .from('helper_batches')
+        .select()
+        .eq('helper_id', helperId)
+        .gte('date', start)
+        .lte('date', end)
+        .order('date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<void> deleteHelperBatch(String id) async {
+    await _db.from('helper_batches').delete().eq('id', id);
   }
 
   // ──────────────────────────────────────────────────

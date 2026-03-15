@@ -4,11 +4,9 @@ import '../models/production_model.dart';
 import '../models/payroll_model.dart';
 import 'supabase_service.dart';
 
-/// DatabaseService wraps SupabaseService and exposes the unified API
-/// that all ViewModels depend on.
 class DatabaseService {
   final SupabaseService _supa;
-SupabaseService get supa => _supa;
+  SupabaseService get supa => _supa;
   DatabaseService(this._supa);
 
   // ─── USERS ────────────────────────────────────────────────────────────────
@@ -19,7 +17,6 @@ SupabaseService get supa => _supa;
   Future<UserModel?> authenticateUser(String email, String password, String role) =>
       _supa.authenticateUser(email, password, role);
 
-  // FIX 1: getUserByEmail — used by AuthViewModel
   Future<UserModel?> getUserByEmail(String email) async {
     final all = await _supa.getAllUsers();
     return all
@@ -53,6 +50,23 @@ SupabaseService get supa => _supa;
       _supa.updateProduction(production);
   Future<void> deleteProduction(String id) => _supa.deleteProduction(id);
 
+  // ─── HELPER BATCHES ───────────────────────────────────────────────────────
+
+  Future<void> insertHelperBatch(Map<String, dynamic> batch) =>
+      _supa.insertHelperBatch(batch);
+
+  Future<List<Map<String, dynamic>>> getHelperBatches(String helperId) =>
+      _supa.getHelperBatches(helperId);
+
+  Future<List<Map<String, dynamic>>> getHelperBatchesByDateRange(
+    String helperId,
+    String start,
+    String end,
+  ) =>
+      _supa.getHelperBatchesByDateRange(helperId, start, end);
+
+  Future<void> deleteHelperBatch(String id) => _supa.deleteHelperBatch(id);
+
   // ─── DEDUCTIONS ───────────────────────────────────────────────────────────
 
   Future<List<DeductionModel>> getAllDeductions() => _supa.getAllDeductions();
@@ -63,10 +77,7 @@ SupabaseService get supa => _supa;
   Future<List<DeductionModel>> getUserDeductions(String userId) =>
       _supa.getUserDeductions(userId);
 
-  // FIX 2: upsertDeduction — used directly by admin_payroll_viewmodel
   Future<void> upsertDeduction(DeductionModel d) => _supa.upsertDeduction(d);
-
-  // Convenience aliases that also route to upsert
   Future<void> insertDeduction(DeductionModel d) => _supa.upsertDeduction(d);
   Future<void> updateDeduction(DeductionModel d) => _supa.upsertDeduction(d);
   Future<void> deleteDeduction(String id) => _supa.deleteDeduction(id);
