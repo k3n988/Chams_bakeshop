@@ -7,14 +7,20 @@ import 'supabase_service.dart';
 class DatabaseService {
   final SupabaseService _supa;
   SupabaseService get supa => _supa;
+
   DatabaseService(this._supa);
 
   // ─── USERS ────────────────────────────────────────────────────────────────
 
   Future<List<UserModel>> getAllUsers() => _supa.getAllUsers();
-  Future<List<UserModel>> getUsersByRole(String role) => _supa.getUsersByRole(role);
+
+  Future<List<UserModel>> getUsersByRole(String role) =>
+      _supa.getUsersByRole(role);
+
   Future<UserModel?> getUserById(String id) => _supa.getUserById(id);
-  Future<UserModel?> authenticateUser(String email, String password, String role) =>
+
+  Future<UserModel?> authenticateUser(
+          String email, String password, String role) =>
       _supa.authenticateUser(email, password, role);
 
   Future<UserModel?> getUserByEmail(String email) async {
@@ -31,23 +37,33 @@ class DatabaseService {
   // ─── PRODUCTS ─────────────────────────────────────────────────────────────
 
   Future<List<ProductModel>> getAllProducts() => _supa.getAllProducts();
-  Future<void> insertProduct(ProductModel product) => _supa.insertProduct(product);
-  Future<void> updateProduct(ProductModel product) => _supa.updateProduct(product);
+  Future<void> insertProduct(ProductModel product) =>
+      _supa.insertProduct(product);
+  Future<void> updateProduct(ProductModel product) =>
+      _supa.updateProduct(product);
   Future<void> deleteProduct(String id) => _supa.deleteProduct(id);
 
   // ─── PRODUCTION ───────────────────────────────────────────────────────────
 
-  Future<List<ProductionModel>> getAllProductions() => _supa.getAllProductions();
-  Future<List<ProductionModel>> getProductionsByDateRange(String start, String end) =>
+  Future<List<ProductionModel>> getAllProductions() =>
+      _supa.getAllProductions();
+
+  Future<List<ProductionModel>> getProductionsByDateRange(
+          String start, String end) =>
       _supa.getProductionsByDateRange(start, end);
+
   Future<List<ProductionModel>> getProductionsByMasterBaker(String id) =>
       _supa.getProductionsByMasterBaker(id);
+
   Future<bool> productionExistsForDate(String date, String masterBakerId) =>
       _supa.productionExistsForDate(date, masterBakerId);
+
   Future<void> insertProduction(ProductionModel production) =>
       _supa.insertProduction(production);
+
   Future<void> updateProduction(ProductionModel production) =>
       _supa.updateProduction(production);
+
   Future<void> deleteProduction(String id) => _supa.deleteProduction(id);
 
   // ─── HELPER BATCHES ───────────────────────────────────────────────────────
@@ -55,36 +71,62 @@ class DatabaseService {
   Future<void> insertHelperBatch(Map<String, dynamic> batch) =>
       _supa.insertHelperBatch(batch);
 
-  Future<List<Map<String, dynamic>>> getHelperBatches(String helperId) =>
-      _supa.getHelperBatches(helperId);
+  Future<List<Map<String, dynamic>>> getHelperBatches({
+    String? helperId,
+    String? dateFrom,
+    String? dateTo,
+  }) =>
+      _supa.getHelperBatches(
+        helperId: helperId,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      );
 
-  Future<List<Map<String, dynamic>>> getHelperBatchesByDateRange(
-    String helperId,
-    String start,
-    String end,
-  ) =>
-      _supa.getHelperBatchesByDateRange(helperId, start, end);
+  Future<List<Map<String, dynamic>>> getHelperBatchesByDate(String date) =>
+      _supa.getHelperBatchesByDate(date);
 
-  Future<void> deleteHelperBatch(String id) => _supa.deleteHelperBatch(id);
+  Future<List<Map<String, dynamic>>> getHelperBatchesByBaker(
+          String masterBakerId) =>
+      _supa.getHelperBatchesByBaker(masterBakerId);
+
+  Future<void> deleteHelperBatch(String id) =>
+      _supa.deleteHelperBatch(id);
+
+  Future<void> updateHelperBatch(String id, Map<String, dynamic> fields) =>
+      _supa.updateHelperBatch(id, fields);
 
   // ─── DEDUCTIONS ───────────────────────────────────────────────────────────
 
-  Future<List<DeductionModel>> getAllDeductions() => _supa.getAllDeductions();
-  Future<DeductionModel?> getDeductionForUser(String userId, String weekStart) =>
+  Future<List<DeductionModel>> getAllDeductions() =>
+      _supa.getAllDeductions();
+
+  Future<DeductionModel?> getDeductionForUser(
+          String userId, String weekStart) =>
       _supa.getDeduction(userId, weekStart);
+
   Future<List<DeductionModel>> getDeductionsForWeek(String weekStart) =>
       _supa.getDeductionsForWeek(weekStart);
+
   Future<List<DeductionModel>> getUserDeductions(String userId) =>
       _supa.getUserDeductions(userId);
 
-  Future<void> upsertDeduction(DeductionModel d) => _supa.upsertDeduction(d);
-  Future<void> insertDeduction(DeductionModel d) => _supa.upsertDeduction(d);
-  Future<void> updateDeduction(DeductionModel d) => _supa.upsertDeduction(d);
-  Future<void> deleteDeduction(String id) => _supa.deleteDeduction(id);
+  Future<void> upsertDeduction(DeductionModel d) =>
+      _supa.upsertDeduction(d);
+
+  Future<void> insertDeduction(DeductionModel d) =>
+      _supa.upsertDeduction(d);
+
+  Future<void> updateDeduction(DeductionModel d) =>
+      _supa.upsertDeduction(d);
+
+  Future<void> deleteDeduction(String id) =>
+      _supa.deleteDeduction(id);
 
   // ─── PAYROLL RELEASES ─────────────────────────────────────────────────────
 
-  Future<bool> isWeekReleased(String weekStart) => _supa.isWeekReleased(weekStart);
+  Future<bool> isWeekReleased(String weekStart) =>
+      _supa.isWeekReleased(weekStart);
+
   Future<void> releaseWeeklyPayroll({
     required String id,
     required String weekStart,
@@ -97,4 +139,27 @@ class DatabaseService {
         releasedBy: releasedBy,
         notes: notes,
       );
+
+  Future<List<Map<String, dynamic>>> getAllPayrollReleases() =>
+      _supa.getAllPayrollReleases();
+
+  // ─── PAYROLL PAID ─────────────────────────────────────────────────────────
+
+  Future<void> insertPayrollPaid({
+    required String id,
+    required String userId,
+    required String weekStart,
+    required String paidBy,
+    required double amount,
+  }) =>
+      _supa.insertPayrollPaid(
+        id: id,
+        userId: userId,
+        weekStart: weekStart,
+        paidBy: paidBy,
+        amount: amount,
+      );
+
+  Future<Set<String>> getPaidUserIds(String weekStart) =>
+      _supa.getPaidUserIds(weekStart);
 }

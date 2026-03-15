@@ -1,9 +1,8 @@
-// lib/core/models/payroll_model.dart
-
 class DeductionModel {
   final String id;
   final String userId;
   final String weekStart;
+  final double oven; // ← NEW: overrides auto-calc when set > 0
   final double gas;
   final double vale;
   final double wifi;
@@ -12,6 +11,7 @@ class DeductionModel {
     required this.id,
     required this.userId,
     required this.weekStart,
+    this.oven = 0,
     this.gas = 0,
     this.vale = 0,
     this.wifi = 0,
@@ -21,6 +21,7 @@ class DeductionModel {
         'id': id,
         'user_id': userId,
         'week_start': weekStart,
+        'oven': oven,
         'gas': gas,
         'vale': vale,
         'wifi': wifi,
@@ -30,6 +31,7 @@ class DeductionModel {
         id: map['id'],
         userId: map['user_id'],
         weekStart: map['week_start'],
+        oven: (map['oven'] as num?)?.toDouble() ?? 0,
         gas: (map['gas'] as num?)?.toDouble() ?? 0,
         vale: (map['vale'] as num?)?.toDouble() ?? 0,
         wifi: (map['wifi'] as num?)?.toDouble() ?? 0,
@@ -41,12 +43,13 @@ class PayrollEntry {
   final String name;
   final String role;
   final int daysWorked;
-  final double grossSalary;   // base salary + incentive (baker only) — bonus NOT included
-  final double bonusTotal;    // shown separately, never in payroll total
+  final double grossSalary;
+  final double bonusTotal;
   final double ovenDeduction;
   final double gasDeduction;
   final double valeDeduction;
   final double wifiDeduction;
+  final bool isPaid; // ← NEW
 
   PayrollEntry({
     required this.userId,
@@ -54,12 +57,13 @@ class PayrollEntry {
     required this.role,
     required this.daysWorked,
     required this.grossSalary,
-    double masterBonus = 0,  // legacy param name — maps to bonusTotal
+    double masterBonus = 0,
     double bonusTotal = 0,
     this.ovenDeduction = 0,
     this.gasDeduction = 0,
     this.valeDeduction = 0,
     this.wifiDeduction = 0,
+    this.isPaid = false, // ← NEW
   }) : bonusTotal = bonusTotal != 0 ? bonusTotal : masterBonus;
 
   double get masterBonus => bonusTotal;
@@ -67,17 +71,29 @@ class PayrollEntry {
   double get totalDeductions =>
       ovenDeduction + gasDeduction + valeDeduction + wifiDeduction;
 
-  /// Gross salary (base + incentive) minus deductions. Bonus is NOT included.
   double get finalSalary => grossSalary - totalDeductions;
-
-  /// For display only — final salary + bonus shown together
   double get finalSalaryWithBonus => finalSalary + bonusTotal;
+
+  // copyWith for toggling isPaid
+  PayrollEntry copyWith({bool? isPaid}) => PayrollEntry(
+        userId: userId,
+        name: name,
+        role: role,
+        daysWorked: daysWorked,
+        grossSalary: grossSalary,
+        bonusTotal: bonusTotal,
+        ovenDeduction: ovenDeduction,
+        gasDeduction: gasDeduction,
+        valeDeduction: valeDeduction,
+        wifiDeduction: wifiDeduction,
+        isPaid: isPaid ?? this.isPaid,
+      );
 }
 
 class DailySalaryEntry {
   final String date;
-  final double baseSalary;  // includes baker incentive for master baker
-  final double bonus;       // shown separately
+  final double baseSalary;
+  final double bonus;
 
   DailySalaryEntry({
     required this.date,
@@ -85,26 +101,18 @@ class DailySalaryEntry {
     this.bonus = 0,
   });
 
-  double get total => baseSalary;             // use for weekly/monthly sums
-  double get totalWithBonus => baseSalary + bonus; // use for display only
+  double get total => baseSalary;
+  double get totalWithBonus => baseSalary + bonus;
 }
 
-/// Result of computing one day's production salary.
-///
-/// KEY RULES:
-/// • effectiveSacks    = sacks + extraKg / 25.0  (1 sack = 25 kg)
-/// • salaryPerWorker   = totalValue / totalWorkers      ← base, NO bonus, NO incentive
-/// • bonusPerWorker    = Σ(bonusPerSack × eff) / totalWorkers  ← split equally, paid separately
-/// • bakerIncentive    = totalEffectiveSacks × ₱100            ← ADDED to baker salary only
-///                       e.g. 2 sacks + 2 kg → 2.08 × ₱100 = ₱208
 class DailySalaryResult {
   final double totalValue;
   final int totalSacks;
   final int totalExtraKg;
   final int totalWorkers;
-  final double salaryPerWorker;   // base share for every worker
-  final double bonusPerWorker;    // same share for master baker AND helpers (separate)
-  final double bakerIncentive;    // added to baker salary only (₱100/sack)
+  final double salaryPerWorker;
+  final double bonusPerWorker;
+  final double bakerIncentive;
 
   const DailySalaryResult({
     required this.totalValue,
@@ -116,6 +124,5 @@ class DailySalaryResult {
     this.bakerIncentive = 0,
   });
 
-  // Legacy getter
   double get masterBonus => bonusPerWorker;
 }

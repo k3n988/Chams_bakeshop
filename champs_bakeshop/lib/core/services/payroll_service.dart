@@ -8,18 +8,8 @@ class PayrollService {
 
   PayrollService(this._db);
 
-  /// ₱100 incentive per effective sack — added to baker salary only
   static const double incentivePerSack = 100.0;
-  static const double helperOvenDeductionPerDay = 20.0;
-
-  // ───────────────────────────────────────────────────────────
-  //  DAILY
-  //
-  //  • effectiveSacks    = sacks + extraKg / 25.0
-  //  • salaryPerWorker   = totalValue / totalWorkers  (base only)
-  //  • bonusPerWorker    = Σ(bonusPerSack × eff) / totalWorkers (all workers, separate)
-  //  • bakerIncentive    = totalEffectiveSacks × ₱100 (baker only, included in salary)
-  // ───────────────────────────────────────────────────────────
+  static const double helperOvenDeductionPerDay = 15.0;
 
   DailySalaryResult computeDaily(
       ProductionModel production, List<ProductModel> products) {
@@ -59,21 +49,14 @@ class PayrollService {
     );
   }
 
-  // ───────────────────────────────────────────────────────────
-  //  WEEKLY
-  //
-  //  Baker accumulates: baseSalary (salaryPerWorker + bakerIncentive)
-  //  Helper accumulates: baseSalary (salaryPerWorker only)
-  //  Everyone accumulates: bonusTotal (shown separately, not in payroll)
-  // ───────────────────────────────────────────────────────────
-
   Future<List<PayrollEntry>> computeWeeklyPayroll(
     String weekStart,
     String weekEnd,
     List<ProductModel> products,
     Map<String, String> userNames,
-    Map<String, String> userRoles,
-  ) async {
+    Map<String, String> userRoles, {
+    Set<String> paidUserIds = const {}, // ← NEW
+  }) async {
     final productions =
         await _db.getProductionsByDateRange(weekStart, weekEnd);
     final deductionsList = await _db.getDeductionsForWeek(weekStart);
@@ -95,15 +78,13 @@ class PayrollService {
         );
 
         final w = workers[wid]!;
-        w.bonusTotal += calc.bonusPerWorker; // everyone gets same bonus share
+        w.bonusTotal += calc.bonusPerWorker;
         w.daysWorked += 1;
 
         if (wid == prod.masterBakerId) {
           w.isMaster = true;
-          // Baker gets base salary + incentive
           w.baseSalary += calc.salaryPerWorker + calc.bakerIncentive;
         } else {
-          // Helpers get base salary only
           w.baseSalary += calc.salaryPerWorker;
         }
       }
@@ -112,22 +93,28 @@ class PayrollService {
     final dedMap = {for (final d in deductionsList) d.userId: d};
 
     return workers.values.map((w) {
-      final oven = w.isMaster
+      final ded = dedMap[w.userId];
+
+      // ✅ Use manual oven override if set, otherwise auto-calculate for helpers
+      final autoOven = w.isMaster
           ? 0.0
           : w.daysWorked * helperOvenDeductionPerDay;
-      final ded = dedMap[w.userId];
+      final ovenDeduction = (ded != null && ded.oven > 0)
+          ? ded.oven
+          : autoOven;
 
       return PayrollEntry(
         userId: w.userId,
         name: w.name,
         role: w.role,
         daysWorked: w.daysWorked,
-        grossSalary: w.baseSalary,  // base + incentive for baker, base for helpers
-        bonusTotal: w.bonusTotal,   // shown separately
-        ovenDeduction: oven,
+        grossSalary: w.baseSalary,
+        bonusTotal: w.bonusTotal,
+        ovenDeduction: ovenDeduction,
         gasDeduction: ded?.gas ?? 0,
         valeDeduction: ded?.vale ?? 0,
         wifiDeduction: ded?.wifi ?? 0,
+        isPaid: paidUserIds.contains(w.userId), // ← NEW
       );
     }).toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -138,7 +125,7 @@ class _WorkerAccum {
   final String userId;
   final String name;
   final String role;
-  double baseSalary = 0; // base + incentive for baker, base only for helpers
+  double baseSalary = 0;
   double bonusTotal = 0;
   int daysWorked = 0;
   bool isMaster = false;

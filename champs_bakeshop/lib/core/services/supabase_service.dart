@@ -160,85 +160,95 @@ class SupabaseService {
         'baker_incentive': p.bakerIncentive,
       };
 
-  ProductionModel _rowToProduction(Map<String, dynamic> map) {
-    final helperStr = (map['helper_ids'] as String? ?? '').trim();
-    final rawItems = map['items'];
+ ProductionModel _rowToProduction(Map<String, dynamic> map) {
+  final helperStr = (map['helper_ids'] as String? ?? '').trim();
+  final rawItems = map['items'];
 
-    final List<ProductionItem> items;
-    if (rawItems is List) {
-      items = rawItems
-          .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
-          .toList();
-    } else if (rawItems is String && rawItems.isNotEmpty) {
-      items = rawItems.split('|').map((s) {
-        final p = s.split(':');
-        return ProductionItem(
-          productId: p[0],
-          sacks: int.tryParse(p[1]) ?? 0,
-        );
-      }).toList();
-    } else {
-      items = [];
-    }
-
-    final rawDate = map['date']?.toString() ?? '';
-    final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
-    final bonus =
-        (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
-
-    return ProductionModel(
-      id: map['id'],
-      date: date,
-      masterBakerId: map['master_baker_id'],
-      helperIds: helperStr.isEmpty ? [] : helperStr.split(','),
-      items: items,
-      totalValue: (map['total_value'] ?? 0).toDouble(),
-      totalSacks: map['total_sacks'] ?? 0,
-      totalExtraKg: map['total_extra_kg'] ?? 0,
-      totalWorkers: map['total_workers'] ?? 0,
-      salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
-      bonusPerWorker: bonus,
-      bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
-    );
+  final List<ProductionItem> items;
+  if (rawItems is List) {
+    items = rawItems
+        .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
+        .toList();
+  } else if (rawItems is String && rawItems.isNotEmpty) {
+    items = rawItems.split('|').map((s) {
+      final p = s.split(':');
+      return ProductionItem(
+        productId: p[0],
+        sacks:     int.tryParse(p[1]) ?? 0,
+        // ✅ extraKg only — cat fields don't exist on ProductionItem
+        extraKg:   p.length > 2 ? (int.tryParse(p[2]) ?? 0) : 0,
+      );
+    }).toList();
+  } else {
+    items = [];
   }
 
+  final rawDate = map['date']?.toString() ?? '';
+  final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
+  final bonus =
+      (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
+
+  return ProductionModel(
+    id:             map['id'],
+    date:           date,
+    masterBakerId:  map['master_baker_id'],
+    helperIds:      helperStr.isEmpty ? [] : helperStr.split(','),
+    items:          items,
+    totalValue:     (map['total_value'] ?? 0).toDouble(),
+    totalSacks:     map['total_sacks'] ?? 0,
+    totalExtraKg:   map['total_extra_kg'] ?? 0,
+    totalWorkers:   map['total_workers'] ?? 0,
+    salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
+    bonusPerWorker:  bonus,
+    bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
+  );
+}
+
   // ──────────────────────────────────────────────────
-  //  HELPER BATCHES OPERATIONS
+  //  HELPER BATCH OPERATIONS
   // ──────────────────────────────────────────────────
 
-  /// Inserts one row into helper_batches per batch item.
   Future<void> insertHelperBatch(Map<String, dynamic> batch) async {
     await _db.from('helper_batches').insert(batch);
   }
 
-  /// Fetches all batches for a specific helper, ordered by date descending.
-  Future<List<Map<String, dynamic>>> getHelperBatches(String helperId) async {
-    final rows = await _db
-        .from('helper_batches')
-        .select()
-        .eq('helper_id', helperId)
-        .order('date', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
+  Future<List<Map<String, dynamic>>> getHelperBatches({
+    String? helperId,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    var query = _db.from('helper_batches').select();
+    if (helperId != null) query = query.eq('helper_id', helperId);
+    if (dateFrom  != null) query = query.gte('date', dateFrom);
+    if (dateTo    != null) query = query.lte('date', dateTo);
+    return await query.order('date', ascending: false);
   }
 
-  /// Fetches batches within a date range for a helper.
-  Future<List<Map<String, dynamic>>> getHelperBatchesByDateRange(
-    String helperId,
-    String start,
-    String end,
-  ) async {
-    final rows = await _db
+  Future<List<Map<String, dynamic>>> getHelperBatchesByDate(
+      String date) async {
+    return await _db
         .from('helper_batches')
         .select()
-        .eq('helper_id', helperId)
-        .gte('date', start)
-        .lte('date', end)
+        .eq('date', date)
+        .order('created_at', ascending: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getHelperBatchesByBaker(
+      String masterBakerId) async {
+    return await _db
+        .from('helper_batches')
+        .select()
+        .eq('master_baker_id', masterBakerId)
         .order('date', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
   }
 
   Future<void> deleteHelperBatch(String id) async {
     await _db.from('helper_batches').delete().eq('id', id);
+  }
+
+  Future<void> updateHelperBatch(
+      String id, Map<String, dynamic> fields) async {
+    await _db.from('helper_batches').update(fields).eq('id', id);
   }
 
   // ──────────────────────────────────────────────────
@@ -324,5 +334,35 @@ class SupabaseService {
         .from('payroll_releases')
         .select()
         .order('week_start', ascending: false);
+  }
+
+  // ──────────────────────────────────────────────────
+  //  PAYROLL PAID OPERATIONS  ← NEW
+  // ──────────────────────────────────────────────────
+
+  /// Upsert a paid record — safe to call multiple times.
+  Future<void> insertPayrollPaid({
+    required String id,
+    required String userId,
+    required String weekStart,
+    required String paidBy,
+    required double amount,
+  }) async {
+    await _db.from('payroll_paid').upsert({
+      'id': id,
+      'user_id': userId,
+      'week_start': weekStart,
+      'paid_by': paidBy,
+      'amount': amount,
+    }, onConflict: 'user_id,week_start');
+  }
+
+  /// Returns the set of user IDs that have been paid for [weekStart].
+  Future<Set<String>> getPaidUserIds(String weekStart) async {
+    final rows = await _db
+        .from('payroll_paid')
+        .select('user_id')
+        .eq('week_start', weekStart);
+    return rows.map<String>((r) => r['user_id'] as String).toSet();
   }
 }

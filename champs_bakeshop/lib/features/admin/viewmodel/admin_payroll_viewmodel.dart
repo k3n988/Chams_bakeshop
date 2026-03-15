@@ -17,22 +17,23 @@ class AdminPayrollViewModel extends ChangeNotifier {
   String _weekStart = '';
   String _weekEnd = '';
   bool _isLoading = false;
+  bool _isPaying = false;
+  String? _error; // ✅ added
 
   // ─── Getters ──────────────────────────────────────────────────────────────
-  // Names match exactly what payroll_screen.dart and admin_dashboard.dart use
 
   List<PayrollEntry> get entries => _entries;
   String get weekStart => _weekStart;
   String get weekEnd => _weekEnd;
   bool get isLoading => _isLoading;
+  bool get isPaying => _isPaying;
+  String? get error => _error; // ✅ added
 
   double get totalPayroll =>
       _entries.fold(0.0, (sum, e) => sum + e.finalSalary);
 
   // ─── Load ─────────────────────────────────────────────────────────────────
 
-  /// Called by payroll_screen on init and after week/month changes.
-  /// Receives products + user maps from sibling ViewModels — no redundant fetching.
   Future<void> loadWeeklyPayroll(
     String weekStart,
     List<ProductModel> products,
@@ -42,18 +43,23 @@ class AdminPayrollViewModel extends ChangeNotifier {
     _weekStart = weekStart;
     _weekEnd = getWeekEnd(weekStart);
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
+      final paidIds = await _db.getPaidUserIds(weekStart);
       _entries = await _payroll.computeWeeklyPayroll(
         _weekStart,
         _weekEnd,
         products,
         userNames,
         userRoles,
+        paidUserIds: paidIds,
       );
-    } catch (_) {
+    } catch (e) {
       _entries = [];
+      _error = e.toString();
+      debugPrint('PayrollVM error: $e');
     }
 
     _isLoading = false;
@@ -62,7 +68,6 @@ class AdminPayrollViewModel extends ChangeNotifier {
 
   // ─── Week Navigation ──────────────────────────────────────────────────────
 
-  /// dir = -1 for previous week, +1 for next week
   Future<void> changeWeek(
     int dir,
     List<ProductModel> products,
@@ -79,10 +84,10 @@ class AdminPayrollViewModel extends ChangeNotifier {
 
   // ─── Deductions ───────────────────────────────────────────────────────────
 
-  /// weekStart passed explicitly so the dialog controls which week it applies to.
   Future<bool> saveDeduction({
     required String userId,
     required String weekStart,
+    required double oven,
     required double gas,
     required double vale,
     required double wifi,
@@ -93,18 +98,78 @@ class AdminPayrollViewModel extends ChangeNotifier {
         id: existing?.id ?? generateId('ded'),
         userId: userId,
         weekStart: weekStart,
+        oven: oven,
         gas: gas,
         vale: vale,
         wifi: wifi,
       );
-
-      if (existing != null) {
-        await _db.updateDeduction(deduction);
-      } else {
-        await _db.insertDeduction(deduction);
-      }
+      await _db.upsertDeduction(deduction);
       return true;
     } catch (e) {
+      debugPrint('saveDeduction error: $e');
+      return false;
+    }
+  }
+
+  // ─── Mark as Paid ─────────────────────────────────────────────────────────
+
+  Future<bool> markAsPaid({
+    required String userId,
+    required String paidBy,
+    required double amount,
+  }) async {
+    _isPaying = true;
+    notifyListeners();
+
+    try {
+      await _db.insertPayrollPaid(
+        id: generateId('paid'),
+        userId: userId,
+        weekStart: _weekStart,
+        paidBy: paidBy,
+        amount: amount,
+      );
+
+      _entries = _entries.map((e) {
+        if (e.userId == userId) return e.copyWith(isPaid: true);
+        return e;
+      }).toList();
+
+      _isPaying = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('markAsPaid error: $e');
+      _isPaying = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> markAllAsPaid({required String paidBy}) async {
+    _isPaying = true;
+    notifyListeners();
+
+    try {
+      final unpaid = _entries.where((e) => !e.isPaid).toList();
+      for (final e in unpaid) {
+        await _db.insertPayrollPaid(
+          id: generateId('paid'),
+          userId: e.userId,
+          weekStart: _weekStart,
+          paidBy: paidBy,
+          amount: e.finalSalary,
+        );
+      }
+
+      _entries = _entries.map((e) => e.copyWith(isPaid: true)).toList();
+      _isPaying = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('markAllAsPaid error: $e');
+      _isPaying = false;
+      notifyListeners();
       return false;
     }
   }
