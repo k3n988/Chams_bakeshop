@@ -37,6 +37,7 @@ class ChampsBakeshopApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // ── Services (exposed so screens can read them directly) ──
+        Provider<SupabaseService>(create: (_) => supa), // ✅ Fixed: Added SupabaseService provider
         Provider<DatabaseService>(create: (_) => db),
         Provider<PayrollService>(create:  (_) => payrollSvc),
 
