@@ -112,7 +112,7 @@ class _HelperDashboardState extends State<HelperDashboard>
     ];
 
     return Scaffold(
-      backgroundColor: DashColors.background,
+      backgroundColor: Colors.white,
       appBar: _index == 4
           ? null
           : _DashboardAppBar(userName: user.name),
@@ -183,10 +183,7 @@ class _DashboardAppBar extends StatelessWidget
           ],
         ),
       ]),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: DashColors.border),
-      ),
+      
     );
   }
 }
@@ -855,7 +852,7 @@ class _PreviewRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  HERO BANNER (UPDATED TO WHITE AESTHETIC)
+//  HERO BANNER (COLORFUL PALETTE)
 // ─────────────────────────────────────────────────────────
 class _HeroBanner extends StatelessWidget {
   final String userName;
@@ -870,37 +867,44 @@ class _HeroBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white, // Plain white background
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: DashColors.border), // Soft border
+        // 🔥 Colorful Gradient Palette 
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFFF7A00), // Deep vibrant orange
+            Color(0xFFFFA03A), // Lighter, bright orange
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04), // Faint shadow
+            color: const Color(0xFFFF7A00).withValues(alpha: 0.3),
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Welcome back,',
+          Text('Welcome back,',
               style: TextStyle(
-                  color: DashColors.textHint, // Darker text for white bg
+                  color: Colors.white.withValues(alpha: 0.9), // White text for contrast
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.3)),
           const SizedBox(height: 2),
           Text(userName,
               style: const TextStyle(
-                  color: DashColors.textPrimary, // Darker text for white bg
+                  color: Colors.white, // White text for contrast
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5)),
           const SizedBox(height: 4),
-          const Text("Here's your earnings overview",
+          Text("Here's your earnings overview",
               style: TextStyle(
-                  color: DashColors.textHint, 
+                  color: Colors.white.withValues(alpha: 0.9), 
                   fontSize: 13)),
           const SizedBox(height: 18),
           SizedBox(
@@ -910,10 +914,10 @@ class _HeroBanner extends StatelessWidget {
               icon: const Icon(Icons.add_circle_outline, size: 20),
               label: const Text('Add Production Batch',
                   style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14)),
+                      fontWeight: FontWeight.w800, fontSize: 14)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: DashColors.primary, // Fill with primary color
-                foregroundColor: Colors.white, // White text to contrast
+                backgroundColor: Colors.white, // White button to pop against the gradient
+                foregroundColor: const Color(0xFFFF7A00), // Orange text to match banner
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -1031,7 +1035,7 @@ class DashColors {
   static const primary       = Color(0xFFD48135);
   static const primaryLight  = Color(0xFFE5A663);
   static const primaryDark   = Color(0xFFB86A1E);
-  static const background    = Colors.white; // Changed to Pure White
+  static const background = Color(0xFFFFFFFF); // Changed to Pure White
   static const border        = Color(0xFFEEEEEE);
   static const textPrimary   = Color(0xFF1A1A1A);
   static const textSecondary = Color(0xFF666666);

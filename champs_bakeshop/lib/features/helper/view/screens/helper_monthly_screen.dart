@@ -36,7 +36,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
     final vm = context.read<HelperSalaryViewModel>();
     vm.loadMonthlySummary(_userId,
         year: _selectedMonth.year, month: _selectedMonth.month);
-    vm.loadPaidWeeks(_userId); // ✅ load paid status
+    vm.loadPaidWeeks(_userId);
   }
 
   void _changeMonth(int direction) {
@@ -77,8 +77,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
   }
 
   // ── Week preview sheet ───────────────────────────────────────
-  void _showWeekPreview(
-      WeeklySummary week, Color color, bool paid) {
+  void _showWeekPreview(WeeklySummary week, Color color, bool paid) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -89,7 +88,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
         maxChildSize:     0.92,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFFF7F7F8),
+            color: Colors.white,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -99,7 +98,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 40, height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(2)),
             ),
 
@@ -130,12 +129,10 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                     Text(
                       '${week.daysWorked} days · ${week.totalSacks} sacks',
                       style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textHint),
+                          fontSize: 12, color: AppColors.textHint),
                     ),
                   ]),
                 ),
-                // Paid/Unpaid badge
                 _PaidBadge(paid: paid),
               ]),
             ),
@@ -163,9 +160,9 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                       value: '${week.totalSacks} sacks',
                     ),
                     _PreviewRow(
-                      icon:  Icons.payments_outlined,
-                      label: 'Gross Salary',
-                      value: formatCurrency(week.grossSalary),
+                      icon:       Icons.payments_outlined,
+                      label:      'Gross Salary',
+                      value:      formatCurrency(week.grossSalary),
                       valueColor: AppColors.masterBaker,
                     ),
                   ]),
@@ -176,9 +173,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                     _PreviewLabel(
                         'DEDUCTIONS BREAKDOWN', AppColors.danger),
                     const SizedBox(height: 12),
-                    _DeductionRow(
-                        'Oven',
-                        week.ovenDeduction),
+                    _DeductionRow('Oven', week.ovenDeduction),
                     _DeductionRow('Gas',  week.gasDeduction),
                     _DeductionRow('Vale', week.vale),
                     _DeductionRow('Wifi', week.wifi),
@@ -203,20 +198,21 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                   const SizedBox(height: 12),
 
                   // ── Net salary ─────────────────────────
-                  _PreviewCard(color: AppColors.primaryDark,
+                  _PreviewCard(
+                      color: AppColors.primaryDark,
                       children: [
                     _PreviewLabel(
                         'NET SALARY', AppColors.primaryDark),
                     const SizedBox(height: 12),
                     _PreviewRow(
-                      icon:  Icons.calculate_outlined,
-                      label: 'Gross',
-                      value: formatCurrency(week.grossSalary),
+                      icon:       Icons.calculate_outlined,
+                      label:      'Gross',
+                      value:      formatCurrency(week.grossSalary),
                       valueColor: AppColors.masterBaker,
                     ),
                     _PreviewRow(
-                      icon:  Icons.remove_circle_outline,
-                      label: 'Total Deductions',
+                      icon:       Icons.remove_circle_outline,
+                      label:      'Total Deductions',
                       value:
                           '-${formatCurrency(week.totalDeductions)}',
                       valueColor: AppColors.danger,
@@ -259,7 +255,6 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
         '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
     final paidWeeks  = vm.paidWeekStarts;
 
-    // Count paid weeks this month
     final paidCount = vm.monthlyWeeks
         .where((w) => paidWeeks.contains(w.weekStart))
         .length;
@@ -296,7 +291,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
               _EarningsBanner(vm: vm),
               const SizedBox(height: 14),
 
-              // ✅ Month payment summary bar
+              // Month payment progress bar
               if (vm.monthlyWeeks.isNotEmpty)
                 _MonthPaymentBar(
                     paidCount:  paidCount,
@@ -376,10 +371,10 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                   final paid  =
                       paidWeeks.contains(week.weekStart);
                   return _WeekExpansionTile(
-                    week:  week,
-                    index: e.key,
-                    color: color,
-                    paid:  paid,
+                    week:      week,
+                    index:     e.key,
+                    color:     color,
+                    paid:      paid,
                     onPreview: () =>
                         _showWeekPreview(week, color, paid),
                   );
@@ -397,7 +392,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MONTH PAYMENT BAR  ← NEW
+//  MONTH PAYMENT BAR
 // ─────────────────────────────────────────────────────────────
 class _MonthPaymentBar extends StatelessWidget {
   final int paidCount;
@@ -407,9 +402,9 @@ class _MonthPaymentBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allPaid   = paidCount == totalWeeks && totalWeeks > 0;
-    final nonePaid  = paidCount == 0;
-    final color     = allPaid
+    final allPaid  = paidCount == totalWeeks && totalWeeks > 0;
+    final nonePaid = paidCount == 0;
+    final color    = allPaid
         ? AppColors.success
         : nonePaid
             ? Colors.orange
@@ -420,9 +415,13 @@ class _MonthPaymentBar extends StatelessWidget {
           horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border:
-            Border.all(color: color.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
       ),
       child: Row(children: [
         Container(
@@ -454,8 +453,7 @@ class _MonthPaymentBar extends StatelessWidget {
                   fontSize: 13,
                   color: color),
             ),
-            const SizedBox(height: 3),
-            // Progress bar
+            const SizedBox(height: 4),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -477,7 +475,7 @@ class _MonthPaymentBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  WEEK EXPANSION TILE  ← updated with paid badge + preview
+//  WEEK EXPANSION TILE
 // ─────────────────────────────────────────────────────────────
 class _WeekExpansionTile extends StatelessWidget {
   final WeeklySummary week;
@@ -499,13 +497,19 @@ class _WeekExpansionTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: paid
-                ? AppColors.success.withValues(alpha: 0.3)
-                : AppColors.border,
-            width: paid ? 1.5 : 1,
-          ),
+          borderRadius: BorderRadius.circular(16),
+          border: paid
+              ? Border.all(
+                  color: AppColors.success.withValues(alpha: 0.25),
+                  width: 1.5)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Theme(
           data: Theme.of(context)
@@ -516,7 +520,7 @@ class _WeekExpansionTile extends StatelessWidget {
             leading: Container(
               width: 42, height: 42,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
@@ -534,7 +538,6 @@ class _WeekExpansionTile extends StatelessWidget {
                         fontSize: 13),
                     overflow: TextOverflow.ellipsis),
               ),
-              // ✅ Paid badge in title row
               _PaidBadge(paid: paid, small: true),
             ]),
             subtitle: Text(
@@ -587,7 +590,6 @@ class _WeekExpansionTile extends StatelessWidget {
                             color: AppColors.primaryDark)),
                   ]),
                   const SizedBox(height: 10),
-                  // ✅ View Details button
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -641,7 +643,7 @@ class _DetailRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  PAID BADGE  ← NEW reusable
+//  PAID BADGE
 // ─────────────────────────────────────────────────────────────
 class _PaidBadge extends StatelessWidget {
   final bool paid;
@@ -660,14 +662,14 @@ class _PaidBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: paid
-                ? AppColors.success.withValues(alpha: 0.25)
-                : Colors.orange.withValues(alpha: 0.25),
+                ? AppColors.success.withValues(alpha: 0.2)
+                : Colors.orange.withValues(alpha: 0.2),
           ),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(
             paid ? Icons.check_circle : Icons.schedule,
-            size: small ? 9 : 12,
+            size:  small ? 9 : 12,
             color: paid ? AppColors.success : Colors.orange,
           ),
           SizedBox(width: small ? 3 : 4),
@@ -684,7 +686,7 @@ class _PaidBadge extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  PAYMENT STATUS CARD  ← used in preview sheet
+//  PAYMENT STATUS CARD
 // ─────────────────────────────────────────────────────────────
 class _PaymentStatusCard extends StatelessWidget {
   final bool paid;
@@ -700,8 +702,8 @@ class _PaymentStatusCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: paid
-                ? AppColors.success.withValues(alpha: 0.2)
-                : Colors.orange.withValues(alpha: 0.2),
+                ? AppColors.success.withValues(alpha: 0.15)
+                : Colors.orange.withValues(alpha: 0.15),
           ),
         ),
         child: Row(children: [
@@ -767,13 +769,13 @@ class _PreviewCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: color.withValues(alpha: 0.15)),
+          border:
+              Border.all(color: color.withValues(alpha: 0.12)),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -877,19 +879,15 @@ class _EarningsBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           gradient: const LinearGradient(
-            colors: [
-              AppColors.primaryDark,
-              AppColors.primary,
-              AppColors.primaryLight
-            ],
+            colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.3),
+              color: const Color(0xFFFF7A00).withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -916,8 +914,7 @@ class _EarningsBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            Row(mainAxisAlignment: MainAxisAlignment.center,
                 children: [
               _BannerChip(
                   icon:  Icons.work_history_outlined,
@@ -966,16 +963,28 @@ class _StatTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: color.withValues(alpha: 0.18)),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment:  MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 17, color: color),
+            ),
+            const SizedBox(height: 8),
             FittedBox(
               fit:       BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -1005,8 +1014,14 @@ class _DeductionsSummary extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1035,7 +1050,6 @@ class _DeductionsSummary extends StatelessWidget {
               ],
             ),
             const Divider(height: 24),
-            // ✅ Monthly net summary
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1050,18 +1064,26 @@ class _DeductionsSummary extends StatelessWidget {
                         color: AppColors.masterBaker)),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+                  horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.primaryDark
-                    .withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppColors.primaryDark
-                        .withValues(alpha: 0.12)),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF7A00)
+                        .withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                   mainAxisAlignment:
@@ -1070,13 +1092,14 @@ class _DeductionsSummary extends StatelessWidget {
                 const Text('Monthly Take-Home',
                     style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14)),
+                        fontSize: 14,
+                        color: Colors.white)),
                 Text(
                   formatCurrency(vm.monthlyTotalSalary),
                   style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize:   20,
-                      color:      AppColors.primaryDark),
+                      color:      Colors.white),
                 ),
               ]),
             ),
@@ -1133,8 +1156,13 @@ class _MonthSelector extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppColors.info.withValues(alpha: 0.25)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(children: [
           IconButton(
