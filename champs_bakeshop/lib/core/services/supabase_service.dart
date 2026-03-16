@@ -355,6 +355,58 @@ class SupabaseService {
       'paid_by': paidBy,
       'amount': amount,
     }, onConflict: 'user_id,week_start');
+    Future<Set<String>> getPaidWeekStartsForUser(String userId) async {
+  final rows = await _db
+      .from('payroll_paid')
+      .select('week_start')
+      .eq('user_id', userId);
+  return rows
+      .map<String>((r) => r['week_start'].toString().substring(0, 10))
+      .toSet();
+}
+  }
+  // ──────────────────────────────────────────────────
+  //  CHRISTMAS BONUS OPERATIONS
+  // ──────────────────────────────────────────────────
+
+  Future<void> upsertChristmasBonus(Map<String, dynamic> bonus) async {
+    await _db.from('christmas_bonuses').upsert(
+      bonus,
+      onConflict: 'user_id,date,production_id',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getChristmasBonuses({
+    int? month,
+    int? year,
+  }) async {
+    var query = _db.from('christmas_bonuses').select();
+    if (year != null) {
+      final y = year.toString();
+      final m = month?.toString().padLeft(2, '0');
+      if (m != null) {
+        query = query
+            .gte('date', '$y-$m-01')
+            .lte('date', '$y-$m-31');
+      } else {
+        query = query
+            .gte('date', '$y-01-01')
+            .lte('date', '$y-12-31');
+      }
+    }
+    return await query.order('date', ascending: false);
+  }
+
+  Future<void> deleteChristmasBonus(String id) async {
+    await _db.from('christmas_bonuses').delete().eq('id', id);
+  }
+
+  Future<void> deleteChristmasBonusesByProduction(
+      String productionId) async {
+    await _db
+        .from('christmas_bonuses')
+        .delete()
+        .eq('production_id', productionId);
   }
 
   /// Returns the set of user IDs that have been paid for [weekStart].

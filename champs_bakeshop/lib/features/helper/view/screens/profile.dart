@@ -2,11 +2,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/services/database_service.dart';
 
 // ─────────────────────────────────────────────────────────
-//  PROFILE SCREEN  (StatefulWidget — owns photo + name state)
+//  CONSTANTS
+// ─────────────────────────────────────────────────────────
+const _kBonusCode        = 'CHAMPS2026'; // change anytime
+const _kBonusUnlockedKey = 'bonus_unlocked_'; // + userId
+
+// ─────────────────────────────────────────────────────────
+//  PROFILE SCREEN
 // ─────────────────────────────────────────────────────────
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -38,24 +46,21 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
-  // ── State ─────────────────────────────────────────────
   String? _photoPath;
   late String _displayName;
   late AnimationController _avatarAnim;
   late Animation<double> _avatarScale;
+  bool _bonusUnlocked = false;
 
   static const _photoKey = 'profile_photo_path';
   static const _nameKey  = 'profile_display_name';
 
-  // ── Lifecycle ─────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _displayName = widget.userName;
-    _avatarAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
+    _avatarAnim  = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 350));
     _avatarScale =
         CurvedAnimation(parent: _avatarAnim, curve: Curves.elasticOut);
     _avatarAnim.forward();
@@ -68,16 +73,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
-  // ── Persistence ───────────────────────────────────────
   Future<void> _loadSavedData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final photoPath =
-        prefs.getString('${_photoKey}_${widget.userId}');
-    final savedName =
-        prefs.getString('${_nameKey}_${widget.userId}');
+    final prefs     = await SharedPreferences.getInstance();
+    final photoPath = prefs.getString('${_photoKey}_${widget.userId}');
+    final savedName = prefs.getString('${_nameKey}_${widget.userId}');
+    final unlocked  = prefs.getBool(
+        '$_kBonusUnlockedKey${widget.userId}') ?? false;
     if (!mounted) return;
     setState(() {
-      _photoPath = photoPath;
+      _photoPath      = photoPath;
+      _bonusUnlocked  = unlocked;
       if (savedName != null && savedName.isNotEmpty) {
         _displayName = savedName;
       }
@@ -98,16 +103,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     await prefs.setString('${_nameKey}_${widget.userId}', name);
   }
 
-  // ── Photo Actions ─────────────────────────────────────
+  Future<void> _saveBonusUnlocked(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+        '$_kBonusUnlockedKey${widget.userId}', value);
+  }
+
+  // ── Photo ─────────────────────────────────────────────
   void _showPhotoOptions() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _PhotoOptionsSheet(
-        hasPhoto: _photoPath != null,
-        onCamera: () => _pickImage(ImageSource.camera),
+        hasPhoto:  _photoPath != null,
+        onCamera:  () => _pickImage(ImageSource.camera),
         onGallery: () => _pickImage(ImageSource.gallery),
-        onRemove: _removePhoto,
+        onRemove:  _removePhoto,
       ),
     );
   }
@@ -117,17 +128,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 600,
-        maxHeight: 600,
-      );
+          source: source, imageQuality: 85,
+          maxWidth: 600, maxHeight: 600);
       if (picked == null) return;
       setState(() => _photoPath = picked.path);
       await _savePhotoPath(picked.path);
-      _avatarAnim
-        ..reset()
-        ..forward();
+      _avatarAnim..reset()..forward();
     } catch (e) {
       if (!mounted) return;
       _showSnack('Could not pick image: $e', isError: true);
@@ -138,12 +144,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     Navigator.pop(context);
     setState(() => _photoPath = null);
     _savePhotoPath(null);
-    _avatarAnim
-      ..reset()
-      ..forward();
+    _avatarAnim..reset()..forward();
   }
 
-  // ── Name Editing ──────────────────────────────────────
+  // ── Name ──────────────────────────────────────────────
   void _showEditNameDialog() {
     final ctrl = TextEditingController(text: _displayName);
     showDialog(
@@ -211,13 +215,171 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ── UI Helpers ────────────────────────────────────────
+  // ── Bonus ─────────────────────────────────────────────
+  void _handleBonusButton() {
+    if (_bonusUnlocked) {
+      _openBonusView();
+    } else {
+      _showBonusCodeDialog();
+    }
+  }
+
+  void _showBonusCodeDialog() {
+    final ctrl = TextEditingController();
+    bool obscure = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          contentPadding:
+              const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          title: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFC62828)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text('🎄',
+                  style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 12),
+            const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Text('Christmas Bonus',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
+              Text('Enter your bonus code',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textHint,
+                      fontWeight: FontWeight.w400)),
+            ]),
+          ]),
+          content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFC62828)
+                    .withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: const Color(0xFFC62828)
+                        .withValues(alpha: 0.15)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.lock_outline,
+                    size: 16, color: Color(0xFFC62828)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Ask your admin for the bonus code to unlock your holiday bonus summary.',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFC62828)),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              obscureText: obscure,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: 'Enter bonus code',
+                prefixIcon: const Icon(Icons.vpn_key_outlined,
+                    color: Color(0xFFC62828)),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: AppColors.textHint,
+                    size: 20,
+                  ),
+                  onPressed: () =>
+                      setDlg(() => obscure = !obscure),
+                ),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: Color(0xFFC62828), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFC62828)),
+              onPressed: () {
+                if (ctrl.text.trim().toUpperCase() ==
+                    _kBonusCode) {
+                  Navigator.pop(ctx);
+                  setState(() => _bonusUnlocked = true);
+                  _saveBonusUnlocked(true);
+                  _openBonusView();
+                } else {
+                  _showSnack('Incorrect bonus code.',
+                      isError: true);
+                }
+              },
+              child: const Text('Unlock'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openBonusView() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MultiProvider(
+        providers: [
+          Provider.value(value: context.read<DatabaseService>()),
+        ],
+        child: _BonusViewSheet(
+          userId:   widget.userId,
+          userName: _displayName,
+          role:     widget.userRole,
+          onLock: () {
+            setState(() => _bonusUnlocked = false);
+            _saveBonusUnlocked(false);
+            _showSnack('Bonus locked.');
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       backgroundColor: isError ? AppColors.danger : null,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10)),
       margin: const EdgeInsets.all(12),
     ));
   }
@@ -228,215 +390,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
-
-  // ─────────────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────────────
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F8),
-      body: CustomScrollView(
-        slivers: [
-          // ── Sticky Header ─────────────────────────────
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: widget.accentColor,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _ProfileHero(
-                displayName: _displayName,
-                userRole:    widget.userRole,
-                photoPath:   _photoPath,
-                accentColor: widget.accentColor,
-                avatarScale: _avatarScale,
-                initials:    _getInitials(_displayName),
-                onPhotoTap:  _showPhotoOptions,
-                onNameEdit:  _showEditNameDialog,
-              ),
-            ),
-          ),
-
-          // ── Body Content ──────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Personal Info
-                _ProfileCard(
-                  label: 'PERSONAL INFORMATION',
-                  children: [
-                    _InfoRow(
-                      icon:        Icons.person_outline,
-                      label:       'Name',
-                      value:       _displayName,
-                      accentColor: widget.accentColor,
-                    ),
-                    _InfoRow(
-                      icon:        Icons.badge_outlined,
-                      label:       'Role',
-                      value:       widget.userRole,
-                      accentColor: widget.accentColor,
-                    ),
-                    _InfoRow(
-                      icon:        Icons.fingerprint,
-                      label:       'ID',
-                      value:       widget.userId,
-                      accentColor: widget.accentColor,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Earnings Snapshot
-                _ProfileCard(
-                  label: 'EARNINGS SNAPSHOT',
-                  children: [
-                    _EarningRow(
-                      label: 'Total Gross',
-                      value: formatCurrency(widget.grossSalary),
-                      color: widget.accentColor,
-                    ),
-                    _EarningRow(
-                      label: 'Take-Home Pay',
-                      value: formatCurrency(widget.netSalary),
-                      color: AppColors.success,
-                    ),
-                    const Divider(height: 20),
-                    _EarningRow(
-                      label: 'Days Worked (Week)',
-                      value: '${widget.daysWorked} days',
-                      color: AppColors.info,
-                    ),
-                    _EarningRow(
-                      label: 'Total Records',
-                      value: '${widget.totalRecords}',
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Actions
-                _ActionsCard(
-                  accentColor:      widget.accentColor,
-                  onEditName:       _showEditNameDialog,
-                  onEditPhoto:      _showPhotoOptions,
-                  onChangePassword: () => _showChangePasswordDialog(context),
-                  onChristmasBonus: () => _showChristmasBonusDialog(context),
-                  onAbout:          () => _showAboutAppDialog(context),
-                ),
-                const SizedBox(height: 20),
-
-                // Logout
-                _LogoutButton(
-                    onLogout: () => _confirmLogout(context)),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Dialogs ───────────────────────────────────────────
-  void _showChristmasBonusDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18)),
-        title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFC62828).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.card_giftcard,
-                color: Color(0xFFC62828), size: 22),
-          ),
-          const SizedBox(width: 12),
-          const Text('Christmas Bonus',
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800)),
-        ]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFC62828), Color(0xFFE53935)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: const Column(children: [
-              Text('🎄', style: TextStyle(fontSize: 34)),
-              SizedBox(height: 8),
-              Text('BONUS STATUS',
-                  style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1)),
-              SizedBox(height: 4),
-              Text('Pending',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800)),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          _BonusRow('Eligibility', 'Tenure & performance'),
-          _BonusRow('Payout',      'December payroll'),
-          _BonusRow('Status',      'Awaiting admin approval'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: Colors.amber.withValues(alpha: 0.3)),
-            ),
-            child: const Row(children: [
-              Icon(Icons.info_outline,
-                  color: Colors.amber, size: 18),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Computed and approved by admin. Contact your manager for details.',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary),
-                ),
-              ),
-            ]),
-          ),
-        ]),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close')),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showSnack('Bonus request sent! Admin will review it.');
-            },
-            icon:  const Icon(Icons.send, size: 16),
-            label: const Text('Request'),
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFC62828)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showChangePasswordDialog(BuildContext context) {
@@ -474,7 +427,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               controller: currentCtrl,
               label:      'Current Password',
               obscure:    obscureCurrent,
-              onToggle:   () => setDlgState(
+              onToggle: () => setDlgState(
                   () => obscureCurrent = !obscureCurrent),
             ),
             const SizedBox(height: 12),
@@ -482,7 +435,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               controller: newCtrl,
               label:      'New Password',
               obscure:    obscureNew,
-              onToggle:   () =>
+              onToggle: () =>
                   setDlgState(() => obscureNew = !obscureNew),
             ),
             const SizedBox(height: 12),
@@ -490,7 +443,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               controller: confirmCtrl,
               label:      'Confirm Password',
               obscure:    obscureConfirm,
-              onToggle:   () => setDlgState(
+              onToggle: () => setDlgState(
                   () => obscureConfirm = !obscureConfirm),
             ),
           ]),
@@ -532,8 +485,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             borderRadius: BorderRadius.circular(18)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 64, height: 64,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               gradient: LinearGradient(
@@ -544,7 +496,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
             child: const Center(
-                child: Text('🍞', style: TextStyle(fontSize: 30))),
+                child: Text('🍞',
+                    style: TextStyle(fontSize: 30))),
           ),
           const SizedBox(height: 14),
           const Text('Champs Bakeshop',
@@ -616,10 +569,660 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F7F8),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            elevation: 0,
+            backgroundColor: widget.accentColor,
+            flexibleSpace: FlexibleSpaceBar(
+              background: _ProfileHero(
+                displayName: _displayName,
+                userRole:    widget.userRole,
+                photoPath:   _photoPath,
+                accentColor: widget.accentColor,
+                avatarScale: _avatarScale,
+                initials:    _getInitials(_displayName),
+                onPhotoTap:  _showPhotoOptions,
+                onNameEdit:  _showEditNameDialog,
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _ProfileCard(
+                  label: 'PERSONAL INFORMATION',
+                  children: [
+                    _InfoRow(
+                        icon:        Icons.person_outline,
+                        label:       'Name',
+                        value:       _displayName,
+                        accentColor: widget.accentColor),
+                    _InfoRow(
+                        icon:        Icons.badge_outlined,
+                        label:       'Role',
+                        value:       widget.userRole,
+                        accentColor: widget.accentColor),
+                    _InfoRow(
+                        icon:        Icons.fingerprint,
+                        label:       'ID',
+                        value:       widget.userId,
+                        accentColor: widget.accentColor),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _ProfileCard(
+                  label: 'EARNINGS SNAPSHOT',
+                  children: [
+                    _EarningRow(
+                        label: 'Total Gross',
+                        value: formatCurrency(widget.grossSalary),
+                        color: widget.accentColor),
+                    _EarningRow(
+                        label: 'Take-Home Pay',
+                        value: formatCurrency(widget.netSalary),
+                        color: AppColors.success),
+                    const Divider(height: 20),
+                    _EarningRow(
+                        label: 'Days Worked (Week)',
+                        value: '${widget.daysWorked} days',
+                        color: AppColors.info),
+                    _EarningRow(
+                        label: 'Total Records',
+                        value: '${widget.totalRecords}',
+                        color: AppColors.textSecondary),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _ActionsCard(
+                  accentColor:      widget.accentColor,
+                  bonusUnlocked:    _bonusUnlocked,
+                  onEditName:       _showEditNameDialog,
+                  onEditPhoto:      _showPhotoOptions,
+                  onChangePassword: () =>
+                      _showChangePasswordDialog(context),
+                  onChristmasBonus: _handleBonusButton,
+                  onAbout: () => _showAboutAppDialog(context),
+                ),
+                const SizedBox(height: 20),
+                _LogoutButton(
+                    onLogout: () => _confirmLogout(context)),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────
-//  PROFILE HERO  (SliverAppBar background)
+//  BONUS VIEW BOTTOM SHEET
+// ─────────────────────────────────────────────────────────
+class _BonusViewSheet extends StatefulWidget {
+  final String userId;
+  final String userName;
+  final String role;
+  final VoidCallback onLock;
+
+  const _BonusViewSheet({
+    required this.userId,
+    required this.userName,
+    required this.role,
+    required this.onLock,
+  });
+
+  @override
+  State<_BonusViewSheet> createState() => _BonusViewSheetState();
+}
+
+class _BonusViewSheetState extends State<_BonusViewSheet> {
+  List<Map<String, dynamic>> _entries = [];
+  bool _isLoading = true;
+  int  _selectedYear  = DateTime.now().year;
+  int  _selectedMonth = DateTime.now().month;
+
+  static const _monthNames = [
+    'January',   'February', 'March',    'April',
+    'May',       'June',     'July',     'August',
+    'September', 'October',  'November', 'December',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _isLoading = true);
+    try {
+      final db   = context.read<DatabaseService>();
+      final rows = await db.getChristmasBonuses(year: _selectedYear);
+      _entries   = rows
+          .where((r) => r['user_id'] == widget.userId)
+          .toList()
+        ..sort((a, b) =>
+            (b['date'] ?? '').compareTo(a['date'] ?? ''));
+    } catch (_) {}
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ── Helpers ───────────────────────────────────────────
+  List<Map<String, dynamic>> get _monthEntries => _entries.where((e) {
+        final d = DateTime.tryParse(
+            (e['date'] ?? '').toString().substring(0, 10));
+        return d != null &&
+            d.month == _selectedMonth &&
+            d.year == _selectedYear;
+      }).toList();
+
+  double get _monthTotal =>
+      _monthEntries.fold(0.0, (s, e) => s + (e['amount'] as num).toDouble());
+
+  double get _yearTotal =>
+      _entries.fold(0.0, (s, e) => s + (e['amount'] as num).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize:     0.5,
+      maxChildSize:     0.95,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF7F7F8),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width:  40, height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 16, 0),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC62828)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('🎄',
+                    style: TextStyle(fontSize: 20)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  const Text('My Christmas Bonus',
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFC62828),
+                          letterSpacing: -0.3)),
+                  Text(widget.userName,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textHint)),
+                ]),
+              ),
+              // Lock button
+              IconButton(
+                icon: const Icon(Icons.lock_outline,
+                    size: 20, color: AppColors.textHint),
+                tooltip: 'Lock bonus',
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onLock();
+                },
+              ),
+            ]),
+          ),
+          const Divider(height: 20),
+
+          // Year selector
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left,
+                    color: Color(0xFFC62828)),
+                onPressed: () {
+                  setState(() {
+                    _selectedYear--;
+                    _selectedMonth = 1;
+                  });
+                  _load();
+                },
+              ),
+              Text('$_selectedYear',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: Color(0xFFC62828))),
+              IconButton(
+                icon: const Icon(Icons.chevron_right,
+                    color: Color(0xFFC62828)),
+                onPressed: () {
+                  setState(() {
+                    _selectedYear++;
+                    _selectedMonth = 1;
+                  });
+                  _load();
+                },
+              ),
+            ]),
+          ),
+
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFC62828)))
+                : ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(
+                        16, 0, 16, 32),
+                    children: [
+                      // ── Year total banner ──────────────
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFFC62828),
+                              Color(0xFFE53935)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFC62828)
+                                  .withValues(alpha: 0.28),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Column(children: [
+                          const Text('🎁',
+                              style: TextStyle(fontSize: 30)),
+                          const SizedBox(height: 8),
+                          Text('TOTAL BONUS $_selectedYear',
+    style: TextStyle(
+        color: Colors.white70,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.2)),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            child: Text(
+                              formatCurrency(_yearTotal),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white
+                                  .withValues(alpha: 0.2),
+                              borderRadius:
+                                  BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_entries.length} entr${_entries.length != 1 ? 'ies' : 'y'} total',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Month tabs ─────────────────────
+                      SizedBox(
+                        height: 36,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 12,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 8),
+                          itemBuilder: (ctx, i) {
+                            final m   = i + 1;
+                            final sel = m == _selectedMonth;
+                            // count entries for this month
+                            final cnt = _entries.where((e) {
+                              final d = DateTime.tryParse(
+                                  (e['date'] ?? '')
+                                      .toString()
+                                      .substring(0, 10));
+                              return d != null &&
+                                  d.month == m &&
+                                  d.year == _selectedYear;
+                            }).length;
+                            return GestureDetector(
+                              onTap: () => setState(
+                                  () => _selectedMonth = m),
+                              child: AnimatedContainer(
+                                duration: const Duration(
+                                    milliseconds: 180),
+                                padding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: sel
+                                      ? const Color(0xFFC62828)
+                                      : Colors.white,
+                                  borderRadius:
+                                      BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: sel
+                                        ? const Color(0xFFC62828)
+                                        : AppColors.border,
+                                  ),
+                                  boxShadow: sel
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(
+                                                    0xFFC62828)
+                                                .withValues(
+                                                    alpha: 0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(
+                                                0, 2),
+                                          )
+                                        ]
+                                      : [],
+                                ),
+                                child: Row(
+                                    mainAxisSize:
+                                        MainAxisSize.min,
+                                    children: [
+                                  Text(
+                                    _monthNames[i]
+                                        .substring(0, 3),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight:
+                                            FontWeight.w700,
+                                        color: sel
+                                            ? Colors.white
+                                            : AppColors
+                                                .textSecondary),
+                                  ),
+                                  if (cnt > 0) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding:
+                                          const EdgeInsets.all(
+                                              3),
+                                      decoration: BoxDecoration(
+                                        color: sel
+                                            ? Colors.white
+                                                .withValues(
+                                                    alpha: 0.3)
+                                            : const Color(
+                                                    0xFFC62828)
+                                                .withValues(
+                                                    alpha: 0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text('$cnt',
+                                          style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight:
+                                                  FontWeight.w800,
+                                              color: sel
+                                                  ? Colors.white
+                                                  : const Color(
+                                                      0xFFC62828))),
+                                    ),
+                                  ],
+                                ]),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Month summary ──────────────────
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: const Color(0xFFC62828)
+                                  .withValues(alpha: 0.15)),
+                        ),
+                        child: Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                          Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                            Text(
+                              '${_monthNames[_selectedMonth - 1]} $_selectedYear',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textHint,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              formatCurrency(_monthTotal),
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFC62828)),
+                            ),
+                          ]),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC62828)
+                                  .withValues(alpha: 0.08),
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${_monthEntries.length} entr${_monthEntries.length != 1 ? 'ies' : 'y'}',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFC62828)),
+                            ),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // ── Daily entries ──────────────────
+                      if (_monthEntries.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 36),
+                          alignment: Alignment.center,
+                          child: Column(children: [
+                            Icon(Icons.card_giftcard_outlined,
+                                size: 40,
+                                color: AppColors.textHint
+                                    .withValues(alpha: 0.4)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No bonus for ${_monthNames[_selectedMonth - 1]}',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textHint,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ]),
+                        )
+                      else ...[
+                        const _BonusLabel('DAILY BREAKDOWN'),
+                        const SizedBox(height: 8),
+                        ..._monthEntries
+                            .map((e) => _BonusEntryRow(entry: e)),
+                      ],
+                    ],
+                  ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  BONUS ENTRY ROW  (inside view sheet)
+// ─────────────────────────────────────────────────────────
+class _BonusEntryRow extends StatelessWidget {
+  final Map<String, dynamic> entry;
+  const _BonusEntryRow({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final date   = (entry['date'] ?? '').toString().substring(0, 10);
+    final amount = (entry['amount'] as num).toDouble();
+    final note   = entry['note'] as String?;
+    final isAuto = entry['production_id'] != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isAuto
+              ? AppColors.info.withValues(alpha: 0.25)
+              : AppColors.border,
+        ),
+      ),
+      child: Row(children: [
+        Container(
+          width:  44, height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFFC62828).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.card_giftcard_outlined,
+              color: Color(0xFFC62828), size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            Row(children: [
+              const Icon(Icons.calendar_today_outlined,
+                  size: 12, color: AppColors.textHint),
+              const SizedBox(width: 4),
+              Text(date,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: AppColors.text)),
+              if (isAuto) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Production',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.info)),
+                ),
+              ],
+            ]),
+            if (note != null && note.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(note,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic)),
+            ],
+          ]),
+        ),
+        Text(
+          formatCurrency(amount),
+          style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: Color(0xFFC62828)),
+        ),
+      ]),
+    );
+  }
+}
+
+class _BonusLabel extends StatelessWidget {
+  final String text;
+  const _BonusLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3, height: 13,
+          decoration: BoxDecoration(
+              color: const Color(0xFFC62828),
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textHint,
+                letterSpacing: 0.8)),
+      ]);
+}
+
+// ─────────────────────────────────────────────────────────
+//  PROFILE HERO
 // ─────────────────────────────────────────────────────────
 class _ProfileHero extends StatelessWidget {
   final String displayName;
@@ -649,19 +1252,21 @@ class _ProfileHero extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             HSLColor.fromColor(accentColor)
-                .withLightness(
-                    (HSLColor.fromColor(accentColor).lightness - 0.12)
-                        .clamp(0.0, 1.0))
+                .withLightness((HSLColor.fromColor(accentColor)
+                            .lightness -
+                        0.12)
+                    .clamp(0.0, 1.0))
                 .toColor(),
             accentColor,
             HSLColor.fromColor(accentColor)
-                .withLightness(
-                    (HSLColor.fromColor(accentColor).lightness + 0.08)
-                        .clamp(0.0, 1.0))
+                .withLightness((HSLColor.fromColor(accentColor)
+                            .lightness +
+                        0.08)
+                    .clamp(0.0, 1.0))
                 .toColor(),
           ],
           begin: Alignment.topLeft,
-          end:   Alignment.bottomRight,
+          end: Alignment.bottomRight,
         ),
       ),
       child: SafeArea(
@@ -669,24 +1274,22 @@ class _ProfileHero extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 12),
-
-            // ── Avatar with edit badge ─────────────────
             ScaleTransition(
               scale: avatarScale,
               child: GestureDetector(
                 onTap: onPhotoTap,
                 child: Stack(children: [
                   Container(
-                    width:  90,
-                    height: 90,
+                    width: 90, height: 90,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withValues(alpha: 0.2),
-                      border:
-                          Border.all(color: Colors.white, width: 3),
+                      border: Border.all(
+                          color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.18),
+                          color: Colors.black
+                              .withValues(alpha: 0.18),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -694,29 +1297,22 @@ class _ProfileHero extends StatelessWidget {
                       image: photoPath != null
                           ? DecorationImage(
                               image: FileImage(File(photoPath!)),
-                              fit: BoxFit.cover,
-                            )
+                              fit: BoxFit.cover)
                           : null,
                     ),
                     child: photoPath == null
                         ? Center(
-                            child: Text(
-                              initials,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 30,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          )
+                            child: Text(initials,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w900)))
                         : null,
                   ),
                   Positioned(
-                    bottom: 0,
-                    right:  0,
+                    bottom: 0, right: 0,
                     child: Container(
-                      width:  28,
-                      height: 28,
+                      width: 28, height: 28,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
@@ -725,7 +1321,8 @@ class _ProfileHero extends StatelessWidget {
                             width: 1),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
+                            color: Colors.black
+                                .withValues(alpha: 0.15),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -739,22 +1336,17 @@ class _ProfileHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-
-            // ── Name + edit icon ───────────────────────
             GestureDetector(
               onTap: onNameEdit,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    displayName,
-                    style: const TextStyle(
-                      color:      Colors.white,
-                      fontSize:   22,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
+                  Text(displayName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.4)),
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.all(4),
@@ -769,8 +1361,6 @@ class _ProfileHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-
-            // ── Role pill ──────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 5),
@@ -780,15 +1370,12 @@ class _ProfileHero extends StatelessWidget {
                 border: Border.all(
                     color: Colors.white.withValues(alpha: 0.3)),
               ),
-              child: Text(
-                userRole.toUpperCase(),
-                style: const TextStyle(
-                  color:         Colors.white,
-                  fontSize:      11,
-                  fontWeight:    FontWeight.w700,
-                  letterSpacing: 1.0,
-                ),
-              ),
+              child: Text(userRole.toUpperCase(),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0)),
             ),
             const SizedBox(height: 16),
           ],
@@ -799,7 +1386,7 @@ class _ProfileHero extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  PHOTO OPTIONS BOTTOM SHEET
+//  PHOTO OPTIONS SHEET
 // ─────────────────────────────────────────────────────────
 class _PhotoOptionsSheet extends StatelessWidget {
   final bool hasPhoto;
@@ -819,14 +1406,12 @@ class _PhotoOptionsSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20)),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           margin: const EdgeInsets.only(top: 10),
-          width:  36,
-          height: 4,
+          width: 36, height: 4,
           decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(2)),
@@ -836,14 +1421,14 @@ class _PhotoOptionsSheet extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Text('Profile Photo',
               style: TextStyle(
-                  fontSize:   16,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color:      Color(0xFF1A1A1A))),
+                  color: Color(0xFF1A1A1A))),
         ),
         const SizedBox(height: 4),
         const Text('Choose how to update your photo',
-            style:
-                TextStyle(fontSize: 12, color: AppColors.textHint)),
+            style: TextStyle(
+                fontSize: 12, color: AppColors.textHint)),
         const SizedBox(height: 16),
         const Divider(height: 1),
         _OptionTile(
@@ -879,12 +1464,10 @@ class _PhotoOptionsSheet extends StatelessWidget {
 }
 
 class _OptionTile extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final String       subtitle;
-  final Color        color;
+  final IconData icon;
+  final String label, subtitle;
+  final Color color;
   final VoidCallback onTap;
-
   const _OptionTile({
     required this.icon,
     required this.label,
@@ -896,8 +1479,7 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         leading: Container(
-          width:  38,
-          height: 38,
+          width: 38, height: 38,
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
@@ -915,57 +1497,49 @@ class _OptionTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  REUSABLE CARD
+//  REUSABLE WIDGETS
 // ─────────────────────────────────────────────────────────
 class _ProfileCard extends StatelessWidget {
-  final String       label;
+  final String label;
   final List<Widget> children;
-
   const _ProfileCard(
       {required this.label, required this.children});
 
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color:        Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: const Color(0xFFEEEEEE)),
+          border: Border.all(color: const Color(0xFFEEEEEE)),
           boxShadow: [
             BoxShadow(
-              color:      Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset:     const Offset(0, 2),
-            ),
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
           ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize:      10,
-                      fontWeight:    FontWeight.w800,
-                      color:         AppColors.textHint,
-                      letterSpacing: 1.0)),
-              const SizedBox(height: 14),
-              ...children,
-            ],
-          ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textHint,
+                    letterSpacing: 1.0)),
+            const SizedBox(height: 14),
+            ...children,
+          ]),
         ),
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  INFO ROW
-// ─────────────────────────────────────────────────────────
 class _InfoRow extends StatelessWidget {
   final IconData icon;
-  final String   label;
-  final String   value;
-  final Color    accentColor;
-
+  final String label, value;
+  final Color accentColor;
   const _InfoRow({
     required this.icon,
     required this.label,
@@ -990,28 +1564,24 @@ class _InfoRow extends StatelessWidget {
             width: 56,
             child: Text(label,
                 style: const TextStyle(
-                    fontSize: 12, color: AppColors.textHint)),
+                    fontSize: 12,
+                    color: AppColors.textHint)),
           ),
           Expanded(
             child: Text(value,
                 style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize:   14,
-                    color:      Color(0xFF1A1A1A)),
+                    fontSize: 14,
+                    color: Color(0xFF1A1A1A)),
                 overflow: TextOverflow.ellipsis),
           ),
         ]),
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  EARNING ROW
-// ─────────────────────────────────────────────────────────
 class _EarningRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color  color;
-
+  final String label, value;
+  final Color color;
   const _EarningRow(
       {required this.label,
       required this.value,
@@ -1021,30 +1591,26 @@ class _EarningRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+          Flexible(
               child: Text(label,
                   style: const TextStyle(
                       fontSize: 13,
-                      color:    AppColors.textSecondary)),
-            ),
-            const SizedBox(width: 8),
-            Text(value,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize:   14,
-                    color:      color)),
-          ],
-        ),
+                      color: AppColors.textSecondary))),
+          const SizedBox(width: 8),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: color)),
+        ]),
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  ACTIONS CARD
-// ─────────────────────────────────────────────────────────
 class _ActionsCard extends StatelessWidget {
-  final Color        accentColor;
+  final Color accentColor;
+  final bool bonusUnlocked;
   final VoidCallback onEditName;
   final VoidCallback onEditPhoto;
   final VoidCallback onChangePassword;
@@ -1053,6 +1619,7 @@ class _ActionsCard extends StatelessWidget {
 
   const _ActionsCard({
     required this.accentColor,
+    required this.bonusUnlocked,
     required this.onEditName,
     required this.onEditPhoto,
     required this.onChangePassword,
@@ -1063,15 +1630,14 @@ class _ActionsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color:        Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: const Color(0xFFEEEEEE)),
+          border: Border.all(color: const Color(0xFFEEEEEE)),
           boxShadow: [
             BoxShadow(
-              color:      Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset:     const Offset(0, 2),
-            ),
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
           ],
         ),
         child: Column(children: [
@@ -1099,33 +1665,73 @@ class _ActionsCard extends StatelessWidget {
             onTap:    onChangePassword,
           ),
           const Divider(height: 1, indent: 56),
+          // ✅ Christmas Bonus with lock/unlock indicator
           _ActionItem(
-            icon:     Icons.card_giftcard_outlined,
+            icon:     bonusUnlocked
+                ? Icons.card_giftcard
+                : Icons.card_giftcard_outlined,
             label:    'Christmas Bonus',
-            subtitle: 'View or request your holiday bonus',
+            subtitle: bonusUnlocked
+                ? 'View your holiday bonus summary'
+                : 'Enter code to unlock your bonus',
             color:    const Color(0xFFC62828),
-            onTap:    onChristmasBonus,
+            trailing: bonusUnlocked
+                ? Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.success
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppColors.success
+                              .withValues(alpha: 0.2)),
+                    ),
+                    child: const Text('Unlocked',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.success)),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFC62828)
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: const Color(0xFFC62828)
+                              .withValues(alpha: 0.2)),
+                    ),
+                    child: const Text('Locked 🔒',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFC62828))),
+                  ),
+            onTap: onChristmasBonus,
           ),
           const Divider(height: 1, indent: 56),
           _ActionItem(
-            icon:     Icons.info_outline,
-            label:    'About',
+            icon:    Icons.info_outline,
+            label:   'About',
             subtitle: 'App version & info',
-            color:    accentColor,
-            onTap:    onAbout,
-            isLast:   true,
+            color:   accentColor,
+            onTap:   onAbout,
+            isLast:  true,
           ),
         ]),
       );
 }
 
 class _ActionItem extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final String       subtitle;
-  final Color        color;
+  final IconData icon;
+  final String label, subtitle;
+  final Color color;
   final VoidCallback onTap;
-  final bool         isLast;
+  final bool isLast;
+  final Widget? trailing;
 
   const _ActionItem({
     required this.icon,
@@ -1133,14 +1739,16 @@ class _ActionItem extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
-    this.isLast = false,
+    this.isLast  = false,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) => Material(
         color: Colors.transparent,
         borderRadius: isLast
-            ? const BorderRadius.vertical(bottom: Radius.circular(16))
+            ? const BorderRadius.vertical(
+                bottom: Radius.circular(16))
             : BorderRadius.zero,
         child: ListTile(
           shape: isLast
@@ -1149,8 +1757,7 @@ class _ActionItem extends StatelessWidget {
                       bottom: Radius.circular(16)))
               : null,
           leading: Container(
-            width:  38,
-            height: 38,
+            width: 38, height: 38,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
@@ -1163,24 +1770,21 @@ class _ActionItem extends StatelessWidget {
           subtitle: Text(subtitle,
               style: const TextStyle(
                   fontSize: 12, color: AppColors.textHint)),
-          trailing: const Icon(Icons.chevron_right,
-              color: AppColors.textHint, size: 20),
+          trailing: trailing ??
+              const Icon(Icons.chevron_right,
+                  color: AppColors.textHint, size: 20),
           onTap: onTap,
         ),
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  LOGOUT BUTTON
-// ─────────────────────────────────────────────────────────
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onLogout;
   const _LogoutButton({required this.onLogout});
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width:  double.infinity,
-        height: 50,
+        width: double.infinity, height: 50,
         child: OutlinedButton.icon(
           onPressed: onLogout,
           icon:  const Icon(Icons.logout, size: 18),
@@ -1197,45 +1801,11 @@ class _LogoutButton extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  BONUS INFO ROW
-// ─────────────────────────────────────────────────────────
-class _BonusRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _BonusRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize:   12,
-                      color:      AppColors.textHint,
-                      fontWeight: FontWeight.w600)),
-            ),
-            Expanded(
-                child: Text(value,
-                    style: const TextStyle(fontSize: 12))),
-          ],
-        ),
-      );
-}
-
-// ─────────────────────────────────────────────────────────
-//  PASSWORD FIELD WIDGET
-// ─────────────────────────────────────────────────────────
 class _PasswordField extends StatelessWidget {
   final TextEditingController controller;
-  final String       label;
-  final bool         obscure;
+  final String label;
+  final bool obscure;
   final VoidCallback onToggle;
-
   const _PasswordField({
     required this.controller,
     required this.label,
@@ -1245,9 +1815,9 @@ class _PasswordField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller:  controller,
+        controller: controller,
         obscureText: obscure,
-        decoration:  InputDecoration(
+        decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12)),

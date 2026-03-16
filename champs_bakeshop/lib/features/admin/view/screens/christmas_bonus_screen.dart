@@ -1,24 +1,23 @@
-// lib/features/admin/view/screens/christmas_bonus_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/models/user_model.dart';
+import '../../../../core/services/database_service.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  DATA MODEL
 // ─────────────────────────────────────────────────────────────
-
-/// One bonus entry: who, when, how much, and a note
 class BonusEntry {
-  final String id;
-  final String userId;
-  final String userName;
-  final String role;       // 'master_baker' | 'helper'
-  final String date;       // yyyy-MM-dd
-  final double amount;
+  final String  id;
+  final String  userId;
+  final String  userName;
+  final String  role;
+  final String  date;
+  final double  amount;
   final String? note;
+  final String? productionId;
 
   BonusEntry({
     required this.id,
@@ -28,66 +27,103 @@ class BonusEntry {
     required this.date,
     required this.amount,
     this.note,
+    this.productionId,
   });
 
+  bool get isFromProduction => productionId != null;
+
+  factory BonusEntry.fromMap(Map<String, dynamic> m) => BonusEntry(
+        id:           m['id'],
+        userId:       m['user_id'],
+        userName:     m['user_name'],
+        role:         m['role'],
+        date:         (m['date'] ?? '').toString().substring(0, 10),
+        amount:       (m['amount'] as num).toDouble(),
+        note:         m['note'],
+        productionId: m['production_id'],
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id':            id,
+        'user_id':       userId,
+        'user_name':     userName,
+        'role':          role,
+        'date':          date,
+        'amount':        amount,
+        'note':          note,
+        'production_id': productionId,
+      };
+
   BonusEntry copyWith({double? amount, String? note}) => BonusEntry(
-        id:       id,
-        userId:   userId,
-        userName: userName,
-        role:     role,
-        date:     date,
-        amount:   amount ?? this.amount,
-        note:     note ?? this.note,
+        id:           id,
+        userId:       userId,
+        userName:     userName,
+        role:         role,
+        date:         date,
+        amount:       amount ?? this.amount,
+        note:         note ?? this.note,
+        productionId: productionId,
       );
 }
 
 // ─────────────────────────────────────────────────────────────
-//  SIMPLE IN-MEMORY VIEW MODEL  (replace with Supabase later)
+//  VIEW MODEL
 // ─────────────────────────────────────────────────────────────
-
 class ChristmasBonusViewModel extends ChangeNotifier {
-  // Map key: "$userId|$date"
-  final Map<String, BonusEntry> _entries = {};
-  List<UserModel> _workers = [];
-  bool isLoading = false;
+  final DatabaseService _db;
 
-  List<UserModel> get workers => _workers;
+  ChristmasBonusViewModel(this._db);
 
-  List<BonusEntry> get allEntries => _entries.values.toList();
+  List<BonusEntry> _entries  = [];
+  List<UserModel>  _workers  = [];
+  bool             isLoading = false;
+  String?          error;
 
-  // Total for a specific month (1-12) and year
-  double monthTotal(int month, int year) => _entries.values
-      .where((e) {
-        final d = DateTime.tryParse(e.date);
-        return d != null && d.month == month && d.year == year;
-      })
-      .fold(0.0, (s, e) => s + e.amount);
+  List<UserModel>  get workers    => _workers;
+  List<BonusEntry> get allEntries => _entries;
 
-  // Entries for a specific month
+  // ✅ Latest first
   List<BonusEntry> entriesForMonth(int month, int year) =>
-      _entries.values.where((e) {
+      _entries.where((e) {
         final d = DateTime.tryParse(e.date);
         return d != null && d.month == month && d.year == year;
       }).toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
+        ..sort((a, b) => b.date.compareTo(a.date));
 
-  double workerTotal(String userId) => _entries.values
-      .where((e) => e.userId == userId)
-      .fold(0.0, (s, e) => s + e.amount);
+  double monthTotal(int month, int year) =>
+      entriesForMonth(month, year).fold(0.0, (s, e) => s + e.amount);
 
-  double workerMonthTotal(String userId, int month, int year) =>
-      _entries.values
-          .where((e) {
-            final d = DateTime.tryParse(e.date);
-            return e.userId == userId &&
-                d != null &&
-                d.month == month &&
-                d.year == year;
-          })
+  double workerTotal(String userId) =>
+      _entries.where((e) => e.userId == userId)
           .fold(0.0, (s, e) => s + e.amount);
 
-  BonusEntry? getEntry(String userId, String date) =>
-      _entries['$userId|$date'];
+  double workerMonthTotal(String userId, int month, int year) =>
+      entriesForMonth(month, year)
+          .where((e) => e.userId == userId)
+          .fold(0.0, (s, e) => s + e.amount);
+
+  // ── distinct dates that have entries (for date chip strip) ──
+  List<String> datesForMonth(int month, int year) {
+    final dates = <String>{};
+    for (final e in entriesForMonth(month, year)) {
+      dates.add(e.date);
+    }
+    return dates.toList()..sort((a, b) => b.compareTo(a)); // latest first
+  }
+
+  Future<void> loadBonuses({int? month, int? year}) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final rows = await _db.getChristmasBonuses(month: month, year: year);
+      _entries = rows.map((r) => BonusEntry.fromMap(r)).toList();
+    } catch (e) {
+      error = e.toString();
+    }
+    isLoading = false;
+    notifyListeners();
+  }
 
   void setWorkers(List<UserModel> users) {
     _workers = users
@@ -97,56 +133,64 @@ class ChristmasBonusViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void upsertEntry({
+  Future<void> upsertEntry({
     required String userId,
     required String userName,
     required String role,
     required String date,
     required double amount,
-    String? note,
-  }) {
-    final key = '$userId|$date';
-    _entries[key] = BonusEntry(
-      id:       key,
-      userId:   userId,
-      userName: userName,
-      role:     role,
-      date:     date,
-      amount:   amount,
-      note:     note,
-    );
-    notifyListeners();
-  }
-
-  void removeEntry(String userId, String date) {
-    _entries.remove('$userId|$date');
-    notifyListeners();
-  }
-
-  // All distinct dates that have any bonus entry
-  List<String> datesForMonth(int month, int year) {
-    final dates = <String>{};
-    for (final e in _entries.values) {
-      final d = DateTime.tryParse(e.date);
-      if (d != null && d.month == month && d.year == year) {
-        dates.add(e.date);
+    String?         note,
+    String?         existingId,
+  }) async {
+    try {
+      final id    = existingId ?? generateId('bonus');
+      final entry = BonusEntry(
+        id:           id,
+        userId:       userId,
+        userName:     userName,
+        role:         role,
+        date:         date,
+        amount:       amount,
+        note:         note,
+        productionId: null,
+      );
+      await _db.upsertChristmasBonus(entry.toMap());
+      final idx = _entries.indexWhere((e) => e.id == id);
+      if (idx >= 0) {
+        _entries[idx] = entry;
+      } else {
+        _entries.insert(0, entry); // add at top (latest first)
       }
+      notifyListeners();
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
     }
-    return dates.toList()..sort();
+  }
+
+  Future<void> removeEntry(String id) async {
+    try {
+      await _db.deleteChristmasBonus(id);
+      _entries.removeWhere((e) => e.id == id);
+      notifyListeners();
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+    }
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 //  ROOT SCREEN
 // ─────────────────────────────────────────────────────────────
-
 class ChristmasBonusScreen extends StatelessWidget {
   const ChristmasBonusScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final db = context.read<DatabaseService>();
     return ChangeNotifierProvider(
-      create: (_) => ChristmasBonusViewModel(),
+      create: (_) => ChristmasBonusViewModel(db),
       child: const _ChristmasBonusBody(),
     );
   }
@@ -165,21 +209,20 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
   int _selectedYear = DateTime.now().year;
 
   static const _months = [
-    'January', 'February', 'March', 'April',
-    'May',     'June',     'July',  'August',
-    'September','October', 'November','December',
+    'January',   'February', 'March',    'April',
+    'May',       'June',     'July',     'August',
+    'September', 'October',  'November', 'December',
   ];
 
   @override
   void initState() {
     super.initState();
-    final currentMonth = DateTime.now().month - 1;
     _tabController = TabController(
       length: 12,
       vsync: this,
-      initialIndex: currentMonth,
+      initialIndex: DateTime.now().month - 1,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWorkers());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
   @override
@@ -188,11 +231,19 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
     super.dispose();
   }
 
-  Future<void> _loadWorkers() async {
+  Future<void> _init() async {
     final userVm = context.read<AdminUserViewModel>();
     await userVm.loadUsers();
     if (!mounted) return;
-    context.read<ChristmasBonusViewModel>().setWorkers(userVm.users);
+    final bonusVm = context.read<ChristmasBonusViewModel>();
+    bonusVm.setWorkers(userVm.users);
+    await bonusVm.loadBonuses(year: _selectedYear);
+  }
+
+  Future<void> _reloadYear() async {
+    await context
+        .read<ChristmasBonusViewModel>()
+        .loadBonuses(year: _selectedYear);
   }
 
   @override
@@ -210,33 +261,32 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
             child: const Text('🎄', style: TextStyle(fontSize: 16)),
           ),
           const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Christmas Bonus',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-              Text('Track holiday bonuses per worker',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w400)),
-            ],
-          ),
+          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Christmas Bonus',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text('Track holiday bonuses per worker',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w400)),
+          ]),
         ]),
         actions: [
-          // Year switcher
           Container(
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               GestureDetector(
-                onTap: () => setState(() => _selectedYear--),
+                onTap: () {
+                  setState(() => _selectedYear--);
+                  _reloadYear();
+                },
                 child: const Icon(Icons.chevron_left,
                     size: 18, color: AppColors.primary),
               ),
@@ -248,7 +298,10 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
                       color: AppColors.primaryDark)),
               const SizedBox(width: 4),
               GestureDetector(
-                onTap: () => setState(() => _selectedYear++),
+                onTap: () {
+                  setState(() => _selectedYear++);
+                  _reloadYear();
+                },
                 child: const Icon(Icons.chevron_right,
                     size: 18, color: AppColors.primary),
               ),
@@ -284,10 +337,9 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MONTHLY TAB  — the main spreadsheet-like view
+//  MONTHLY TAB  — StatefulWidget with date filter
 // ─────────────────────────────────────────────────────────────
-
-class _MonthBonusTab extends StatelessWidget {
+class _MonthBonusTab extends StatefulWidget {
   final int    month;
   final int    year;
   final String monthName;
@@ -299,72 +351,344 @@ class _MonthBonusTab extends StatelessWidget {
   });
 
   @override
+  State<_MonthBonusTab> createState() => _MonthBonusTabState();
+}
+
+class _MonthBonusTabState extends State<_MonthBonusTab> {
+  String? _filterDate; // null = show all dates
+
+  int    get month     => widget.month;
+  int    get year      => widget.year;
+  String get monthName => widget.monthName;
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _filterDate != null
+          ? DateTime.parse(_filterDate!)
+          : DateTime(year, month, DateTime.now().day.clamp(
+              1, DateUtils.getDaysInMonth(year, month))),
+      firstDate: DateTime(year, month, 1),
+      lastDate:
+          DateTime(year, month, DateUtils.getDaysInMonth(year, month)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+              primary: Color(0xFFC62828),
+              onPrimary: Colors.white,
+              onSurface: Colors.black),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(
+          () => _filterDate = picked.toString().split(' ')[0]);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final vm      = context.watch<ChristmasBonusViewModel>();
     final workers = vm.workers;
     final total   = vm.monthTotal(month, year);
-    final entries = vm.entriesForMonth(month, year);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Month hero ───────────────────────────────────────
-        _MonthHeroCard(
-          monthName: monthName,
-          year:      year,
-          total:     total,
-          count:     entries.length,
-          workers:   workers.length,
-        ),
-        const SizedBox(height: 16),
+    // ✅ All entries for month, latest first
+    final allEntries = vm.entriesForMonth(month, year);
 
-        // ── Add bonus button ─────────────────────────────────
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: workers.isEmpty
-                ? null
-                : () => _showAddBonusDialog(context, vm, workers),
-            icon:  const Icon(Icons.add, size: 18),
-            label: const Text('Add Bonus Entry',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+    // ✅ Filter by selected date if set
+    final entries = _filterDate == null
+        ? allEntries
+        : allEntries.where((e) => e.date == _filterDate).toList();
+
+    // ✅ Distinct dates for quick-filter chips
+    final availableDates = vm.datesForMonth(month, year);
+
+    if (vm.isLoading) {
+      return const Center(
+          child: CircularProgressIndicator(
+              color: Color(0xFFC62828)));
+    }
+
+    return RefreshIndicator(
+      color: const Color(0xFFC62828),
+      onRefresh: () => vm.loadBonuses(year: year),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+          // ── Month hero ────────────────────────────────────
+          _MonthHeroCard(
+            monthName: monthName,
+            year:      year,
+            total:     total,
+            count:     allEntries.length,
+            workers:   workers.length,
+          ),
+          const SizedBox(height: 16),
+
+          // ── Info banner ───────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppColors.info.withValues(alpha: 0.2)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.info_outline,
+                  size: 16, color: AppColors.info),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Production bonuses are auto-added when baker saves production. '
+                  'You can also add manual entries below.',
+                  style: TextStyle(fontSize: 11, color: AppColors.info),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Add bonus button ──────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: workers.isEmpty
+                  ? null
+                  : () => _showAddBonusDialog(context, vm, workers),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Bonus Entry',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-
-        // ── Worker summary ───────────────────────────────────
-        if (workers.isNotEmpty) ...[
-          _WorkerSummaryCard(
-              workers: workers, vm: vm, month: month, year: year),
           const SizedBox(height: 16),
-        ],
 
-        // ── Entries list ─────────────────────────────────────
-        if (entries.isEmpty)
-          _EmptyState(monthName: monthName)
-        else ...[
-          _SectionLabel('BONUS ENTRIES — $monthName $year'),
-          const SizedBox(height: 10),
-          ...entries.map((e) => _BonusEntryCard(
-                entry: e,
-                onEdit: () => _showEditDialog(context, vm, e, workers),
-                onDelete: () => _confirmDelete(context, vm, e),
-              )),
-        ],
-      ]),
+          // ── Worker summary ────────────────────────────────
+          if (workers.isNotEmpty) ...[
+            _WorkerSummaryCard(
+                workers: workers,
+                vm: vm,
+                month: month,
+                year: year),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Entries section ───────────────────────────────
+          if (allEntries.isEmpty)
+            _EmptyState(monthName: monthName)
+          else ...[
+
+            // Section header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _SectionLabel('BONUS ENTRIES — $monthName $year'),
+                // ✅ Date filter button
+                GestureDetector(
+                  onTap: () => _pickDate(context),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _filterDate != null
+                          ? const Color(0xFFC62828)
+                              .withValues(alpha: 0.1)
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _filterDate != null
+                            ? const Color(0xFFC62828)
+                                .withValues(alpha: 0.35)
+                            : AppColors.border,
+                      ),
+                    ),
+                    child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                      Icon(
+                        _filterDate != null
+                            ? Icons.calendar_today
+                            : Icons.calendar_today_outlined,
+                        size: 13,
+                        color: _filterDate != null
+                            ? const Color(0xFFC62828)
+                            : AppColors.textHint,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _filterDate ?? 'All Dates',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _filterDate != null
+                                ? const Color(0xFFC62828)
+                                : AppColors.textHint),
+                      ),
+                      if (_filterDate != null) ...[
+                        const SizedBox(width: 5),
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _filterDate = null),
+                          child: const Icon(Icons.close,
+                              size: 12,
+                              color: Color(0xFFC62828)),
+                        ),
+                      ],
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // ✅ Date quick-filter chips (only when entries exist)
+            if (availableDates.length > 1) ...[
+              SizedBox(
+                height: 34,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: availableDates.length + 1, // +1 for "All"
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (ctx, i) {
+                    if (i == 0) {
+                      // "All" chip
+                      final isSelected = _filterDate == null;
+                      return _DateChip(
+                        label: 'All',
+                        isSelected: isSelected,
+                        onTap: () =>
+                            setState(() => _filterDate = null),
+                      );
+                    }
+                    final date = availableDates[i - 1];
+                    final isSelected = _filterDate == date;
+                    return _DateChip(
+                      label: date,
+                      isSelected: isSelected,
+                      onTap: () =>
+                          setState(() => _filterDate = date),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // ✅ Active filter summary badge
+            if (_filterDate != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC62828)
+                      .withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: const Color(0xFFC62828)
+                          .withValues(alpha: 0.15)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.filter_list,
+                      size: 14, color: Color(0xFFC62828)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Showing ${entries.length} entr${entries.length != 1 ? 'ies' : 'y'} for $_filterDate',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFC62828),
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _filterDate = null),
+                    child: const Text('Show all',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFC62828),
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline)),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // ✅ Empty for this date
+            if (entries.isEmpty && _filterDate != null)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                alignment: Alignment.center,
+                child: Column(children: [
+                  Icon(Icons.event_busy_outlined,
+                      size: 36,
+                      color: AppColors.textHint
+                          .withValues(alpha: 0.5)),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No bonuses on $_filterDate',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textHint,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _filterDate = null),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFC62828)
+                            .withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: const Color(0xFFC62828)
+                                .withValues(alpha: 0.2)),
+                      ),
+                      child: const Text('Clear filter',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFC62828),
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ]),
+              )
+            else
+              ...entries.map((e) => _BonusEntryCard(
+                    entry: e,
+                    onEdit: e.isFromProduction
+                        ? null
+                        : () => _showEditDialog(
+                            context, vm, e, workers),
+                    onDelete: () => _confirmDelete(context, vm, e),
+                  )),
+          ],
+        ]),
+      ),
     );
   }
 
-  // ── Add dialog ──────────────────────────────────────────────
-  void _showAddBonusDialog(BuildContext context, ChristmasBonusViewModel vm,
-      List<UserModel> workers) {
+  // ── Dialogs ───────────────────────────────────────────────
+
+  void _showAddBonusDialog(BuildContext context,
+      ChristmasBonusViewModel vm, List<UserModel> workers) {
     String? selectedUserId;
     String? selectedUserName;
     String? selectedRole;
@@ -400,8 +724,6 @@ class _MonthBonusTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
               const SizedBox(height: 12),
-
-              // Worker picker
               const _FieldLabel('Worker'),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
@@ -428,8 +750,6 @@ class _MonthBonusTab extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 12),
-
-              // Date
               const _FieldLabel('Date'),
               const SizedBox(height: 6),
               GestureDetector(
@@ -441,7 +761,9 @@ class _MonthBonusTab extends StatelessWidget {
                     lastDate: DateTime(year, month,
                         DateUtils.getDaysInMonth(year, month)),
                   );
-                  if (picked != null) setDlg(() => selectedDate = picked);
+                  if (picked != null) {
+                    setDlg(() => selectedDate = picked);
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -458,13 +780,12 @@ class _MonthBonusTab extends StatelessWidget {
                     const SizedBox(width: 10),
                     Text(selectedDate.toString().split(' ')[0],
                         style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14)),
                   ]),
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Amount
               const _FieldLabel('Bonus Amount (₱)'),
               const SizedBox(height: 6),
               TextField(
@@ -474,13 +795,11 @@ class _MonthBonusTab extends StatelessWidget {
                 decoration: _inputDec(hint: '0.00', prefix: '₱ '),
               ),
               const SizedBox(height: 12),
-
-              // Note (optional)
               const _FieldLabel('Note (optional)'),
               const SizedBox(height: 6),
               TextField(
                 controller: noteCtrl,
-                decoration: _inputDec(hint: 'e.g. Christmas 2025'),
+                decoration: _inputDec(hint: 'e.g. Christmas 2026'),
                 maxLines: 2,
               ),
               const SizedBox(height: 8),
@@ -493,22 +812,22 @@ class _MonthBonusTab extends StatelessWidget {
             FilledButton(
               style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFC62828)),
-              onPressed: () {
+              onPressed: () async {
                 if (selectedUserId == null) return;
                 final amount =
                     double.tryParse(amountCtrl.text.trim()) ?? 0;
                 if (amount <= 0) return;
-                vm.upsertEntry(
+                await vm.upsertEntry(
                   userId:   selectedUserId!,
                   userName: selectedUserName!,
                   role:     selectedRole!,
                   date:     selectedDate.toString().split(' ')[0],
                   amount:   amount,
-                  note:     noteCtrl.text.trim().isEmpty
+                  note: noteCtrl.text.trim().isEmpty
                       ? null
                       : noteCtrl.text.trim(),
                 );
-                Navigator.pop(ctx);
+                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Save'),
             ),
@@ -518,9 +837,9 @@ class _MonthBonusTab extends StatelessWidget {
     );
   }
 
-  // ── Edit dialog ─────────────────────────────────────────────
-  void _showEditDialog(BuildContext context, ChristmasBonusViewModel vm,
-      BonusEntry entry, List<UserModel> workers) {
+  void _showEditDialog(BuildContext context,
+      ChristmasBonusViewModel vm, BonusEntry entry,
+      List<UserModel> workers) {
     final amountCtrl =
         TextEditingController(text: entry.amount.toStringAsFixed(2));
     final noteCtrl =
@@ -564,8 +883,8 @@ class _MonthBonusTab extends StatelessWidget {
           TextField(
             controller: amountCtrl,
             autofocus: true,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true),
             decoration: _inputDec(hint: '0.00', prefix: '₱ '),
           ),
           const SizedBox(height: 12),
@@ -573,7 +892,7 @@ class _MonthBonusTab extends StatelessWidget {
           const SizedBox(height: 6),
           TextField(
             controller: noteCtrl,
-            decoration: _inputDec(hint: 'e.g. Christmas 2025'),
+            decoration: _inputDec(hint: 'e.g. Christmas 2026'),
             maxLines: 2,
           ),
         ]),
@@ -584,21 +903,22 @@ class _MonthBonusTab extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary),
-            onPressed: () {
+            onPressed: () async {
               final amount =
                   double.tryParse(amountCtrl.text.trim()) ?? 0;
               if (amount <= 0) return;
-              vm.upsertEntry(
-                userId:   entry.userId,
-                userName: entry.userName,
-                role:     entry.role,
-                date:     entry.date,
-                amount:   amount,
-                note:     noteCtrl.text.trim().isEmpty
+              await vm.upsertEntry(
+                userId:     entry.userId,
+                userName:   entry.userName,
+                role:       entry.role,
+                date:       entry.date,
+                amount:     amount,
+                existingId: entry.id,
+                note: noteCtrl.text.trim().isEmpty
                     ? null
                     : noteCtrl.text.trim(),
               );
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Update'),
           ),
@@ -607,31 +927,63 @@ class _MonthBonusTab extends StatelessWidget {
     );
   }
 
-  // ── Delete confirm ──────────────────────────────────────────
-  void _confirmDelete(BuildContext context, ChristmasBonusViewModel vm,
-      BonusEntry entry) {
+  void _confirmDelete(BuildContext context,
+      ChristmasBonusViewModel vm, BonusEntry entry) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18)),
-        title: const Text('Remove Entry',
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        content: RichText(
-          text: TextSpan(
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 14),
-            children: [
-              const TextSpan(text: 'Remove bonus entry for '),
-              TextSpan(
-                  text: entry.userName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.text)),
-              TextSpan(text: ' on ${entry.date}?'),
-            ],
-          ),
+        title: Text(
+          entry.isFromProduction
+              ? 'Remove Production Bonus'
+              : 'Remove Entry',
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
+        content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14),
+              children: [
+                const TextSpan(text: 'Remove bonus for '),
+                TextSpan(
+                    text: entry.userName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.text)),
+                TextSpan(text: ' on ${entry.date}?'),
+              ],
+            ),
+          ),
+          if (entry.isFromProduction) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.2)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.warning_amber_outlined,
+                    size: 14, color: AppColors.warning),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'This was auto-added from production. Deleting it will not remove the production record.',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.warning),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ]),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -639,9 +991,9 @@ class _MonthBonusTab extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.danger),
-            onPressed: () {
-              vm.removeEntry(entry.userId, entry.date);
-              Navigator.pop(ctx);
+            onPressed: () async {
+              await vm.removeEntry(entry.id);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Remove'),
           ),
@@ -652,9 +1004,61 @@ class _MonthBonusTab extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  DATE CHIP  — horizontal scrollable quick filter
+// ─────────────────────────────────────────────────────────────
+class _DateChip extends StatelessWidget {
+  final String   label;
+  final bool     isSelected;
+  final VoidCallback onTap;
+  const _DateChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFFC62828)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFFC62828)
+                  : AppColors.border,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                        color: const Color(0xFFC62828)
+                            .withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2)),
+                  ]
+                : [],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isSelected
+                    ? Colors.white
+                    : AppColors.textSecondary),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
 //  MONTH HERO CARD
 // ─────────────────────────────────────────────────────────────
-
 class _MonthHeroCard extends StatelessWidget {
   final String monthName;
   final int    year;
@@ -704,13 +1108,11 @@ class _MonthHeroCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5)),
                 const SizedBox(height: 2),
-                Text(
-                  formatCurrency(total),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900),
-                ),
+                Text(formatCurrency(total),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900)),
                 const SizedBox(height: 6),
                 Row(children: [
                   _HeroPill(
@@ -753,9 +1155,8 @@ class _HeroPill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  WORKER SUMMARY CARD  — like the Excel totals per row
+//  WORKER SUMMARY CARD
 // ─────────────────────────────────────────────────────────────
-
 class _WorkerSummaryCard extends StatelessWidget {
   final List<UserModel>         workers;
   final ChristmasBonusViewModel vm;
@@ -785,7 +1186,6 @@ class _WorkerSummaryCard extends StatelessWidget {
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
           child: Row(children: [
@@ -804,26 +1204,24 @@ class _WorkerSummaryCard extends StatelessWidget {
                     letterSpacing: 0.8)),
           ]),
         ),
-
         if (bakers.isNotEmpty) ...[
-          _RoleHeader(label: '👨‍🍳  Master Bakers', color: AppColors.masterBaker),
+          _RoleHeader(
+              label: '👨‍🍳  Master Bakers',
+              color: AppColors.masterBaker),
           ...bakers.map((w) => _WorkerRow(
-                worker: w,
-                amount: vm.workerMonthTotal(w.id, month, year),
+                worker:  w,
+                amount:  vm.workerMonthTotal(w.id, month, year),
                 allTime: vm.workerTotal(w.id),
               )),
         ],
-
         if (helpers.isNotEmpty) ...[
           _RoleHeader(label: '🧑‍🍳  Helpers', color: AppColors.info),
           ...helpers.map((w) => _WorkerRow(
-                worker: w,
-                amount: vm.workerMonthTotal(w.id, month, year),
+                worker:  w,
+                amount:  vm.workerMonthTotal(w.id, month, year),
                 allTime: vm.workerTotal(w.id),
               )),
         ],
-
-        // Grand total row
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: const BoxDecoration(
@@ -885,7 +1283,6 @@ class _WorkerRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(children: [
-          // Initials avatar
           Container(
             width: 32,
             height: 32,
@@ -895,7 +1292,9 @@ class _WorkerRow extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              worker.name.isNotEmpty ? worker.name[0].toUpperCase() : '?',
+              worker.name.isNotEmpty
+                  ? worker.name[0].toUpperCase()
+                  : '?',
               style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
@@ -929,13 +1328,12 @@ class _WorkerRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  BONUS ENTRY CARD  — individual entry row
+//  BONUS ENTRY CARD
 // ─────────────────────────────────────────────────────────────
-
 class _BonusEntryCard extends StatelessWidget {
-  final BonusEntry   entry;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final BonusEntry    entry;
+  final VoidCallback? onEdit;
+  final VoidCallback  onDelete;
   const _BonusEntryCard({
     required this.entry,
     required this.onEdit,
@@ -944,7 +1342,7 @@ class _BonusEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBaker = entry.role == 'master_baker';
+    final isBaker   = entry.role == 'master_baker';
     final roleColor = isBaker ? AppColors.masterBaker : AppColors.info;
     final roleLabel = isBaker ? '👨‍🍳 Baker' : '🧑‍🍳 Helper';
 
@@ -954,7 +1352,11 @@ class _BonusEntryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: entry.isFromProduction
+              ? AppColors.info.withValues(alpha: 0.3)
+              : AppColors.border,
+        ),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -963,7 +1365,6 @@ class _BonusEntryCard extends StatelessWidget {
         ],
       ),
       child: Row(children: [
-        // Left: avatar
         Container(
           width: 42,
           height: 42,
@@ -983,19 +1384,20 @@ class _BonusEntryCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-
-        // Middle: info
         Expanded(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
             Row(children: [
-              Text(entry.userName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.text)),
-              const SizedBox(width: 8),
+              Flexible(
+                child: Text(entry.userName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.text),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 7, vertical: 2),
@@ -1009,6 +1411,22 @@ class _BonusEntryCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: roleColor)),
               ),
+              if (entry.isFromProduction) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Auto',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.info)),
+                ),
+              ],
             ]),
             const SizedBox(height: 3),
             Row(children: [
@@ -1019,10 +1437,10 @@ class _BonusEntryCard extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textHint)),
               if (entry.note != null) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 const Text('•',
                     style: TextStyle(color: AppColors.textHint)),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Flexible(
                   child: Text(entry.note!,
                       style: const TextStyle(
@@ -1035,8 +1453,6 @@ class _BonusEntryCard extends StatelessWidget {
             ]),
           ]),
         ),
-
-        // Right: amount + actions
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(
             formatCurrency(entry.amount),
@@ -1047,19 +1463,21 @@ class _BonusEntryCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Row(children: [
-            GestureDetector(
-              onTap: onEdit,
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
+            if (onEdit != null) ...[
+              GestureDetector(
+                onTap: onEdit,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.edit_outlined,
+                      size: 14, color: AppColors.primary),
                 ),
-                child: const Icon(Icons.edit_outlined,
-                    size: 14, color: AppColors.primary),
               ),
-            ),
-            const SizedBox(width: 6),
+              const SizedBox(width: 6),
+            ],
             GestureDetector(
               onTap: onDelete,
               child: Container(
@@ -1082,7 +1500,6 @@ class _BonusEntryCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 //  EMPTY STATE
 // ─────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final String monthName;
   const _EmptyState({required this.monthName});
@@ -1107,7 +1524,9 @@ class _EmptyState extends StatelessWidget {
                   fontSize: 15,
                   color: AppColors.text)),
           const SizedBox(height: 6),
-          const Text('Tap "Add Bonus Entry" to record a bonus',
+          const Text(
+              'Bonuses appear here when baker saves production,\nor tap "Add Bonus Entry" to add manually.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 13, color: AppColors.textSecondary)),
         ]),
@@ -1115,9 +1534,8 @@ class _EmptyState extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  SHARED SMALL HELPERS
+//  SHARED HELPERS
 // ─────────────────────────────────────────────────────────────
-
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
@@ -1163,11 +1581,12 @@ InputDecoration _inputDec({String? hint, String? prefix}) =>
           borderSide: const BorderSide(color: AppColors.border)),
       enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+          borderSide: const BorderSide(
+              color: AppColors.border, width: 1.5)),
       focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(
               color: Color(0xFFC62828), width: 1.5)),
-      filled:     true,
-      fillColor:  AppColors.background,
+      filled:    true,
+      fillColor: AppColors.background,
     );

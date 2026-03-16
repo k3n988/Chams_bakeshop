@@ -13,21 +13,15 @@ class BakerProductionViewModel extends ChangeNotifier {
 
   BakerProductionViewModel(this._db, this._payroll);
 
-  // ─── State ────────────────────────────────────────────────────────────────
-
   List<ProductionModel> _productions = [];
   List<ProductModel>    _products    = [];
   List<UserModel>       _helpers     = [];
   bool                  _isLoading   = false;
 
-  // ─── Getters ──────────────────────────────────────────────────────────────
-
   List<ProductionModel> get productions => _productions;
   List<ProductModel>    get products    => _products;
   List<UserModel>       get helpers     => _helpers;
   bool                  get isLoading   => _isLoading;
-
-  // ─── Load ─────────────────────────────────────────────────────────────────
 
   Future<void> loadData(String masterBakerId) async {
     _isLoading = true;
@@ -49,20 +43,9 @@ class BakerProductionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Compute ──────────────────────────────────────────────────────────────
-
-  /// Computes a saved production's daily result — same as AdminProductionViewModel.
   DailySalaryResult computeDaily(ProductionModel production) =>
       _payroll.computeDaily(production, _products);
 
-  // ─── Preview ──────────────────────────────────────────────────────────────
-
-  /// Live preview before saving.
-  ///
-  /// • effectiveSacks    = sacks + extraKg / 25.0
-  /// • salaryPerWorker   = totalValue / totalWorkers  (base, all workers share)
-  /// • bonusPerWorker    = Σ(bonusPerSack × eff) / totalWorkers  (paid separately)
-  /// • bakerIncentive    = totalEffectiveSacks × ₱100  (baker only, in salary)
   DailySalaryResult previewSalary(
       List<ProductionItem> items, int helperCount) {
     double totalValue          = 0;
@@ -72,11 +55,12 @@ class BakerProductionViewModel extends ChangeNotifier {
     int    totalExtraKg        = 0;
 
     for (final item in items) {
-      final product = _products.where((p) => p.id == item.productId).firstOrNull;
+      final product =
+          _products.where((p) => p.id == item.productId).firstOrNull;
       if (product != null) {
         final eff = item.effectiveSacks;
-        totalValue          += product.pricePerSack  * eff;
-        totalBonusAmount    += product.bonusPerSack  * eff;
+        totalValue          += product.pricePerSack * eff;
+        totalBonusAmount    += product.bonusPerSack * eff;
         totalEffectiveSacks += eff;
         totalSacks          += item.sacks;
         totalExtraKg        += item.extraKg;
@@ -84,9 +68,12 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
 
     final totalWorkers    = 1 + helperCount;
-    final salaryPerWorker = totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
-    final bonusPerWorker  = totalWorkers > 0 ? totalBonusAmount / totalWorkers : 0.0;
-    final bakerIncentive  = totalEffectiveSacks * PayrollService.incentivePerSack;
+    final salaryPerWorker =
+        totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
+    final bonusPerWorker =
+        totalWorkers > 0 ? totalBonusAmount / totalWorkers : 0.0;
+    final bakerIncentive =
+        totalEffectiveSacks * PayrollService.incentivePerSack;
 
     return DailySalaryResult(
       totalValue:      totalValue,
@@ -99,26 +86,22 @@ class BakerProductionViewModel extends ChangeNotifier {
     );
   }
 
-  // ─── Add ──────────────────────────────────────────────────────────────────
-
-  /// Returns:
-  ///  true  — saved successfully
-  ///  false — production already exists for this date
-  ///  null  — unexpected error (DB / network)
   Future<bool?> addProduction({
-    required String              date,
-    required String              masterBakerId,
-    required List<String>        helperIds,
+    required String               date,
+    required String               masterBakerId,
+    required List<String>         helperIds,
     required List<ProductionItem> items,
   }) async {
     try {
-      final exists = await _db.productionExistsForDate(date, masterBakerId);
+      final exists =
+          await _db.productionExistsForDate(date, masterBakerId);
       if (exists) return false;
 
       final computed = previewSalary(items, helperIds.length);
+      final productionId = generateId('prod');
 
       final production = ProductionModel(
-        id:              generateId('prod'),
+        id:              productionId,
         date:            date,
         masterBakerId:   masterBakerId,
         helperIds:       helperIds,
@@ -133,6 +116,32 @@ class BakerProductionViewModel extends ChangeNotifier {
       );
 
       await _db.insertProduction(production);
+
+      // ✅ Auto-save bonus for each worker into christmas_bonuses
+      if (computed.bonusPerWorker > 0) {
+        final allWorkerIds = [masterBakerId, ...helperIds];
+
+        // Get user info for names and roles
+        final allUsers = await _db.getAllUsers();
+        final userMap = {for (final u in allUsers) u.id: u};
+
+        for (final workerId in allWorkerIds) {
+          final user = userMap[workerId];
+          if (user == null) continue;
+
+          await _db.upsertChristmasBonus({
+            'id':            generateId('bonus'),
+            'user_id':       workerId,
+            'user_name':     user.name,
+            'role':          user.role,
+            'date':          date,
+            'amount':        computed.bonusPerWorker,
+            'note':          'Production bonus',
+            'production_id': productionId,
+          });
+        }
+      }
+
       await loadData(masterBakerId);
       return true;
     } catch (_) {
@@ -140,11 +149,10 @@ class BakerProductionViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Update ───────────────────────────────────────────────────────────────
-
   Future<bool> updateProduction(ProductionModel updated) async {
     try {
-      final recomputed = previewSalary(updated.items, updated.helperIds.length);
+      final recomputed =
+          previewSalary(updated.items, updated.helperIds.length);
 
       final refreshed = updated.copyWith(
         totalValue:      recomputed.totalValue,
@@ -158,7 +166,36 @@ class BakerProductionViewModel extends ChangeNotifier {
 
       await _db.updateProduction(refreshed);
 
-      final idx = _productions.indexWhere((p) => p.id == refreshed.id);
+      // ✅ Re-sync bonus entries when production is updated
+      await _db.deleteChristmasBonusesByProduction(updated.id);
+
+      if (recomputed.bonusPerWorker > 0) {
+        final allWorkerIds = [
+          updated.masterBakerId,
+          ...updated.helperIds
+        ];
+        final allUsers = await _db.getAllUsers();
+        final userMap  = {for (final u in allUsers) u.id: u};
+
+        for (final workerId in allWorkerIds) {
+          final user = userMap[workerId];
+          if (user == null) continue;
+
+          await _db.upsertChristmasBonus({
+            'id':            generateId('bonus'),
+            'user_id':       workerId,
+            'user_name':     user.name,
+            'role':          user.role,
+            'date':          updated.date,
+            'amount':        recomputed.bonusPerWorker,
+            'note':          'Production bonus',
+            'production_id': updated.id,
+          });
+        }
+      }
+
+      final idx =
+          _productions.indexWhere((p) => p.id == refreshed.id);
       if (idx != -1) {
         _productions[idx] = refreshed;
         notifyListeners();

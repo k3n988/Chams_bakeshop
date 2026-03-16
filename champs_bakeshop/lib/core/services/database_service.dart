@@ -159,7 +159,22 @@ class DatabaseService {
         paidBy: paidBy,
         amount: amount,
       );
+// ─── CHRISTMAS BONUSES ────────────────────────────────────────────────────
 
+  Future<void> upsertChristmasBonus(Map<String, dynamic> bonus) =>
+      _supa.upsertChristmasBonus(bonus);
+
+  Future<List<Map<String, dynamic>>> getChristmasBonuses({
+    int? month,
+    int? year,
+  }) =>
+      _supa.getChristmasBonuses(month: month, year: year);
+
+  Future<void> deleteChristmasBonus(String id) =>
+      _supa.deleteChristmasBonus(id);
+
+  Future<void> deleteChristmasBonusesByProduction(String productionId) =>
+      _supa.deleteChristmasBonusesByProduction(productionId);
   Future<Set<String>> getPaidUserIds(String weekStart) =>
       _supa.getPaidUserIds(weekStart);
 }
