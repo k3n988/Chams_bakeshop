@@ -151,6 +151,7 @@ class DatabaseService {
     required String weekStart,
     required String paidBy,
     required double amount,
+    
   }) =>
       _supa.insertPayrollPaid(
         id: id,
@@ -159,6 +160,7 @@ class DatabaseService {
         paidBy: paidBy,
         amount: amount,
       );
+      
 // ─── CHRISTMAS BONUSES ────────────────────────────────────────────────────
 
   Future<void> upsertChristmasBonus(Map<String, dynamic> bonus) =>

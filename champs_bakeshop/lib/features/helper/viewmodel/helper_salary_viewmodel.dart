@@ -6,9 +6,6 @@ import '../../../../core/models/product_model.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 
-// ═══════════════════════════════════════════════════════════════════
-//  HELPER SALARY VIEW-MODEL
-// ═══════════════════════════════════════════════════════════════════
 class HelperSalaryViewModel extends ChangeNotifier {
   final SupabaseService _db;
   final PayrollService  _payroll;
@@ -40,8 +37,8 @@ class HelperSalaryViewModel extends ChangeNotifier {
   double _valeDeduction = 0;
   double _wifiDeduction = 0;
 
-  String get weekStart  => _weekStart;
-  String get weekEnd    => _weekEnd;
+  String get weekStart => _weekStart;
+  String get weekEnd   => _weekEnd;
   List<MapEntry<String, double>> get weeklyDaily => _weeklyDaily;
   double get grossSalary   => _grossSalary;
   int    get daysWorked    => _daysWorked;
@@ -55,28 +52,41 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
   // ── Monthly ──────────────────────────────────────────────────
   List<WeeklySummary> _monthlyWeeks       = [];
-  double _monthlyTotalSalary             = 0;
-  double _monthlyGrossSalary             = 0;
-  double _monthlyTotalDeductions         = 0;
-  double _monthlyAvgPerWeek              = 0;
-  int    _monthlyTotalDays               = 0;
-  int    _monthlyTotalSacks              = 0;
-  double _monthlyOvenTotal               = 0;
-  double _monthlyGasTotal                = 0;
-  double _monthlyValeTotal               = 0;
-  double _monthlyWifiTotal               = 0;
+  double _monthlyTotalSalary              = 0;
+  double _monthlyGrossSalary              = 0;
+  double _monthlyTotalDeductions          = 0;
+  double _monthlyAvgPerWeek               = 0;
+  int    _monthlyTotalDays                = 0;
+  int    _monthlyTotalSacks               = 0;
+  double _monthlyOvenTotal                = 0;
+  double _monthlyGasTotal                 = 0;
+  double _monthlyValeTotal                = 0;
+  double _monthlyWifiTotal                = 0;
 
-  List<WeeklySummary> get monthlyWeeks         => _monthlyWeeks;
-  double get monthlyTotalSalary                => _monthlyTotalSalary;
-  double get monthlyGrossSalary                => _monthlyGrossSalary;
-  double get monthlyTotalDeductions            => _monthlyTotalDeductions;
-  double get monthlyAvgPerWeek                 => _monthlyAvgPerWeek;
-  int    get monthlyTotalDays                  => _monthlyTotalDays;
-  int    get monthlyTotalSacks                 => _monthlyTotalSacks;
-  double get monthlyOvenTotal                  => _monthlyOvenTotal;
-  double get monthlyGasTotal                   => _monthlyGasTotal;
-  double get monthlyValeTotal                  => _monthlyValeTotal;
-  double get monthlyWifiTotal                  => _monthlyWifiTotal;
+  List<WeeklySummary> get monthlyWeeks          => _monthlyWeeks;
+  double get monthlyTotalSalary                 => _monthlyTotalSalary;
+  double get monthlyGrossSalary                 => _monthlyGrossSalary;
+  double get monthlyTotalDeductions             => _monthlyTotalDeductions;
+  double get monthlyAvgPerWeek                  => _monthlyAvgPerWeek;
+  int    get monthlyTotalDays                   => _monthlyTotalDays;
+  int    get monthlyTotalSacks                  => _monthlyTotalSacks;
+  double get monthlyOvenTotal                   => _monthlyOvenTotal;
+  double get monthlyGasTotal                    => _monthlyGasTotal;
+  double get monthlyValeTotal                   => _monthlyValeTotal;
+  double get monthlyWifiTotal                   => _monthlyWifiTotal;
+
+  // ── Paid weeks ───────────────────────────────────────────────
+  Set<String> _paidWeekStarts = {};
+  Set<String> get paidWeekStarts => _paidWeekStarts;
+
+  /// Returns true if the production date falls in a paid week.
+  bool isWeekPaid(String date) {
+    final d = DateTime.tryParse(date);
+    if (d == null) return false;
+    final monday = d.subtract(Duration(days: d.weekday - 1));
+    final ws = monday.toString().split(' ')[0];
+    return _paidWeekStarts.contains(ws);
+  }
 
   // ── Internal ─────────────────────────────────────────────────
   void _begin() {
@@ -93,11 +103,30 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
   String _friendlyError(Object e) {
     final s = e.toString();
-    if (s.contains('SocketException') || s.contains('ClientException')) {
+    if (s.contains('SocketException') ||
+        s.contains('ClientException')) {
       return 'No internet connection. Check your network and try again.';
     }
-    if (s.contains('PostgrestException')) return 'Database error. Please try again.';
+    if (s.contains('PostgrestException')) {
+      return 'Database error. Please try again.';
+    }
     return s;
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  PAID WEEKS
+  // ═══════════════════════════════════════════════════
+
+  /// Loads all week-start dates where this user has been paid.
+  /// Call alongside loadDailyRecords on dashboard init.
+  Future<void> loadPaidWeeks(String userId) async {
+    try {
+      final rows = await _db.getPaidWeekStartsForUser(userId);
+      _paidWeekStarts = rows;
+      notifyListeners();
+    } catch (_) {
+      // Silent — paid status is non-critical
+    }
   }
 
   // ═══════════════════════════════════════════════════
@@ -109,7 +138,8 @@ class HelperSalaryViewModel extends ChangeNotifier {
     try {
       final productions = await _db.getAllProductions();
       final products    = await _db.getAllProducts();
-      _dailyRecords = _buildDailyRecords(userId, productions, products);
+      _dailyRecords =
+          _buildDailyRecords(userId, productions, products);
     } catch (e) {
       _end('Failed to load daily records.\n${_friendlyError(e)}');
       return;
@@ -124,13 +154,16 @@ class HelperSalaryViewModel extends ChangeNotifier {
       final prefix  = '$year-${month.toString().padLeft(2, '0')}';
       final lastDay = DateTime(year, month + 1, 0).day;
       final start   = '$prefix-01';
-      final end     = '$prefix-${lastDay.toString().padLeft(2, '0')}';
+      final end =
+          '$prefix-${lastDay.toString().padLeft(2, '0')}';
 
-      final productions = await _db.getProductionsByDateRange(start, end);
-      final products    = await _db.getAllProducts();
+      final productions =
+          await _db.getProductionsByDateRange(start, end);
+      final products = await _db.getAllProducts();
 
-      _dailyRecords = _buildDailyRecords(userId, productions, products)
-        ..retainWhere((r) => r.date.startsWith(prefix));
+      _dailyRecords =
+          _buildDailyRecords(userId, productions, products)
+            ..retainWhere((r) => r.date.startsWith(prefix));
     } catch (e) {
       _end('Failed to load daily records.\n${_friendlyError(e)}');
       return;
@@ -138,11 +171,10 @@ class HelperSalaryViewModel extends ChangeNotifier {
     _end();
   }
 
-  /// Typed helper — avoids List<dynamic> assignment errors.
   List<HelperDailyRecord> _buildDailyRecords(
     String userId,
-    List<ProductionModel> productions,   // ← explicit type
-    List<ProductModel>    products,       // ← explicit type
+    List<ProductionModel> productions,
+    List<ProductModel>    products,
   ) {
     return productions
         .where((p) => p.helperIds.contains(userId))
@@ -175,24 +207,27 @@ class HelperSalaryViewModel extends ChangeNotifier {
       _grossSalary = 0;
       _daysWorked  = 0;
 
-      for (final prod in productions.where(
-          (p) => p.helperIds.contains(userId))) {
+      for (final prod in productions
+          .where((p) => p.helperIds.contains(userId))) {
         final calc = _payroll.computeDaily(prod, products);
         _grossSalary += calc.salaryPerWorker;
         _daysWorked  += 1;
-        _weeklyDaily.add(MapEntry(prod.date, calc.salaryPerWorker));
+        _weeklyDaily
+            .add(MapEntry(prod.date, calc.salaryPerWorker));
       }
 
       _weeklyDaily.sort((a, b) => a.key.compareTo(b.key));
 
-      _ovenDeduction = _daysWorked * AppConstants.helperOvenDeductionPerDay;
+      _ovenDeduction =
+          _daysWorked * AppConstants.helperOvenDeductionPerDay;
 
       final ded      = await _db.getDeduction(userId, _weekStart);
       _gasDeduction  = ded?.gas  ?? 0;
       _valeDeduction = ded?.vale ?? 0;
       _wifiDeduction = ded?.wifi ?? 0;
     } catch (e) {
-      _end('Failed to load weekly salary.\n${_friendlyError(e)}');
+      _end(
+          'Failed to load weekly salary.\n${_friendlyError(e)}');
       return;
     }
     _end();
@@ -200,8 +235,10 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
   void changeWeek(int direction, String userId) {
     final d = DateTime.parse(_weekStart);
-    _weekStart =
-        d.add(Duration(days: direction * 7)).toString().split(' ')[0];
+    _weekStart = d
+        .add(Duration(days: direction * 7))
+        .toString()
+        .split(' ')[0];
     _weekEnd = getWeekEnd(_weekStart);
     loadWeeklySalary(userId);
   }
@@ -232,9 +269,9 @@ class HelperSalaryViewModel extends ChangeNotifier {
       final firstDay = DateTime(y, m, 1);
       final lastDay  = DateTime(y, m + 1, 0);
       final start    = '$prefix-01';
-      final end      = '$prefix-${lastDay.day.toString().padLeft(2, '0')}';
+      final end =
+          '$prefix-${lastDay.day.toString().padLeft(2, '0')}';
 
-      // Parallel fetches — explicit typed casts
       final results = await Future.wait([
         _db.getProductionsByDateRange(start, end),
         _db.getAllProducts(),
@@ -248,21 +285,22 @@ class HelperSalaryViewModel extends ChangeNotifier {
             ..sort((a, b) => a.date.compareTo(b.date));
 
       final products = results[1] as List<ProductModel>;
-      final allDeds  = results[2]; // List<DeductionModel>
+      final allDeds  = results[2];
 
       final dedMap = <String, dynamic>{
         for (final d in allDeds) (d as dynamic).weekStart: d,
       };
 
-      final weeks = <WeeklySummary>[];
-      var weekStart =
+      final weeks    = <WeeklySummary>[];
+      var weekStart  =
           firstDay.subtract(Duration(days: firstDay.weekday - 1));
-      int weekNum = 1;
+      int weekNum    = 1;
 
       while (!weekStart.isAfter(lastDay)) {
-        final weekEnd = weekStart.add(const Duration(days: 6));
-        final wsStr   = weekStart.toString().split(' ')[0];
-        final weStr   = weekEnd.toString().split(' ')[0];
+        final weekEnd =
+            weekStart.add(const Duration(days: 6));
+        final wsStr = weekStart.toString().split(' ')[0];
+        final weStr = weekEnd.toString().split(' ')[0];
 
         final weekProds = monthProds.where((p) =>
             p.date.compareTo(wsStr) >= 0 &&
@@ -277,14 +315,16 @@ class HelperSalaryViewModel extends ChangeNotifier {
         }
 
         final days = weekProds.length;
-        final oven = days * AppConstants.helperOvenDeductionPerDay;
+        final oven =
+            days * AppConstants.helperOvenDeductionPerDay;
         final ded  = dedMap[wsStr];
         final gas  = (ded?.gas  as double?) ?? 0.0;
         final vale = (ded?.vale as double?) ?? 0.0;
         final wifi = (ded?.wifi as double?) ?? 0.0;
 
         weeks.add(WeeklySummary(
-          label:         'Week $weekNum  (${_fmtShort(weekStart)} – ${_fmtShort(weekEnd)})',
+          label: 'Week $weekNum  '
+              '(${_fmtShort(weekStart)} – ${_fmtShort(weekEnd)})',
           weekStart:     wsStr,
           daysWorked:    days,
           totalSacks:    sacks,
@@ -298,24 +338,37 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
         weekStart = weekEnd.add(const Duration(days: 1));
         weekNum++;
-        if (weekStart.month != m && weekStart.isAfter(lastDay)) break;
+        if (weekStart.month != m &&
+            weekStart.isAfter(lastDay)) break;
       }
 
       _monthlyWeeks           = weeks;
-      _monthlyGrossSalary     = weeks.fold(0, (s, w) => s + w.grossSalary);
-      _monthlyOvenTotal       = weeks.fold(0, (s, w) => s + w.ovenDeduction);
-      _monthlyGasTotal        = weeks.fold(0, (s, w) => s + w.gasDeduction);
-      _monthlyValeTotal       = weeks.fold(0, (s, w) => s + w.vale);
-      _monthlyWifiTotal       = weeks.fold(0, (s, w) => s + w.wifi);
-      _monthlyTotalDeductions = _monthlyOvenTotal + _monthlyGasTotal +
-          _monthlyValeTotal + _monthlyWifiTotal;
-      _monthlyTotalSalary     = _monthlyGrossSalary - _monthlyTotalDeductions;
-      _monthlyTotalDays       = weeks.fold(0, (s, w) => s + w.daysWorked);
-      _monthlyTotalSacks      = weeks.fold(0, (s, w) => s + w.totalSacks);
-      _monthlyAvgPerWeek      =
-          weeks.isNotEmpty ? _monthlyTotalSalary / weeks.length : 0;
+      _monthlyGrossSalary     =
+          weeks.fold(0, (s, w) => s + w.grossSalary);
+      _monthlyOvenTotal       =
+          weeks.fold(0, (s, w) => s + w.ovenDeduction);
+      _monthlyGasTotal        =
+          weeks.fold(0, (s, w) => s + w.gasDeduction);
+      _monthlyValeTotal       =
+          weeks.fold(0, (s, w) => s + w.vale);
+      _monthlyWifiTotal       =
+          weeks.fold(0, (s, w) => s + w.wifi);
+      _monthlyTotalDeductions = _monthlyOvenTotal +
+          _monthlyGasTotal +
+          _monthlyValeTotal +
+          _monthlyWifiTotal;
+      _monthlyTotalSalary =
+          _monthlyGrossSalary - _monthlyTotalDeductions;
+      _monthlyTotalDays   =
+          weeks.fold(0, (s, w) => s + w.daysWorked);
+      _monthlyTotalSacks  =
+          weeks.fold(0, (s, w) => s + w.totalSacks);
+      _monthlyAvgPerWeek  = weeks.isNotEmpty
+          ? _monthlyTotalSalary / weeks.length
+          : 0;
     } catch (e) {
-      _end('Failed to load monthly summary.\n${_friendlyError(e)}');
+      _end(
+          'Failed to load monthly summary.\n${_friendlyError(e)}');
       return;
     }
     _end();
@@ -323,8 +376,8 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
   String _fmtShort(DateTime d) {
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}';
   }

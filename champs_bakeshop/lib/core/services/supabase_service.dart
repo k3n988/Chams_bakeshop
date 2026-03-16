@@ -105,7 +105,8 @@ class SupabaseService {
     return rows.map(_rowToProduction).toList();
   }
 
-  Future<List<ProductionModel>> getProductionsByMasterBaker(String id) async {
+  Future<List<ProductionModel>> getProductionsByMasterBaker(
+      String id) async {
     final rows = await _db
         .from('productions')
         .select()
@@ -160,49 +161,51 @@ class SupabaseService {
         'baker_incentive': p.bakerIncentive,
       };
 
- ProductionModel _rowToProduction(Map<String, dynamic> map) {
-  final helperStr = (map['helper_ids'] as String? ?? '').trim();
-  final rawItems = map['items'];
+  ProductionModel _rowToProduction(Map<String, dynamic> map) {
+    final helperStr = (map['helper_ids'] as String? ?? '').trim();
+    final rawItems  = map['items'];
 
-  final List<ProductionItem> items;
-  if (rawItems is List) {
-    items = rawItems
-        .map((i) => ProductionItem.fromMap(Map<String, dynamic>.from(i)))
-        .toList();
-  } else if (rawItems is String && rawItems.isNotEmpty) {
-    items = rawItems.split('|').map((s) {
-      final p = s.split(':');
-      return ProductionItem(
-        productId: p[0],
-        sacks:     int.tryParse(p[1]) ?? 0,
-        // ✅ extraKg only — cat fields don't exist on ProductionItem
-        extraKg:   p.length > 2 ? (int.tryParse(p[2]) ?? 0) : 0,
-      );
-    }).toList();
-  } else {
-    items = [];
+    final List<ProductionItem> items;
+    if (rawItems is List) {
+      items = rawItems
+          .map((i) =>
+              ProductionItem.fromMap(Map<String, dynamic>.from(i)))
+          .toList();
+    } else if (rawItems is String && rawItems.isNotEmpty) {
+      items = rawItems.split('|').map((s) {
+        final p = s.split(':');
+        return ProductionItem(
+          productId: p[0],
+          sacks:     int.tryParse(p[1]) ?? 0,
+          extraKg:   p.length > 2 ? (int.tryParse(p[2]) ?? 0) : 0,
+        );
+      }).toList();
+    } else {
+      items = [];
+    }
+
+    final rawDate = map['date']?.toString() ?? '';
+    final date =
+        rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
+    final bonus =
+        (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0)
+            .toDouble();
+
+    return ProductionModel(
+      id:              map['id'],
+      date:            date,
+      masterBakerId:   map['master_baker_id'],
+      helperIds:       helperStr.isEmpty ? [] : helperStr.split(','),
+      items:           items,
+      totalValue:      (map['total_value'] ?? 0).toDouble(),
+      totalSacks:      map['total_sacks'] ?? 0,
+      totalExtraKg:    map['total_extra_kg'] ?? 0,
+      totalWorkers:    map['total_workers'] ?? 0,
+      salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
+      bonusPerWorker:  bonus,
+      bakerIncentive:  (map['baker_incentive'] ?? 0).toDouble(),
+    );
   }
-
-  final rawDate = map['date']?.toString() ?? '';
-  final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
-  final bonus =
-      (map['bonus_per_worker'] ?? map['master_bonus'] ?? 0).toDouble();
-
-  return ProductionModel(
-    id:             map['id'],
-    date:           date,
-    masterBakerId:  map['master_baker_id'],
-    helperIds:      helperStr.isEmpty ? [] : helperStr.split(','),
-    items:          items,
-    totalValue:     (map['total_value'] ?? 0).toDouble(),
-    totalSacks:     map['total_sacks'] ?? 0,
-    totalExtraKg:   map['total_extra_kg'] ?? 0,
-    totalWorkers:   map['total_workers'] ?? 0,
-    salaryPerWorker: (map['salary_per_worker'] ?? 0).toDouble(),
-    bonusPerWorker:  bonus,
-    bakerIncentive: (map['baker_incentive'] ?? 0).toDouble(),
-  );
-}
 
   // ──────────────────────────────────────────────────
   //  HELPER BATCH OPERATIONS
@@ -274,7 +277,8 @@ class SupabaseService {
     return row == null ? null : DeductionModel.fromMap(row);
   }
 
-  Future<List<DeductionModel>> getDeductionsForWeek(String weekStart) async {
+  Future<List<DeductionModel>> getDeductionsForWeek(
+      String weekStart) async {
     final rows = await _db
         .from('deductions')
         .select()
@@ -337,7 +341,7 @@ class SupabaseService {
   }
 
   // ──────────────────────────────────────────────────
-  //  PAYROLL PAID OPERATIONS  ← NEW
+  //  PAYROLL PAID OPERATIONS
   // ──────────────────────────────────────────────────
 
   /// Upsert a paid record — safe to call multiple times.
@@ -349,27 +353,45 @@ class SupabaseService {
     required double amount,
   }) async {
     await _db.from('payroll_paid').upsert({
-      'id': id,
-      'user_id': userId,
+      'id':         id,
+      'user_id':    userId,
       'week_start': weekStart,
-      'paid_by': paidBy,
-      'amount': amount,
+      'paid_by':    paidBy,
+      'amount':     amount,
     }, onConflict: 'user_id,week_start');
-    Future<Set<String>> getPaidWeekStartsForUser(String userId) async {
-  final rows = await _db
-      .from('payroll_paid')
-      .select('week_start')
-      .eq('user_id', userId);
-  return rows
-      .map<String>((r) => r['week_start'].toString().substring(0, 10))
-      .toSet();
-}
   }
+
+  /// Returns the set of user IDs paid for [weekStart].
+  /// Used by admin payroll screen.
+  Future<Set<String>> getPaidUserIds(String weekStart) async {
+    final rows = await _db
+        .from('payroll_paid')
+        .select('user_id')
+        .eq('week_start', weekStart);
+    return rows
+        .map<String>((r) => r['user_id'] as String)
+        .toSet();
+  }
+
+  /// Returns all week-start dates where [userId] has been paid.
+  /// Used by helper dashboard to show Paid/Unpaid badge per record.
+  Future<Set<String>> getPaidWeekStartsForUser(String userId) async {
+    final rows = await _db
+        .from('payroll_paid')
+        .select('week_start')
+        .eq('user_id', userId);
+    return rows
+        .map<String>(
+            (r) => r['week_start'].toString().substring(0, 10))
+        .toSet();
+  }
+
   // ──────────────────────────────────────────────────
   //  CHRISTMAS BONUS OPERATIONS
   // ──────────────────────────────────────────────────
 
-  Future<void> upsertChristmasBonus(Map<String, dynamic> bonus) async {
+  Future<void> upsertChristmasBonus(
+      Map<String, dynamic> bonus) async {
     await _db.from('christmas_bonuses').upsert(
       bonus,
       onConflict: 'user_id,date,production_id',
@@ -407,14 +429,5 @@ class SupabaseService {
         .from('christmas_bonuses')
         .delete()
         .eq('production_id', productionId);
-  }
-
-  /// Returns the set of user IDs that have been paid for [weekStart].
-  Future<Set<String>> getPaidUserIds(String weekStart) async {
-    final rows = await _db
-        .from('payroll_paid')
-        .select('user_id')
-        .eq('week_start', weekStart);
-    return rows.map<String>((r) => r['user_id'] as String).toSet();
   }
 }
