@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/utils/constants.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import '../../admin/view/screens/admin_dashboard.dart';
 import '../../master_baker/view/screens/master_baker_dashboard.dart';
 import '../../helper/view/screens/helper_dashboard.dart';
+
+class LoginColors {
+  static const gradientStart = Color(0xFFFF7A00);
+  static const gradientEnd = Color(0xFFFFA03A);
+  static const background = Colors.white;
+  static const cardBg = Colors.white;
+  static const textDark = Color(0xFF795548);
+  static const textLight = Color(0xFFA1887F);
+  static const inputFill = Color(0xFFFAF6F0);
+  static const border = Color(0xFFEFEBE6);
+  static const error = Color(0xFFD32F2F);
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+
   String _selectedRole = '';
   bool _obscure = true;
 
@@ -26,10 +38,12 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
   }
 
@@ -43,12 +57,13 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _onRoleChanged(String? role) {
     if (role == null) return;
+
     setState(() => _selectedRole = role);
     context.read<AuthViewModel>().clearError();
 
     if (role.isNotEmpty) {
       _animCtrl.forward();
-      // ── ADDED AUTO-FILL LOGIC HERE ──
+
       if (role == 'admin') {
         _emailCtrl.text = 'admin@champs.com';
         _passCtrl.text = 'admin123';
@@ -92,7 +107,9 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (success && mounted) {
       final user = auth.currentUser!;
+
       Widget destination;
+
       if (user.isAdmin) {
         destination = const AdminDashboard();
       } else if (user.isMasterBaker) {
@@ -100,20 +117,41 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         destination = const HelperDashboard();
       }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => destination),
       );
-    } else if (!mounted) {
-      return;
-    } else {
+    } else if (mounted) {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Invalid credentials or wrong role selected'),
-          backgroundColor: AppColors.danger,
+          backgroundColor: LoginColors.error,
         ),
       );
     }
+  }
+
+  InputDecoration _inputDecoration(String hint, IconData icon) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: LoginColors.textLight),
+      prefixIcon: Icon(icon, color: LoginColors.textLight),
+      filled: true,
+      fillColor: LoginColors.inputFill,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: LoginColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: LoginColors.gradientStart,
+          width: 2,
+        ),
+      ),
+    );
   }
 
   @override
@@ -121,223 +159,185 @@ class _LoginScreenState extends State<LoginScreen>
     final auth = context.watch<AuthViewModel>();
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFDF6EC), Color(0xFFF5E6CC), Color(0xFFE8D5B5)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 420),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      // FIX: withOpacity → withValues()
-                      color: AppColors.text.withValues(alpha: 0.1),
-                      blurRadius: 40,
-                      offset: const Offset(0, 16),
+      backgroundColor: LoginColors.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 420),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
+              decoration: BoxDecoration(
+                color: LoginColors.cardBg,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 40,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+
+                  /// LOGO
+               /// LOGO
+Image.asset(
+  'assets/logo.png',
+  width: double.infinity,  // fills available width
+  height: 150,             // control height only
+  fit: BoxFit.contain,
+  errorBuilder: (context, error, stackTrace) {
+    return const Icon(
+      Icons.bakery_dining,
+      size: 80,
+      color: LoginColors.gradientStart,
+    );
+  },
+),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'CHAMPS BAKESHOP',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: LoginColors.gradientStart,
+                      letterSpacing: 0.6,
                     ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // ── Logo ──
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, AppColors.accent],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            // FIX: withOpacity → withValues()
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  const Text(
+                    'PAYROLL SYSTEM',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: LoginColors.textLight,
+                      letterSpacing: 3,
+                    ),
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _label('SELECT YOUR ROLE'),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  DropdownButtonFormField<String>(
+                    value: _selectedRole.isEmpty ? null : _selectedRole,
+                    decoration:
+                        _inputDecoration('-- Choose Role --', Icons.badge_outlined),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'admin', child: Text('Admin (Owner)')),
+                      DropdownMenuItem(
+                          value: 'master_baker', child: Text('Master Baker')),
+                      DropdownMenuItem(value: 'helper', child: Text('Helper')),
+                    ],
+                    onChanged: _onRoleChanged,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SizeTransition(
+                      sizeFactor: _fadeAnim,
+                      axisAlignment: -1,
+                      child: Column(
+                        children: [
+
+                          TextField(
+                            controller: _emailCtrl,
+                            decoration: _inputDecoration(
+                                'you@champs.com', Icons.mail_outline),
                           ),
+
+                          const SizedBox(height: 18),
+
+                          TextField(
+                            controller: _passCtrl,
+                            obscureText: _obscure,
+                            decoration: _inputDecoration(
+                                    'Enter password', Icons.lock_outline)
+                                .copyWith(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 26),
                         ],
                       ),
-                      child: const Center(
-                          child: Text('🧁', style: TextStyle(fontSize: 36))),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'CHAMPS BAKESHOP',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primaryDark,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'PAYROLL SYSTEM',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textHint,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    const SizedBox(height: 36),
+                  ),
 
-                    // ── Role Dropdown ──
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: _label('SELECT YOUR ROLE'),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      // FIX: value → initialValue
-                      initialValue: _selectedRole.isEmpty ? null : _selectedRole,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.person_outline,
-                            color: AppColors.textHint, size: 20),
-                        filled: true,
-                        fillColor: _selectedRole.isNotEmpty
-                            // FIX: withOpacity → withValues()
-                            ? AppColors.primaryLight.withValues(alpha: 0.15)
-                            : AppColors.background,
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: _selectedRole.isNotEmpty
-                                ? AppColors.primary
-                                : AppColors.border,
-                            width: 2,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.primary, width: 2),
+                  if (auth.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        auth.errorMessage!,
+                        style: const TextStyle(
+                          color: LoginColors.error,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      hint: const Text('-- Choose Role --'),
-                      items: const [
-                        DropdownMenuItem(value: 'admin', child: Text('Admin (Owner)')),
-                        DropdownMenuItem(
-                            value: 'master_baker', child: Text('Master Baker')),
-                        DropdownMenuItem(value: 'helper', child: Text('Helper')),
+                    ),
+
+                  /// LOGIN BUTTON
+                  Container(
+                    width: double.infinity,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          LoginColors.gradientStart,
+                          LoginColors.gradientEnd,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: LoginColors.gradientStart.withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
                       ],
-                      onChanged: _onRoleChanged,
                     ),
-                    const SizedBox(height: 20),
-
-                    // ── Email & Password (animated) ──
-                    FadeTransition(
-                      opacity: _fadeAnim,
-                      child: SizeTransition(
-                        sizeFactor: _fadeAnim,
-                        axisAlignment: -1,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('EMAIL ADDRESS'),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _emailCtrl,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                hintText: 'you@champs.com',
-                                prefixIcon: Icon(Icons.mail_outline,
-                                    color: AppColors.textHint, size: 20),
-                              ),
-                              onSubmitted: (_) => _handleLogin(),
-                            ),
-                            const SizedBox(height: 18),
-                            _label('PASSWORD'),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _passCtrl,
-                              obscureText: _obscure,
-                              decoration: InputDecoration(
-                                hintText: 'Enter password',
-                                prefixIcon: const Icon(Icons.lock_outline,
-                                    color: AppColors.textHint, size: 20),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscure
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: AppColors.textHint,
-                                    size: 20,
-                                  ),
-                                  onPressed: () =>
-                                      setState(() => _obscure = !_obscure),
-                                ),
-                              ),
-                              onSubmitted: (_) => _handleLogin(),
-                            ),
-                            const SizedBox(height: 18),
-                          ],
-                        ),
+                    child: ElevatedButton(
+                      onPressed: auth.isLoading ? null : _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
                       ),
-                    ),
-
-                    // ── Error Message ──
-                    if (auth.errorMessage != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          // FIX: withOpacity → withValues()
-                          color: AppColors.danger.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.danger, size: 18),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                auth.errorMessage!,
-                                style: const TextStyle(
-                                  color: AppColors.danger,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                      child: auth.isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-
-                    // ── Sign In Button ──
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: auth.isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16)),
-                        child: auth.isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('Sign In',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700)),
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -350,9 +350,9 @@ class _LoginScreenState extends State<LoginScreen>
         text,
         style: const TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textSecondary,
-          letterSpacing: 0.8,
+          fontWeight: FontWeight.w800,
+          color: LoginColors.textLight,
+          letterSpacing: 1,
         ),
       );
 }

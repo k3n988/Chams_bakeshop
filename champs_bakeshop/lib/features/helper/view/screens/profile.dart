@@ -12,6 +12,8 @@ import '../../../../core/services/database_service.dart';
 // ─────────────────────────────────────────────────────────
 const _kBonusCode        = 'CHAMPS2026';
 const _kBonusUnlockedKey = 'bonus_unlocked_';
+const _kOrange           = Color(0xFFFF7A00);
+const _kDark             = Color(0xFF1A1A1A);
 
 // ─────────────────────────────────────────────────────────
 //  PROFILE SCREEN
@@ -20,11 +22,11 @@ class ProfileScreen extends StatefulWidget {
   final String userName;
   final String userRole;
   final String userId;
-  final Color accentColor;
+  final Color  accentColor;
   final double grossSalary;
   final double netSalary;
-  final int daysWorked;
-  final int totalRecords;
+  final int    daysWorked;
+  final int    totalRecords;
   final VoidCallback onLogout;
 
   const ProfileScreen({
@@ -34,8 +36,8 @@ class ProfileScreen extends StatefulWidget {
     required this.userId,
     this.accentColor = AppColors.info,
     this.grossSalary = 0,
-    this.netSalary = 0,
-    this.daysWorked = 0,
+    this.netSalary   = 0,
+    this.daysWorked  = 0,
     this.totalRecords = 0,
     required this.onLogout,
   });
@@ -49,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String? _photoPath;
   late String _displayName;
   late AnimationController _avatarAnim;
-  late Animation<double> _avatarScale;
+  late Animation<double>   _avatarScale;
   bool _bonusUnlocked = false;
 
   static const _photoKey = 'profile_photo_path';
@@ -60,7 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     _displayName = widget.userName;
     _avatarAnim  = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 350));
+        vsync: this,
+        duration: const Duration(milliseconds: 350));
     _avatarScale =
         CurvedAnimation(parent: _avatarAnim, curve: Curves.elasticOut);
     _avatarAnim.forward();
@@ -73,6 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  // ── Persistence ───────────────────────────────────────
   Future<void> _loadSavedData() async {
     final prefs     = await SharedPreferences.getInstance();
     final photoPath = prefs.getString('${_photoKey}_${widget.userId}');
@@ -105,7 +109,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _saveBonusUnlocked(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_kBonusUnlockedKey${widget.userId}', value);
+    await prefs.setBool(
+        '$_kBonusUnlockedKey${widget.userId}', value);
   }
 
   // ── Photo ─────────────────────────────────────────────
@@ -155,23 +160,25 @@ class _ProfileScreenState extends State<ProfileScreen>
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-        contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        contentPadding:
+            const EdgeInsets.fromLTRB(20, 16, 20, 0),
         title: Row(children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: widget.accentColor.withValues(alpha: 0.1),
+              color: _kOrange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.edit_outlined,
-                color: widget.accentColor, size: 20),
+            child: const Icon(Icons.edit_outlined,
+                color: _kOrange, size: 20),
           ),
           const SizedBox(width: 12),
           const Text('Edit Display Name',
               style: TextStyle(
                   fontSize: 16, fontWeight: FontWeight.w800)),
         ]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: Column(mainAxisSize: MainAxisSize.min,
+            children: [
           const SizedBox(height: 12),
           TextField(
             controller: ctrl,
@@ -179,14 +186,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
               hintText: 'Enter your name',
-              prefixIcon: Icon(Icons.person_outline,
-                  color: widget.accentColor),
+              prefixIcon: const Icon(Icons.person_outline,
+                  color: _kOrange),
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: widget.accentColor, width: 1.5),
+                borderSide: const BorderSide(
+                    color: _kOrange, width: 1.5),
               ),
             ),
           ),
@@ -198,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: widget.accentColor),
+                backgroundColor: _kOrange),
             onPressed: () {
               final name = ctrl.text.trim();
               if (name.isEmpty) return;
@@ -226,20 +233,22 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showBonusCodeDialog() {
     final ctrl = TextEditingController();
     bool obscure = true;
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          titlePadding:
+              const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          contentPadding:
+              const EdgeInsets.fromLTRB(20, 16, 20, 0),
           title: Row(children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFC62828).withValues(alpha: 0.1),
+                color: const Color(0xFFC62828)
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text('🎄',
@@ -251,7 +260,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 children: [
               Text('Christmas Bonus',
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
               Text('Enter your bonus code',
                   style: TextStyle(
                       fontSize: 11,
@@ -259,12 +269,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                       fontWeight: FontWeight.w400)),
             ]),
           ]),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFC62828).withValues(alpha: 0.05),
+                color: const Color(0xFFC62828)
+                    .withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: const Color(0xFFC62828)
@@ -278,7 +291,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Text(
                     'Ask your admin for the bonus code to unlock your holiday bonus summary.',
                     style: TextStyle(
-                        fontSize: 12, color: Color(0xFFC62828)),
+                        fontSize: 12,
+                        color: Color(0xFFC62828)),
                   ),
                 ),
               ]),
@@ -290,7 +304,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
                 hintText: 'Enter bonus code',
-                prefixIcon: const Icon(Icons.vpn_key_outlined,
+                prefixIcon: const Icon(
+                    Icons.vpn_key_outlined,
                     color: Color(0xFFC62828)),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -300,7 +315,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     color: AppColors.textHint,
                     size: 20,
                   ),
-                  onPressed: () => setDlg(() => obscure = !obscure),
+                  onPressed: () =>
+                      setDlg(() => obscure = !obscure),
                 ),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -321,13 +337,15 @@ class _ProfileScreenState extends State<ProfileScreen>
               style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFC62828)),
               onPressed: () {
-                if (ctrl.text.trim().toUpperCase() == _kBonusCode) {
+                if (ctrl.text.trim().toUpperCase() ==
+                    _kBonusCode) {
                   Navigator.pop(ctx);
                   setState(() => _bonusUnlocked = true);
                   _saveBonusUnlocked(true);
                   _openBonusView();
                 } else {
-                  _showSnack('Incorrect bonus code.', isError: true);
+                  _showSnack('Incorrect bonus code.',
+                      isError: true);
                 }
               },
               child: const Text('Unlock'),
@@ -399,18 +417,21 @@ class _ProfileScreenState extends State<ProfileScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: widget.accentColor.withValues(alpha: 0.1),
+                color: _kOrange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.lock_outline,
-                  color: widget.accentColor, size: 20),
+              child: const Icon(Icons.lock_outline,
+                  color: _kOrange, size: 20),
             ),
             const SizedBox(width: 12),
             const Text('Change Password',
                 style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800)),
           ]),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             _PasswordField(
               controller: currentCtrl,
               label:      'Current Password',
@@ -423,7 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               controller: newCtrl,
               label:      'New Password',
               obscure:    obscureNew,
-              onToggle:   () =>
+              onToggle: () =>
                   setDlgState(() => obscureNew = !obscureNew),
             ),
             const SizedBox(height: 12),
@@ -441,7 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: const Text('Cancel')),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: widget.accentColor),
+                  backgroundColor: _kOrange),
               onPressed: () {
                 if (newCtrl.text.length < 6) {
                   _showSnack(
@@ -471,28 +492,28 @@ class _ProfileScreenState extends State<ProfileScreen>
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: Column(mainAxisSize: MainAxisSize.min,
+            children: [
           Container(
             width: 72, height: 72,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
+                colors: [_kOrange, Color(0xFFFFA03A)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF7A00)
-                      .withValues(alpha: 0.3),
+                  color: _kOrange.withValues(alpha: 0.3),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: const Center(
-                child:
-                    Text('🍞', style: TextStyle(fontSize: 32))),
+                child: Text('🍞',
+                    style: TextStyle(fontSize: 32))),
           ),
           const SizedBox(height: 16),
           const Text('Champs Bakeshop',
@@ -513,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         actions: [
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFF7A00),
+              backgroundColor: _kOrange,
               padding: const EdgeInsets.symmetric(
                   horizontal: 28, vertical: 10),
               shape: RoundedRectangleBorder(
@@ -570,33 +591,51 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ─────────────────────────────────────────────────────
+  //  BUILD
+  // ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ clean white background
       backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
-  SliverAppBar(
-  expandedHeight: 300, // ✅ slightly taller
-  pinned: true,
-  elevation: 0,
-  backgroundColor: const Color(0xFFFF7A00), // ✅ solid orange
-  flexibleSpace: FlexibleSpaceBar(
-    background: _ProfileHero(
-      displayName: _displayName,
-      userRole:    widget.userRole,
-      photoPath:   _photoPath,
-      accentColor: const Color(0xFFFF7A00),
-      avatarScale: _avatarScale,
-      initials:    _getInitials(_displayName),
-      onPhotoTap:  _showPhotoOptions,
-      onNameEdit:  _showEditNameDialog,
-    ),
-  ),
-),
+          // ✅ White SliverAppBar — no orange flash on scroll
+          SliverAppBar(
+            expandedHeight:   300,
+            pinned:           true,
+            elevation:        0,
+            backgroundColor:  Colors.white,
+            foregroundColor:  _kDark,
+            surfaceTintColor: Colors.transparent,
+            shadowColor:
+                Colors.black.withValues(alpha: 0.08),
+            // ✅ Shows name when collapsed
+            title: Text(
+              _displayName,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _kDark),
+            ),
+            centerTitle: true,
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.pin,
+              background: _ProfileHero(
+                displayName: _displayName,
+                userRole:    widget.userRole,
+                photoPath:   _photoPath,
+                avatarScale: _avatarScale,
+                initials:    _getInitials(_displayName),
+                onPhotoTap:  _showPhotoOptions,
+                onNameEdit:  _showEditNameDialog,
+              ),
+            ),
+          ),
+
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            padding:
+                const EdgeInsets.fromLTRB(16, 20, 16, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
 
@@ -605,44 +644,39 @@ class _ProfileScreenState extends State<ProfileScreen>
                   label: 'PERSONAL INFORMATION',
                   children: [
                     _InfoRow(
-                        icon:        Icons.person_outline,
-                        label:       'Name',
-                        value:       _displayName,
-                        accentColor: const Color(0xFFFF7A00)),
+                        icon:  Icons.person_outline,
+                        label: 'Name',
+                        value: _displayName),
                     _InfoRow(
-                        icon:        Icons.badge_outlined,
-                        label:       'Role',
-                        value:       widget.userRole,
-                        accentColor: const Color(0xFFFF7A00)),
+                        icon:  Icons.badge_outlined,
+                        label: 'Role',
+                        value: widget.userRole),
                     _InfoRow(
-                        icon:        Icons.fingerprint,
-                        label:       'ID',
-                        value:       widget.userId,
-                        accentColor: const Color(0xFFFF7A00)),
+                        icon:  Icons.fingerprint,
+                        label: 'ID',
+                        value: widget.userId),
                   ],
                 ),
                 const SizedBox(height: 14),
 
                 // ── Earnings snapshot ──────────────────
                 _EarningsSnapshotCard(
-                  grossSalary: widget.grossSalary,
-                  netSalary:   widget.netSalary,
-                  daysWorked:  widget.daysWorked,
+                  grossSalary:  widget.grossSalary,
+                  netSalary:    widget.netSalary,
+                  daysWorked:   widget.daysWorked,
                   totalRecords: widget.totalRecords,
                 ),
                 const SizedBox(height: 14),
 
                 // ── Actions ────────────────────────────
                 _ActionsCard(
-                  accentColor:      const Color(0xFFFF7A00),
                   bonusUnlocked:    _bonusUnlocked,
                   onEditName:       _showEditNameDialog,
                   onEditPhoto:      _showPhotoOptions,
                   onChangePassword: () =>
                       _showChangePasswordDialog(context),
                   onChristmasBonus: _handleBonusButton,
-                  onAbout:          () =>
-                      _showAboutAppDialog(context),
+                  onAbout: () => _showAboutAppDialog(context),
                 ),
                 const SizedBox(height: 20),
 
@@ -660,23 +694,21 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 // ─────────────────────────────────────────────────────────
-//  PROFILE HERO  — orange gradient
+//  PROFILE HERO  — clean white, no accentColor param
 // ─────────────────────────────────────────────────────────
 class _ProfileHero extends StatelessWidget {
-  final String displayName;
-  final String userRole;
-  final String? photoPath;
-  final Color accentColor;
+  final String            displayName;
+  final String            userRole;
+  final String?           photoPath;
   final Animation<double> avatarScale;
-  final String initials;
-  final VoidCallback onPhotoTap;
-  final VoidCallback onNameEdit;
+  final String            initials;
+  final VoidCallback      onPhotoTap;
+  final VoidCallback      onNameEdit;
 
   const _ProfileHero({
     required this.displayName,
     required this.userRole,
     required this.photoPath,
-    required this.accentColor,
     required this.avatarScale,
     required this.initials,
     required this.onPhotoTap,
@@ -685,13 +717,12 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        // ✅ clean white background
         color: Colors.white,
         child: SafeArea(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // ── Avatar ─────────────────────────────
               ScaleTransition(
@@ -701,61 +732,54 @@ class _ProfileHero extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // ✅ 110px avatar
+                      // ✅ 110px orange avatar
                       Container(
-                        width:  110,
-                        height: 110,
+                        width: 110, height: 110,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          // ✅ orange tint background
-                          color: const Color(0xFFFF7A00)
+                          color: _kOrange
                               .withValues(alpha: 0.85),
                           border: Border.all(
-                            color: const Color(0xFFFF7A00)
-                                .withValues(alpha: 0.2),
+                            color: _kOrange
+                                .withValues(alpha: 0.15),
                             width: 4,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF7A00)
-                                  .withValues(alpha: 0.2),
+                              color: _kOrange
+                                  .withValues(alpha: 0.25),
                               blurRadius: 24,
                               offset: const Offset(0, 8),
                             ),
                           ],
                           image: photoPath != null
                               ? DecorationImage(
-                                  image:
-                                      FileImage(File(photoPath!)),
+                                  image: FileImage(
+                                      File(photoPath!)),
                                   fit: BoxFit.cover)
                               : null,
                         ),
                         child: photoPath == null
                             ? Center(
-                                child: Text(
-                                  initials,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 38,
-                                      fontWeight:
-                                          FontWeight.w900),
-                                ),
-                              )
+                                child: Text(initials,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 38,
+                                        fontWeight:
+                                            FontWeight.w900)))
                             : null,
                       ),
 
                       // ✅ camera badge
                       Positioned(
-                        bottom: 2,
-                        right:  2,
+                        bottom: 2, right: 2,
                         child: Container(
-                          width:  32,
-                          height: 32,
+                          width: 32, height: 32,
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFFFF7A00)
+                              color: _kOrange
                                   .withValues(alpha: 0.15),
                               width: 1.5,
                             ),
@@ -769,10 +793,9 @@ class _ProfileHero extends StatelessWidget {
                             ],
                           ),
                           child: const Icon(
-                            Icons.camera_alt_outlined,
-                            size:  16,
-                            color: Color(0xFFFF7A00),
-                          ),
+                              Icons.camera_alt_outlined,
+                              size: 16,
+                              color: _kOrange),
                         ),
                       ),
                     ],
@@ -787,27 +810,22 @@ class _ProfileHero extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                          color:      Color(0xFF1A1A1A),
-                          fontSize:   24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5),
-                    ),
+                    Text(displayName,
+                        style: const TextStyle(
+                            color: _kDark,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5)),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A)
-                            .withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(8),
+                        color: _kDark.withValues(alpha: 0.05),
+                        borderRadius:
+                            BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.edit,
-                        size:  14,
-                        color: Color(0xFF1A1A1A),
-                      ),
+                      child: const Icon(Icons.edit,
+                          size: 14, color: _kDark),
                     ),
                   ],
                 ),
@@ -819,32 +837,37 @@ class _ProfileHero extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 18, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF7A00)
-                      .withValues(alpha: 0.1),
+                  color: _kOrange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFFFF7A00)
-                        .withValues(alpha: 0.3),
+                    color: _kOrange.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
                 child: Text(
                   userRole.toUpperCase(),
                   style: const TextStyle(
-                      color:      Color(0xFFFF7A00),
-                      fontSize:   12,
+                      color: _kOrange,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2),
                 ),
               ),
               const SizedBox(height: 16),
+
+              // ✅ subtle bottom divider
+              Container(
+                height: 1,
+                color: Colors.black.withValues(alpha: 0.04),
+              ),
             ],
           ),
         ),
       );
 }
+
 // ─────────────────────────────────────────────────────────
-//  EARNINGS SNAPSHOT CARD  — orange gradient take-home box
+//  EARNINGS SNAPSHOT CARD
 // ─────────────────────────────────────────────────────────
 class _EarningsSnapshotCard extends StatelessWidget {
   final double grossSalary;
@@ -880,21 +903,20 @@ class _EarningsSnapshotCard extends StatelessWidget {
               const _CardLabel('EARNINGS SNAPSHOT'),
               const SizedBox(height: 14),
 
-              // ✅ Orange gradient take-home box
+              // Orange gradient take-home box
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
+                    colors: [_kOrange, Color(0xFFFFA03A)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF7A00)
-                          .withValues(alpha: 0.25),
+                      color: _kOrange.withValues(alpha: 0.25),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -925,31 +947,26 @@ class _EarningsSnapshotCard extends StatelessWidget {
                       ),
                     ]),
                   ),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white
-                            .withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Gross: ${formatCurrency(grossSalary)}',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ]),
+                    child: Text(
+                      'Gross: ${formatCurrency(grossSalary)}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ]),
               ),
               const SizedBox(height: 14),
 
-              // Days + records row
               Row(children: [
                 Expanded(
                     child: _SnapTile(
@@ -1022,7 +1039,7 @@ class _SnapTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  PROFILE CARD  — clean shadow, no border
+//  PROFILE CARD
 // ─────────────────────────────────────────────────────────
 class _ProfileCard extends StatelessWidget {
   final String       label;
@@ -1075,12 +1092,10 @@ class _CardLabel extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String   label, value;
-  final Color    accentColor;
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
-    required this.accentColor,
   });
 
   @override
@@ -1090,24 +1105,25 @@ class _InfoRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.08),
+              color: _kOrange.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 17, color: accentColor),
+            child: Icon(icon, size: 17, color: _kOrange),
           ),
           const SizedBox(width: 12),
           SizedBox(
             width: 56,
             child: Text(label,
                 style: const TextStyle(
-                    fontSize: 12, color: AppColors.textHint)),
+                    fontSize: 12,
+                    color: AppColors.textHint)),
           ),
           Expanded(
             child: Text(value,
                 style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
-                    color: Color(0xFF1A1A1A)),
+                    color: _kDark),
                 overflow: TextOverflow.ellipsis),
           ),
         ]),
@@ -1115,10 +1131,9 @@ class _InfoRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  ACTIONS CARD  — clean shadow, no border
+//  ACTIONS CARD  — no accentColor param
 // ─────────────────────────────────────────────────────────
 class _ActionsCard extends StatelessWidget {
-  final Color        accentColor;
   final bool         bonusUnlocked;
   final VoidCallback onEditName;
   final VoidCallback onEditPhoto;
@@ -1127,7 +1142,6 @@ class _ActionsCard extends StatelessWidget {
   final VoidCallback onAbout;
 
   const _ActionsCard({
-    required this.accentColor,
     required this.bonusUnlocked,
     required this.onEditName,
     required this.onEditPhoto,
@@ -1154,7 +1168,7 @@ class _ActionsCard extends StatelessWidget {
             icon:     Icons.person_outline,
             label:    'Edit Display Name',
             subtitle: 'Change how your name appears',
-            color:    accentColor,
+            color:    _kOrange,
             onTap:    onEditName,
           ),
           const _ActionDivider(),
@@ -1194,12 +1208,12 @@ class _ActionsCard extends StatelessWidget {
           ),
           const _ActionDivider(),
           _ActionItem(
-            icon:    Icons.info_outline,
-            label:   'About',
+            icon:     Icons.info_outline,
+            label:    'About',
             subtitle: 'App version & info',
-            color:   accentColor,
-            onTap:   onAbout,
-            isLast:  true,
+            color:    _kOrange,
+            onTap:    onAbout,
+            isLast:   true,
           ),
         ]),
       );
@@ -1210,7 +1224,9 @@ class _ActionDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Divider(
-      height: 1, indent: 56, color: Color(0xFFF5F5F5));
+      height: 1,
+      indent: 56,
+      color: Color(0xFFF5F5F5));
 }
 
 class _StatusChip extends StatelessWidget {
@@ -1250,7 +1266,7 @@ class _ActionItem extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
-    this.isLast  = false,
+    this.isLast   = false,
     this.trailing,
   });
 
@@ -1280,10 +1296,12 @@ class _ActionItem extends StatelessWidget {
                   fontWeight: FontWeight.w600, fontSize: 14)),
           subtitle: Text(subtitle,
               style: const TextStyle(
-                  fontSize: 12, color: AppColors.textHint)),
+                  fontSize: 12,
+                  color: AppColors.textHint)),
           trailing: trailing ??
               Icon(Icons.chevron_right,
-                  color: AppColors.textHint.withValues(alpha: 0.5),
+                  color: AppColors.textHint
+                      .withValues(alpha: 0.5),
                   size: 20),
           onTap: onTap,
         ),
@@ -1309,7 +1327,8 @@ class _LogoutButton extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.danger,
             side: BorderSide(
-                color: AppColors.danger.withValues(alpha: 0.4)),
+                color:
+                    AppColors.danger.withValues(alpha: 0.4)),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
           ),
@@ -1354,7 +1373,7 @@ class _PasswordField extends StatelessWidget {
 //  PHOTO OPTIONS SHEET
 // ─────────────────────────────────────────────────────────
 class _PhotoOptionsSheet extends StatelessWidget {
-  final bool hasPhoto;
+  final bool         hasPhoto;
   final VoidCallback onCamera;
   final VoidCallback onGallery;
   final VoidCallback onRemove;
@@ -1372,7 +1391,8 @@ class _PhotoOptionsSheet extends StatelessWidget {
         decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20)),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: Column(mainAxisSize: MainAxisSize.min,
+            children: [
           Container(
             margin: const EdgeInsets.only(top: 10),
             width: 36, height: 4,
@@ -1387,7 +1407,7 @@ class _PhotoOptionsSheet extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A1A))),
+                    color: _kDark)),
           ),
           const SizedBox(height: 4),
           const Text('Choose how to update your photo',
@@ -1421,8 +1441,8 @@ class _PhotoOptionsSheet extends StatelessWidget {
             ),
           ],
           SizedBox(
-              height:
-                  12 + MediaQuery.of(context).padding.bottom),
+              height: 12 +
+                  MediaQuery.of(context).padding.bottom),
         ]),
       );
 }
@@ -1464,9 +1484,9 @@ class _OptionTile extends StatelessWidget {
 //  BONUS VIEW SHEET
 // ─────────────────────────────────────────────────────────
 class _BonusViewSheet extends StatefulWidget {
-  final String userId;
-  final String userName;
-  final String role;
+  final String       userId;
+  final String       userName;
+  final String       role;
   final VoidCallback onLock;
 
   const _BonusViewSheet({
@@ -1477,12 +1497,13 @@ class _BonusViewSheet extends StatefulWidget {
   });
 
   @override
-  State<_BonusViewSheet> createState() => _BonusViewSheetState();
+  State<_BonusViewSheet> createState() =>
+      _BonusViewSheetState();
 }
 
 class _BonusViewSheetState extends State<_BonusViewSheet> {
   List<Map<String, dynamic>> _entries = [];
-  bool _isLoading   = true;
+  bool _isLoading    = true;
   int  _selectedYear  = DateTime.now().year;
   int  _selectedMonth = DateTime.now().month;
 
@@ -1502,8 +1523,9 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
     setState(() => _isLoading = true);
     try {
       final db   = context.read<DatabaseService>();
-      final rows = await db.getChristmasBonuses(year: _selectedYear);
-      _entries   = rows
+      final rows = await db.getChristmasBonuses(
+          year: _selectedYear);
+      _entries = rows
           .where((r) => r['user_id'] == widget.userId)
           .toList()
         ..sort((a, b) =>
@@ -1566,7 +1588,8 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                   const Text('My Christmas Bonus',
                       style: TextStyle(
@@ -1594,40 +1617,36 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
           const Divider(height: 20),
 
           // Year selector
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left,
-                    color: Color(0xFFC62828)),
-                onPressed: () {
-                  setState(() {
-                    _selectedYear--;
-                    _selectedMonth = 1;
-                  });
-                  _load();
-                },
-              ),
-              Text('$_selectedYear',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: Color(0xFFC62828))),
-              IconButton(
-                icon: const Icon(Icons.chevron_right,
-                    color: Color(0xFFC62828)),
-                onPressed: () {
-                  setState(() {
-                    _selectedYear++;
-                    _selectedMonth = 1;
-                  });
-                  _load();
-                },
-              ),
-            ]),
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left,
+                  color: Color(0xFFC62828)),
+              onPressed: () {
+                setState(() {
+                  _selectedYear--;
+                  _selectedMonth = 1;
+                });
+                _load();
+              },
+            ),
+            Text('$_selectedYear',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: Color(0xFFC62828))),
+            IconButton(
+              icon: const Icon(Icons.chevron_right,
+                  color: Color(0xFFC62828)),
+              onPressed: () {
+                setState(() {
+                  _selectedYear++;
+                  _selectedMonth = 1;
+                });
+                _load();
+              },
+            ),
+          ]),
 
           // Content
           Expanded(
@@ -1640,7 +1659,7 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                     padding: const EdgeInsets.fromLTRB(
                         16, 0, 16, 32),
                     children: [
-                      // ── Year total banner ──────────────
+                      // Year banner
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -1669,12 +1688,14 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                               style:
                                   TextStyle(fontSize: 30)),
                           const SizedBox(height: 8),
-                          Text('TOTAL BONUS $_selectedYear',
-                              style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.2)),
+                          Text(
+                            'TOTAL BONUS $_selectedYear',
+                            style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2),
+                          ),
                           const SizedBox(height: 4),
                           FittedBox(
                             child: Text(
@@ -1711,7 +1732,7 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ── Month chips ────────────────────
+                      // Month chips
                       SizedBox(
                         height: 36,
                         child: ListView.separated(
@@ -1758,11 +1779,12 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                                                   alpha: 0.3)
                                           : Colors.black
                                               .withValues(
-                                                  alpha: 0.04),
+                                                  alpha:
+                                                      0.04),
                                       blurRadius:
                                           sel ? 8 : 6,
-                                      offset:
-                                          const Offset(0, 2),
+                                      offset: const Offset(
+                                          0, 2),
                                     ),
                                   ],
                                 ),
@@ -1796,7 +1818,8 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                                             : const Color(
                                                     0xFFC62828)
                                                 .withValues(
-                                                    alpha: 0.1),
+                                                    alpha:
+                                                        0.1),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Text(
@@ -1820,7 +1843,7 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ── Month summary ──────────────────
+                      // Month summary
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -1857,7 +1880,8 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                               formatCurrency(_monthTotal),
                               style: const TextStyle(
                                   fontSize: 22,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight:
+                                      FontWeight.w900,
                                   color:
                                       Color(0xFFC62828)),
                             ),
@@ -1878,14 +1902,15 @@ class _BonusViewSheetState extends State<_BonusViewSheet> {
                               style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFFC62828)),
+                                  color:
+                                      Color(0xFFC62828)),
                             ),
                           ),
                         ]),
                       ),
                       const SizedBox(height: 12),
 
-                      // ── Daily entries ──────────────────
+                      // Daily entries
                       if (_monthEntries.isEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(

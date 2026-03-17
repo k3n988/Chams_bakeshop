@@ -12,7 +12,7 @@ import 'manage_users_screen.dart';
 import 'manage_products_screen.dart';
 import 'production_reports_screen.dart';
 import 'payroll_screen.dart';
-import 'christmas_bonus_screen.dart'; // ✅ NEW
+import 'christmas_bonus_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -36,8 +36,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _logout() {
     context.read<AuthViewModel>().logout();
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -46,99 +46,192 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (user == null) {
       return const Scaffold(
         body: Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+            child:
+                CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     context.watch<AdminPayrollViewModel>();
 
     final pages = [
-      AdminHomeScreen(onNavigate: (i) => setState(() => _index = i)),
+      AdminHomeScreen(
+          onNavigate: (i) => setState(() => _index = i)),
       const ManageUsersScreen(),
       const ManageProductsScreen(),
       const ProductionReportsScreen(),
       const AdminPayrollScreen(),
-      const ChristmasBonusScreen(), // ✅ NEW
+      const ChristmasBonusScreen(),
     ];
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 16,
         title: Row(children: [
+          // ✅ Logo badge
           Container(
-            width: 34,
-            height: 34,
+            width: 38, height: 38,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(11),
               gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.accent]),
+                colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF7A00)
+                      .withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: const Center(
-                child: Text('🧁', style: TextStyle(fontSize: 18))),
+                child: Text('🧁',
+                    style: TextStyle(fontSize: 20))),
           ),
           const SizedBox(width: 10),
-          const Text('CHAMPS BAKESHOP'),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('CHAMPS BAKESHOP',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: 0.3)),
+              Text('Admin Panel',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textHint,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
         ]),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Text(
+          // ✅ Admin name pill
+          Container(
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 20, height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    user.name.isNotEmpty
+                        ? user.name[0].toUpperCase()
+                        : 'A',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
                 user.name,
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary),
+                    color: AppColors.primary),
               ),
-            ),
+            ]),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.textSecondary),
-            onPressed: _logout,
-            tooltip: 'Logout',
+          // ✅ Logout button
+          Container(
+            margin: const EdgeInsets.only(right: 10),
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.logout,
+                    color: AppColors.danger, size: 16),
+              ),
+              onPressed: _logout,
+              tooltip: 'Logout',
+            ),
           ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: AppColors.border),
+          child: Container(
+              height: 1,
+              color: Colors.black.withValues(alpha: 0.04)),
         ),
       ),
       body: pages[_index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        backgroundColor: Colors.white,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
-              label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people, color: AppColors.primary),
-              label: 'Users'),
-          NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon:
-                  Icon(Icons.inventory_2, color: AppColors.primary),
-              label: 'Products'),
-          NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon:
-                  Icon(Icons.bar_chart, color: AppColors.primary),
-              label: 'Reports'),
-          NavigationDestination(
-              icon: Icon(Icons.payments_outlined),
-              selectedIcon:
-                  Icon(Icons.payments, color: AppColors.primary),
-              label: 'Payroll'),
-          // ✅ NEW
-          NavigationDestination(
-              icon: Icon(Icons.card_giftcard_outlined),
-              selectedIcon: Icon(Icons.card_giftcard,
-                  color: Color(0xFFC62828)),
-              label: 'Bonus'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) =>
+              setState(() => _index = i),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          indicatorColor:
+              AppColors.primary.withValues(alpha: 0.1),
+          labelBehavior:
+              NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard,
+                    color: AppColors.primary),
+                label: 'Home'),
+            NavigationDestination(
+                icon: Icon(Icons.people_outline),
+                selectedIcon:
+                    Icon(Icons.people, color: AppColors.primary),
+                label: 'Users'),
+            NavigationDestination(
+                icon: Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(Icons.inventory_2,
+                    color: AppColors.primary),
+                label: 'Products'),
+            NavigationDestination(
+                icon: Icon(Icons.bar_chart_outlined),
+                selectedIcon: Icon(Icons.bar_chart,
+                    color: AppColors.primary),
+                label: 'Reports'),
+            NavigationDestination(
+                icon: Icon(Icons.payments_outlined),
+                selectedIcon: Icon(Icons.payments,
+                    color: AppColors.primary),
+                label: 'Payroll'),
+            NavigationDestination(
+                icon: Icon(Icons.card_giftcard_outlined),
+                selectedIcon: Icon(Icons.card_giftcard,
+                    color: Color(0xFFC62828)),
+                label: 'Bonus'),
+          ],
+        ),
       ),
     );
   }

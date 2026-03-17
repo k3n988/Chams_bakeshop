@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
-
 import '../../../auth/viewmodel/auth_viewmodel.dart';
-
 import 'baker_production_input_screen.dart';
 import 'baker_history_screen.dart';
 import 'baker_salary_screen.dart';
@@ -16,8 +14,41 @@ class BakerHomeScreen extends StatefulWidget {
   State<BakerHomeScreen> createState() => _BakerHomeScreenState();
 }
 
-class _BakerHomeScreenState extends State<BakerHomeScreen> {
+class _BakerHomeScreenState extends State<BakerHomeScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  // 🔥 Explicitly defined the orange color from the Helper Dashboard
+  static const Color _primaryOrange = Color(0xFFD48135);
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged(int i) {
+    setState(() => _currentIndex = i);
+    _fadeController
+      ..reset()
+      ..forward();
+  }
 
   final List<Widget> _screens = const [
     MasterBakerDashboard(),
@@ -31,81 +62,113 @@ class _BakerHomeScreenState extends State<BakerHomeScreen> {
     final user = context.watch<AuthViewModel>().currentUser;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
         elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 16,
         title: Row(children: [
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
+              color: Colors.white,
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: const Icon(Icons.bakery_dining,
-                color: Colors.white, size: 20),
+            child: const Center(
+              child: Text('👨‍🍳', style: TextStyle(fontSize: 18)),
+            ),
           ),
           const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Hi, ${user?.name.toUpperCase() ?? 'BAKER'}',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Hi, ${user?.name ?? 'Baker'} 👋',
                 style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white)),
-            const Text('Master Baker',
-                style: TextStyle(fontSize: 11, color: Colors.white70)),
-          ]),
-        ]),
-        actions: [
-          IconButton(
-            icon: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                  letterSpacing: -0.3,
+                ),
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 20),
+              const Text(
+                'Master Baker',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ]),
+        // 🔥 The actions array (Add Button) was completely removed from here
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.border),
+        ),
+      ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
-            onPressed: () => setState(() => _currentIndex = 1),
-            tooltip: 'Add Production',
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon:
-                Icon(Icons.add_circle, color: AppColors.primary),
-            label: 'Production',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history, color: AppColors.primary),
-            label: 'History',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.payments_outlined),
-            selectedIcon: Icon(Icons.payments, color: AppColors.primary),
-            label: 'Salary',
-          ),
-        ],
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: _onTabChanged,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          // 🔥 Updated indicator color to Orange
+          indicatorColor: _primaryOrange.withValues(alpha: 0.10),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              // 🔥 Updated selected icon color to Orange
+              selectedIcon: Icon(Icons.dashboard, color: _primaryOrange),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.add_circle_outline),
+              selectedIcon: Icon(Icons.add_circle, color: _primaryOrange),
+              label: 'Production',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.history_outlined),
+              selectedIcon: Icon(Icons.history, color: _primaryOrange),
+              label: 'History',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.payments_outlined),
+              selectedIcon: Icon(Icons.payments, color: _primaryOrange),
+              label: 'Salary',
+            ),
+          ],
+        ),
       ),
     );
   }
