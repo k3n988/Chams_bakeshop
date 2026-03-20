@@ -4,7 +4,7 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/models/user_model.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
-import 'admin_user_detail_screen.dart'; // ← NEW
+import 'admin_user_detail_screen.dart';
 
 class ManageUsersScreen extends StatelessWidget {
   const ManageUsersScreen({super.key});
@@ -62,6 +62,10 @@ class ManageUsersScreen extends StatelessWidget {
                       child: Text('Master Baker')),
                   DropdownMenuItem(
                       value: 'helper', child: Text('Helper')),
+                  DropdownMenuItem(
+                      value: 'packer', child: Text('Packer')),
+                  DropdownMenuItem(
+                      value: 'seller', child: Text('Seller')),
                 ],
                 onChanged: (v) => setState(() => role = v!),
               ),
@@ -140,7 +144,6 @@ class ManageUsersScreen extends StatelessWidget {
     );
   }
 
-  // ✅ Navigate to detail screen
   void _viewUser(BuildContext context, UserModel user) {
     Navigator.push(
       context,
@@ -148,6 +151,20 @@ class ManageUsersScreen extends StatelessWidget {
         builder: (_) => AdminUserDetailScreen(user: user),
       ),
     );
+  }
+
+  Color _avatarColor(UserModel u) {
+    if (u.isMasterBaker) return AppColors.masterBaker.withValues(alpha: 0.12);
+    if (u.isPacker)      return AppColors.packer.withValues(alpha: 0.12);
+    if (u.isSeller)      return AppColors.seller.withValues(alpha: 0.12);
+    return AppColors.helper.withValues(alpha: 0.12);
+  }
+
+  Color _avatarTextColor(UserModel u) {
+    if (u.isMasterBaker) return AppColors.masterBaker;
+    if (u.isPacker)      return AppColors.packer;
+    if (u.isSeller)      return AppColors.seller;
+    return AppColors.helper;
   }
 
   @override
@@ -176,16 +193,11 @@ class ManageUsersScreen extends StatelessWidget {
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 18, vertical: 8),
                     leading: CircleAvatar(
-                      backgroundColor: u.isMasterBaker
-                          ? AppColors.masterBaker
-                              .withValues(alpha: 0.12)
-                          : AppColors.helper.withValues(alpha: 0.12),
+                      backgroundColor: _avatarColor(u),
                       child: Text(u.name[0],
                           style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: u.isMasterBaker
-                                  ? AppColors.masterBaker
-                                  : AppColors.helper)),
+                              color: _avatarTextColor(u))),
                     ),
                     title: Text(u.name,
                         style: const TextStyle(
@@ -202,7 +214,6 @@ class ManageUsersScreen extends StatelessWidget {
                     trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // ✅ View button
                           IconButton(
                             icon: const Icon(Icons.bar_chart_outlined,
                                 color: AppColors.info, size: 20),

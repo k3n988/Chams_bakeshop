@@ -23,163 +23,221 @@ class BakerHistoryScreen extends StatelessWidget {
         else
           ...vm.productions.map((prod) {
             final calc = vm.computeDaily(prod);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Header ────────────────────────────────────────────
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(prod.date,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 15)),
-                            Row(children: [
-                              // Total value badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  formatCurrency(calc.totalValue),
-                                  style: const TextStyle(
-                                      color: AppColors.success,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Edit button
-                              InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () =>
-                                    _openEditSheet(context, vm, prod),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
+            return GestureDetector(
+              onTap: () => _showPreviewSheet(context, vm, prod, calc),
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Header ──────────────────────────────────────────
+                        Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color:
-                                        AppColors.primary.withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: AppColors.masterBaker
+                                        .withValues(alpha: 0.08),
+                                    borderRadius:
+                                        BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.edit_outlined,
-                                      size: 16, color: AppColors.primary),
+                                  child: const Icon(
+                                      Icons.receipt_long_outlined,
+                                      color: AppColors.masterBaker,
+                                      size: 16),
                                 ),
-                              ),
+                                const SizedBox(width: 10),
+                                Text(prod.date,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: AppColors.text)),
+                              ]),
+                              Row(children: [
+                                // Total value badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success
+                                        .withValues(alpha: 0.12),
+                                    borderRadius:
+                                        BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    formatCurrency(calc.totalValue),
+                                    style: const TextStyle(
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Edit button
+                                InkWell(
+                                  borderRadius:
+                                      BorderRadius.circular(20),
+                                  onTap: () => _openEditSheet(
+                                      context, vm, prod),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.10),
+                                      borderRadius:
+                                          BorderRadius.circular(20),
+                                    ),
+                                    child: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                        color: AppColors.primary),
+                                  ),
+                                ),
+                              ]),
                             ]),
-                          ]),
 
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                      // ── Salary line (base + incentive, no bonus) ──────────
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary),
-                          children: [
-                            const TextSpan(text: 'Salary: '),
-                            TextSpan(
-                              text: formatCurrency(calc.salaryPerWorker + calc.bakerIncentive),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black87),
-                            ),
-                            if (calc.bakerIncentive > 0)
-                              TextSpan(
-                                text: ' (${formatCurrency(calc.salaryPerWorker)} + ${formatCurrency(calc.bakerIncentive)} incentive)',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // ── Bonus line (separate) ─────────────────────────────
-                      if (calc.bonusPerWorker > 0) ...[
-                        const SizedBox(height: 2),
+                        // ── Salary line ──────────────────────────────────────
                         RichText(
                           text: TextSpan(
                             style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: AppColors.textSecondary),
                             children: [
-                              const TextSpan(text: 'Bonus: '),
+                              const TextSpan(text: 'Salary: '),
                               TextSpan(
-                                text: formatCurrency(calc.bonusPerWorker),
+                                text: formatCurrency(
+                                    calc.salaryPerWorker +
+                                        calc.bakerIncentive),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.masterBaker),
+                                    color: Colors.black87),
                               ),
-                              TextSpan(
-                                text:
-                                    ' (shared ÷ ${calc.totalWorkers} workers — paid separately)',
-                                style: const TextStyle(fontSize: 11),
-                              ),
+                              if (calc.bakerIncentive > 0)
+                                TextSpan(
+                                  text:
+                                      ' (${formatCurrency(calc.salaryPerWorker)} + ${formatCurrency(calc.bakerIncentive)} incentive)',
+                                  style:
+                                      const TextStyle(fontSize: 11),
+                                ),
                             ],
                           ),
                         ),
-                      ],
 
-                      // ── Sacks summary ─────────────────────────────────────
-                      if (prod.totalSacks > 0 || prod.totalExtraKg > 0) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          prod.totalExtraKg > 0
-                              ? '${prod.totalSacks} sacks + ${prod.totalExtraKg} kg  •  ${prod.totalWorkers} workers'
-                              : '${prod.totalSacks} sacks  •  ${prod.totalWorkers} workers',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textHint),
-                        ),
-                      ],
+                        // ── Bonus line ───────────────────────────────────────
+                        if (calc.bonusPerWorker > 0) ...[
+                          const SizedBox(height: 2),
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary),
+                              children: [
+                                const TextSpan(text: 'Bonus: '),
+                                TextSpan(
+                                  text: formatCurrency(
+                                      calc.bonusPerWorker),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.masterBaker),
+                                ),
+                                TextSpan(
+                                  text:
+                                      ' (shared ÷ ${calc.totalWorkers} workers — paid separately)',
+                                  style:
+                                      const TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
-                      const SizedBox(height: 8),
+                        // ── Sacks summary ────────────────────────────────────
+                        if (prod.totalSacks > 0 ||
+                            prod.totalExtraKg > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            prod.totalExtraKg > 0
+                                ? '${prod.totalSacks} sacks + ${prod.totalExtraKg} kg  •  ${prod.totalWorkers} workers'
+                                : '${prod.totalSacks} sacks  •  ${prod.totalWorkers} workers',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textHint),
+                          ),
+                        ],
 
-                      // ── Helper chips ──────────────────────────────────────
-                      if (prod.helperIds.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+
+                        // ── Helper chips ─────────────────────────────────────
+                        if (prod.helperIds.isNotEmpty) ...[
+                          Wrap(
+                            spacing: 6,
+                            children: prod.helperIds.map((hId) {
+                              final h = vm.helpers
+                                  .where((u) => u.id == hId)
+                                  .firstOrNull;
+                              return Chip(
+                                avatar: const Icon(
+                                    Icons.person_outline,
+                                    size: 14),
+                                label: Text(h?.name ?? 'Helper',
+                                    style: const TextStyle(
+                                        fontSize: 11)),
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: AppColors.primary
+                                    .withValues(alpha: 0.08),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+
+                        // ── Product chips ────────────────────────────────────
                         Wrap(
                           spacing: 6,
-                          children: prod.helperIds.map((hId) {
-                            final h = vm.helpers
-                                .where((u) => u.id == hId)
+                          runSpacing: 4,
+                          children: prod.items.map((item) {
+                            final p = vm.products
+                                .where((x) => x.id == item.productId)
                                 .firstOrNull;
+                            final label = item.extraKg > 0
+                                ? '${item.sacks}sacks+${item.extraKg}kg ${p?.name ?? "?"}'
+                                : '${item.sacks}x ${p?.name ?? "?"}';
                             return Chip(
-                              avatar: const Icon(Icons.person_outline,
-                                  size: 14),
-                              label: Text(h?.name ?? 'Helper',
-                                  style: const TextStyle(fontSize: 11)),
+                              label: Text(label,
+                                  style:
+                                      const TextStyle(fontSize: 11)),
                               visualDensity: VisualDensity.compact,
-                              backgroundColor:
-                                  AppColors.primary.withValues(alpha: 0.08),
                             );
                           }).toList(),
                         ),
-                        const SizedBox(height: 6),
-                      ],
 
-                      // ── Product chips ─────────────────────────────────────
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: prod.items.map((item) {
-                          final p = vm.products
-                              .where((x) => x.id == item.productId)
-                              .firstOrNull;
-                          final label = item.extraKg > 0
-                              ? '${item.sacks}sacks+${item.extraKg}kg ${p?.name ?? "?"}'
-                              : '${item.sacks}x ${p?.name ?? "?"}';
-                          return Chip(
-                            label: Text(label,
-                                style: const TextStyle(fontSize: 11)),
-                            visualDensity: VisualDensity.compact,
-                          );
-                        }).toList(),
-                      ),
-                    ]),
+                        // ── Tap hint ─────────────────────────────────────────
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text('Tap to view details',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.masterBaker
+                                        .withValues(alpha: 0.7),
+                                    fontWeight: FontWeight.w500)),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right,
+                                size: 14,
+                                color: AppColors.masterBaker
+                                    .withValues(alpha: 0.7)),
+                          ],
+                        ),
+                      ]),
+                ),
               ),
             );
           }),
@@ -187,8 +245,11 @@ class BakerHistoryScreen extends StatelessWidget {
     );
   }
 
+  // ── Open edit sheet ─────────────────────────────────────────────────────────
   void _openEditSheet(
-      BuildContext context, BakerProductionViewModel vm, ProductionModel prod) {
+      BuildContext context,
+      BakerProductionViewModel vm,
+      ProductionModel prod) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -196,6 +257,410 @@ class BakerHistoryScreen extends StatelessWidget {
       builder: (_) => _EditProductionSheet(prod: prod, vm: vm),
     );
   }
+
+  // ── Production Preview Bottom Sheet ────────────────────────────────────────
+  void _showPreviewSheet(
+      BuildContext context,
+      BakerProductionViewModel vm,
+      ProductionModel prod,
+      dynamic calc) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(children: [
+            // ── Handle ──────────────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+
+            // ── Header ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color:
+                        AppColors.masterBaker.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined,
+                      color: AppColors.masterBaker, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(prod.date,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.text,
+                              letterSpacing: -0.3)),
+                      const Text('Production Detail',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint)),
+                    ],
+                  ),
+                ),
+                // Edit shortcut
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openEditSheet(context, vm, prod);
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color:
+                          AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.primary
+                              .withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 13, color: AppColors.primary),
+                          SizedBox(width: 5),
+                          Text('Edit',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary)),
+                        ]),
+                  ),
+                ),
+              ]),
+            ),
+
+            const Divider(height: 20, color: AppColors.border),
+
+            // ── Scrollable content ───────────────────────────────────
+            Expanded(
+              child: ListView(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                children: [
+                  // ── Production Summary ─────────────────────────────
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('PRODUCTION SUMMARY'),
+                    const SizedBox(height: 12),
+                    _PreviewDataRow(
+                      icon: Icons.groups_outlined,
+                      label: 'Total Workers',
+                      value: '${prod.totalWorkers}',
+                    ),
+                    _PreviewDataRow(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Total Sacks',
+                      value: prod.totalExtraKg > 0
+                          ? '${prod.totalSacks} sacks + ${prod.totalExtraKg} kg'
+                          : '${prod.totalSacks} sacks',
+                    ),
+                    _PreviewDataRow(
+                      icon: Icons.attach_money,
+                      label: 'Batch Value',
+                      value: formatCurrency(calc.totalValue),
+                      valueColor: AppColors.masterBaker,
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // ── Salary Breakdown ───────────────────────────────
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('SALARY BREAKDOWN'),
+                    const SizedBox(height: 12),
+                    _PreviewDataRow(
+                      icon: Icons.people_outline,
+                      label: 'Per Worker (base)',
+                      value: formatCurrency(calc.salaryPerWorker),
+                      valueColor: AppColors.masterBaker,
+                    ),
+                    if (calc.bakerIncentive > 0)
+                      _PreviewDataRow(
+                        icon: Icons.star_outline,
+                        label: 'Baker Incentive',
+                        value: formatCurrency(calc.bakerIncentive),
+                        valueColor: const Color(0xFF1976D2),
+                      ),
+                    const Divider(height: 20, color: AppColors.border),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Your Earnings',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.text)),
+                        Text(
+                          formatCurrency(calc.salaryPerWorker +
+                              calc.bakerIncentive),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20,
+                              color: AppColors.primaryDark),
+                        ),
+                      ],
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // ── Bonus card ─────────────────────────────────────
+                  if (calc.bonusPerWorker > 0) ...[
+                    _PreviewCard(children: [
+                      const _PreviewCardLabel('BONUS (PAID SEPARATELY)'),
+                      const SizedBox(height: 12),
+                      _PreviewDataRow(
+                        icon: Icons.card_giftcard_outlined,
+                        label: 'Master Baker Bonus',
+                        value: formatCurrency(calc.bonusPerWorker),
+                        valueColor: AppColors.masterBaker,
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: Colors.amber.shade200),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.info_outline,
+                              size: 14,
+                              color: Colors.amber.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Bonus is paid separately and not included in the weekly/monthly payroll total.',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.amber.shade800),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ── Helpers ────────────────────────────────────────
+                  if (prod.helperIds.isNotEmpty) ...[
+                    _PreviewCard(children: [
+                      const _PreviewCardLabel('HELPERS ASSIGNED'),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: prod.helperIds.map((hId) {
+                          final h = vm.helpers
+                              .where((u) => u.id == hId)
+                              .firstOrNull;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary
+                                  .withValues(alpha: 0.07),
+                              borderRadius:
+                                  BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.15)),
+                            ),
+                            child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.person_outline,
+                                      size: 13,
+                                      color: AppColors.primary),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    h?.name ?? 'Helper',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary),
+                                  ),
+                                ]),
+                          );
+                        }).toList(),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ── Products Breakdown ─────────────────────────────
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('PRODUCTS PRODUCED'),
+                    const SizedBox(height: 12),
+                    ...prod.items.map((item) {
+                      final p = vm.products
+                          .where((x) => x.id == item.productId)
+                          .firstOrNull;
+                      return Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: 8),
+                        child: Row(children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.masterBaker
+                                  .withValues(alpha: 0.07),
+                              borderRadius:
+                                  BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                                Icons.bakery_dining_outlined,
+                                size: 14,
+                                color: AppColors.masterBaker),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              p?.name ?? 'Unknown Product',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textHint),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.masterBaker
+                                  .withValues(alpha: 0.08),
+                              borderRadius:
+                                  BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item.extraKg > 0
+                                  ? '${item.sacks} sacks + ${item.extraKg} kg'
+                                  : '${item.sacks} sacks',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.masterBaker),
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ]),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  PREVIEW SHEET SUB-WIDGETS
+// ─────────────────────────────────────────────────────────
+class _PreviewCard extends StatelessWidget {
+  final List<Widget> children;
+  const _PreviewCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children),
+      );
+}
+
+class _PreviewCardLabel extends StatelessWidget {
+  final String text;
+  const _PreviewCardLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3,
+          height: 13,
+          decoration: BoxDecoration(
+              color: AppColors.masterBaker,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textHint,
+                letterSpacing: 0.8)),
+      ]);
+}
+
+class _PreviewDataRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _PreviewDataRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Icon(icon, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textHint)),
+          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor ?? AppColors.text)),
+        ]),
+      );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -225,7 +690,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
     _items = widget.prod.items
         .map((i) => _EditItemEntry(
               productId: i.productId,
-              sacksCtrl: TextEditingController(text: i.sacks.toString()),
+              sacksCtrl:
+                  TextEditingController(text: i.sacks.toString()),
               kgCtrl: TextEditingController(
                   text: i.extraKg > 0 ? i.extraKg.toString() : ''),
             ))
@@ -248,10 +714,12 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
       if (e.productId == null) return 'Select a product for every row.';
       final s = int.tryParse(e.sacksCtrl.text.trim()) ?? 0;
       final k = int.tryParse(e.kgCtrl.text.trim()) ?? 0;
-      if (s <= 0 && k <= 0) return 'Sacks or KG must be > 0 for each row.';
+      if (s <= 0 && k <= 0)
+        return 'Sacks or KG must be > 0 for each row.';
     }
     final ids = _items.map((e) => e.productId).toList();
-    if (ids.toSet().length != ids.length) return 'Duplicate products found.';
+    if (ids.toSet().length != ids.length)
+      return 'Duplicate products found.';
     return null;
   }
 
@@ -269,7 +737,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
         .map((e) => ProductionItem(
               productId: e.productId!,
               sacks: int.tryParse(e.sacksCtrl.text.trim()) ?? 0,
-              extraKg: (int.tryParse(e.kgCtrl.text.trim()) ?? 0).clamp(0, 24),
+              extraKg:
+                  (int.tryParse(e.kgCtrl.text.trim()) ?? 0).clamp(0, 24),
             ))
         .toList();
 
@@ -280,13 +749,14 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'Production updated!' : 'Failed. Try again.'),
+        content:
+            Text(ok ? 'Production updated!' : 'Failed. Try again.'),
         backgroundColor: ok ? AppColors.success : Colors.red,
       ));
     }
   }
 
-  // ── Products tab ───────────────────────────────────────────────────────────
+  // ── Products tab ────────────────────────────────────────────────────────────
   Widget _buildProductsTab() {
     final allProducts = widget.vm.products;
     return Column(children: [
@@ -294,7 +764,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
         child: _items.isEmpty
             ? const Center(
                 child: Text('No products. Tap + Add.',
-                    style: TextStyle(color: AppColors.textSecondary)))
+                    style:
+                        TextStyle(color: AppColors.textSecondary)))
             : ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: _items.length,
@@ -304,8 +775,9 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                       .where((e) => e != entry && e.productId != null)
                       .map((e) => e.productId!)
                       .toSet();
-                  final dropdownItems =
-                      allProducts.where((p) => !usedIds.contains(p.id)).toList();
+                  final dropdownItems = allProducts
+                      .where((p) => !usedIds.contains(p.id))
+                      .toList();
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -314,12 +786,12 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border:
+                          Border.all(color: Colors.grey.shade200),
                     ),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Product dropdown
                           DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: entry.productId,
@@ -340,12 +812,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                   setState(() => entry.productId = val),
                             ),
                           ),
-
                           const SizedBox(height: 6),
-
-                          // Sacks + KG + delete row
                           Row(children: [
-                            // − sacks +
                             _CounterButton(
                               icon: Icons.remove,
                               onTap: () {
@@ -353,9 +821,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                         entry.sacksCtrl.text) ??
                                     0;
                                 if (v > 0) {
-                                  setState(() =>
-                                      entry.sacksCtrl.text =
-                                          (v - 1).toString());
+                                  setState(() => entry.sacksCtrl
+                                      .text = (v - 1).toString());
                                 }
                               },
                             ),
@@ -372,11 +839,12 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                 decoration: InputDecoration(
                                   isDense: true,
                                   labelText: 'Sacks',
-                                  labelStyle:
-                                      const TextStyle(fontSize: 9),
+                                  labelStyle: const TextStyle(
+                                      fontSize: 9),
                                   contentPadding:
                                       const EdgeInsets.symmetric(
-                                          horizontal: 4, vertical: 8),
+                                          horizontal: 4,
+                                          vertical: 8),
                                   border: OutlineInputBorder(
                                       borderRadius:
                                           BorderRadius.circular(8)),
@@ -395,15 +863,12 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                     (v + 1).toString());
                               },
                             ),
-
                             const SizedBox(width: 10),
                             Text('+',
                                 style: TextStyle(
                                     color: AppColors.textHint,
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(width: 10),
-
-                            // KG field
                             SizedBox(
                               width: 56,
                               child: TextField(
@@ -416,18 +881,18 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                 decoration: InputDecoration(
                                   isDense: true,
                                   labelText: 'KG (0-24)',
-                                  labelStyle:
-                                      const TextStyle(fontSize: 9),
+                                  labelStyle: const TextStyle(
+                                      fontSize: 9),
                                   contentPadding:
                                       const EdgeInsets.symmetric(
-                                          horizontal: 4, vertical: 8),
+                                          horizontal: 4,
+                                          vertical: 8),
                                   border: OutlineInputBorder(
                                       borderRadius:
                                           BorderRadius.circular(8)),
                                 ),
                                 onChanged: (v) {
-                                  
-                                      (int.tryParse(v) ?? 0).clamp(0, 24);
+                                  (int.tryParse(v) ?? 0).clamp(0, 24);
                                   setState(() {});
                                   if ((int.tryParse(v) ?? 0) > 24) {
                                     entry.kgCtrl.text = '24';
@@ -435,10 +900,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                 },
                               ),
                             ),
-
                             const Spacer(),
-
-                            // Delete row
                             InkWell(
                               onTap: () => setState(() {
                                 entry.dispose();
@@ -449,10 +911,12 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
                                 ),
                                 child: Icon(Icons.delete_outline,
-                                    size: 16, color: Colors.red.shade400),
+                                    size: 16,
+                                    color: Colors.red.shade400),
                               ),
                             ),
                           ]),
@@ -461,7 +925,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                 },
               ),
       ),
-
       if (_items.length < allProducts.length)
         Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -488,7 +951,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
     ]);
   }
 
-  // ── Helpers tab ────────────────────────────────────────────────────────────
+  // ── Helpers tab ─────────────────────────────────────────────────────────────
   Widget _buildHelpersTab() {
     final allHelpers = widget.vm.helpers;
     if (allHelpers.isEmpty) {
@@ -511,8 +974,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
           }),
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: selected
                   ? AppColors.primary.withValues(alpha: 0.08)
@@ -596,7 +1059,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
       ),
       padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + bottomInset),
       child: Column(children: [
-        // Handle
         Center(
           child: Container(
             width: 40,
@@ -607,8 +1069,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                 borderRadius: BorderRadius.circular(2)),
           ),
         ),
-
-        // Title
         Row(children: [
           const Icon(Icons.edit_calendar_outlined,
               size: 20, color: AppColors.primary),
@@ -617,10 +1077,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
               style: const TextStyle(
                   fontWeight: FontWeight.w700, fontSize: 15)),
         ]),
-
         const SizedBox(height: 12),
-
-        // Tabs
         Container(
           decoration: BoxDecoration(
               color: Colors.grey.shade100,
@@ -641,7 +1098,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                 child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.inventory_2_outlined, size: 15),
+                      const Icon(Icons.inventory_2_outlined,
+                          size: 15),
                       const SizedBox(width: 6),
                       const Text('Products'),
                       if (_items.isNotEmpty) ...[
@@ -666,9 +1124,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
         Expanded(
           child: TabBarView(
             controller: _tab,
@@ -676,49 +1132,53 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
           ),
         ),
 
-        // ── Live preview bar ───────────────────────────────────────────────
+        // ── Live preview bar ─────────────────────────────────────────────────
         Container(
           margin: const EdgeInsets.symmetric(vertical: 10),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.15)),
           ),
           child: Column(children: [
             Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _PreviewStat('Total',
-                      formatCurrency(preview.totalValue)),
+                  _PreviewStat(
+                      'Total', formatCurrency(preview.totalValue)),
                   _PreviewStat(
                       'Sacks',
                       preview.totalExtraKg > 0
                           ? '${preview.totalSacks}s+${preview.totalExtraKg}kg'
                           : '${preview.totalSacks}'),
-                  _PreviewStat('Workers', '${preview.totalWorkers}'),
-                  _PreviewStat('Salary',
+                  _PreviewStat(
+                      'Workers', '${preview.totalWorkers}'),
+                  _PreviewStat(
+                      'Salary',
                       formatCurrency(preview.salaryPerWorker),
                       highlight: true),
                 ]),
             const Divider(height: 12),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.star_outline,
-                  size: 12, color: AppColors.masterBaker),
-              const SizedBox(width: 4),
-              Text(
-                'Bonus per worker: ${formatCurrency(preview.bonusPerWorker)} (paid separately)',
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.masterBaker,
-                    fontWeight: FontWeight.w600),
-              ),
-            ]),
+            Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.star_outline,
+                      size: 12, color: AppColors.masterBaker),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Bonus per worker: ${formatCurrency(preview.bonusPerWorker)} (paid separately)',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.masterBaker,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ]),
           ]),
         ),
 
-        // ── Action buttons ─────────────────────────────────────────────────
+        // ── Action buttons ───────────────────────────────────────────────────
         Row(children: [
           Expanded(
             child: OutlinedButton(
@@ -750,7 +1210,8 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Text('Save Changes',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ]),
@@ -759,7 +1220,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
   }
 }
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
+// ─── Small helpers ─────────────────────────────────────────────────────────────
 
 class _EditItemEntry {
   String? productId;
@@ -805,7 +1266,8 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(10),
@@ -833,8 +1295,9 @@ class _PreviewStat extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
-                  color:
-                      highlight ? AppColors.success : Colors.black87)),
+                  color: highlight
+                      ? AppColors.success
+                      : Colors.black87)),
         ],
       );
 }

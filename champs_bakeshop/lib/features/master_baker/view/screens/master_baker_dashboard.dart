@@ -195,7 +195,6 @@ class _BakerAppBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
       ]),
-
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: AppColors.border),
@@ -236,8 +235,7 @@ class _BakerNavBar extends StatelessWidget {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
-            selectedIcon:
-                Icon(Icons.dashboard, color: AppColors.masterBaker),
+            selectedIcon: Icon(Icons.dashboard, color: AppColors.masterBaker),
             label: 'Home',
           ),
           NavigationDestination(
@@ -248,8 +246,7 @@ class _BakerNavBar extends StatelessWidget {
           ),
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
-            selectedIcon:
-                Icon(Icons.history, color: AppColors.masterBaker),
+            selectedIcon: Icon(Icons.history, color: AppColors.masterBaker),
             label: 'History',
           ),
           NavigationDestination(
@@ -260,8 +257,7 @@ class _BakerNavBar extends StatelessWidget {
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
-            selectedIcon:
-                Icon(Icons.person, color: AppColors.masterBaker),
+            selectedIcon: Icon(Icons.person, color: AppColors.masterBaker),
             label: 'Profile',
           ),
         ],
@@ -316,8 +312,8 @@ class _DashboardHome extends StatelessWidget {
                   children: _statsCards
                       .map((c) => Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
                               child: c,
                             ),
                           ))
@@ -433,8 +429,8 @@ class _TodayProductionCard extends StatelessWidget {
                           color: AppColors.text)),
                   SizedBox(height: 2),
                   Text('Tap to start your first batch',
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.textHint)),
+                      style:
+                          TextStyle(fontSize: 12, color: AppColors.textHint)),
                 ],
               ),
             ),
@@ -445,11 +441,11 @@ class _TodayProductionCard extends StatelessWidget {
       );
     }
 
-  int totalSacks = 0;
+    int totalSacks = 0;
     double totalEarnings = 0;
     for (final r in todayRecords) {
-      totalSacks += r.totalSacks;
-      totalEarnings += r.salary;
+      totalSacks += r.totalSacks ;
+      totalEarnings += r.salary ;
     }
 
     return Container(
@@ -476,16 +472,14 @@ class _TodayProductionCard extends StatelessWidget {
               icon: Icons.bakery_dining,
               color: AppColors.masterBaker,
             ),
-            Container(
-                width: 1, height: 40, color: AppColors.border),
+            Container(width: 1, height: 40, color: AppColors.border),
             _TodayStat(
               label: 'Sacks',
               value: '$totalSacks',
               icon: Icons.inventory_2_outlined,
               color: const Color(0xFF1976D2),
             ),
-            Container(
-                width: 1, height: 40, color: AppColors.border),
+            Container(width: 1, height: 40, color: AppColors.border),
             _TodayStat(
               label: 'Earnings',
               value: formatCurrency(totalEarnings),
@@ -501,8 +495,8 @@ class _TodayProductionCard extends StatelessWidget {
             onPressed: onGoToProduce,
             icon: const Icon(Icons.add, size: 16),
             label: const Text('Add Another Batch',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700)),
+                style:
+                    TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.masterBaker,
               side: BorderSide(
@@ -542,18 +536,15 @@ class _TodayStat extends StatelessWidget {
         const SizedBox(height: 6),
         Text(value,
             style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: color)),
+                fontWeight: FontWeight.w800, fontSize: 14, color: color)),
         const SizedBox(height: 2),
         Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textHint)),
+            style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
       ]);
 }
 
 // ─────────────────────────────────────────────────────────
-//  RECENT RECORDS LIST
+//  RECENT RECORDS LIST  (with tappable preview)
 // ─────────────────────────────────────────────────────────
 class _RecentRecords extends StatelessWidget {
   final List<dynamic> records;
@@ -571,16 +562,13 @@ class _RecentRecords extends StatelessWidget {
           border: Border.all(color: AppColors.border),
         ),
         child: const Column(children: [
-          Icon(Icons.inbox_outlined,
-              size: 40, color: AppColors.textHint),
+          Icon(Icons.inbox_outlined, size: 40, color: AppColors.textHint),
           SizedBox(height: 10),
           Text('No records yet',
-              style:
-                  TextStyle(color: AppColors.textHint, fontSize: 14)),
+              style: TextStyle(color: AppColors.textHint, fontSize: 14)),
           SizedBox(height: 4),
           Text('Add a production batch to get started',
-              style: TextStyle(
-                  color: AppColors.textHint, fontSize: 12)),
+              style: TextStyle(color: AppColors.textHint, fontSize: 12)),
         ]),
       );
     }
@@ -601,52 +589,63 @@ class _RecentRecords extends StatelessWidget {
               child: child,
             ),
           ),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 4),
-              leading: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.masterBaker.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.receipt_long_outlined,
-                    color: AppColors.masterBaker, size: 20),
+          child: GestureDetector(
+            onTap: () => _showPreviewSheet(context, rec),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              title: Text(rec.date,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.text)),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '${rec.totalWorkers} workers · ${rec.totalSacks} sacks',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textHint),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 4),
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.masterBaker.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined,
+                      color: AppColors.masterBaker, size: 20),
                 ),
-              ),
-              trailing: Text(
-                formatCurrency(rec.salary),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: AppColors.primaryDark),
+                title: Text(rec.date,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.text)),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '${rec.totalWorkers} workers · ${rec.totalSacks} sacks',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textHint),
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      formatCurrency(rec.salary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: AppColors.primaryDark),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.chevron_right,
+                        size: 16, color: AppColors.textHint),
+                  ],
+                ),
               ),
             ),
           ),
@@ -654,6 +653,281 @@ class _RecentRecords extends StatelessWidget {
       }).toList(),
     );
   }
+
+  // ── Production Preview Bottom Sheet ──────────────────────
+  void _showPreviewSheet(BuildContext context, dynamic rec) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.85,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(children: [
+            // ── Handle ──────────────────────────────────────
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+
+            // ── Header ──────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.masterBaker.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined,
+                      color: AppColors.masterBaker, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(rec.date,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.text,
+                              letterSpacing: -0.3)),
+                      const Text('Production Detail',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textHint)),
+                    ],
+                  ),
+                ),
+                // Baker badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.masterBaker.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color:
+                            AppColors.masterBaker.withValues(alpha: 0.2)),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min,
+                      children: [
+                    Text('👨‍🍳', style: TextStyle(fontSize: 12)),
+                    SizedBox(width: 4),
+                    Text('Master Baker',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.masterBaker)),
+                  ]),
+                ),
+              ]),
+            ),
+
+            const Divider(height: 20, color: AppColors.border),
+
+            // ── Content ─────────────────────────────────────
+            Expanded(
+              child: ListView(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                children: [
+                  // Production Summary card
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('PRODUCTION SUMMARY'),
+                    const SizedBox(height: 12),
+                    _PreviewDataRow(
+                      icon: Icons.groups_outlined,
+                      label: 'Total Workers',
+                      value: '${rec.totalWorkers}',
+                    ),
+                    _PreviewDataRow(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Total Sacks',
+                      value: '${rec.totalSacks} sacks',
+                    ),
+                    _PreviewDataRow(
+                      icon: Icons.attach_money,
+                      label: 'Batch Value',
+                      value: formatCurrency(rec.totalValue),
+                      valueColor: AppColors.masterBaker,
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // Salary Breakdown card
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('SALARY BREAKDOWN'),
+                    const SizedBox(height: 12),
+                    _PreviewDataRow(
+                      icon: Icons.people_outline,
+                      label: 'Per Worker (base)',
+                      value: formatCurrency(rec.salary - rec.bakerIncentive),
+                      valueColor: AppColors.masterBaker,
+                    ),
+                    _PreviewDataRow(
+                      icon: Icons.star_outline,
+                      label: 'Baker Incentive',
+                      value: formatCurrency(rec.bakerIncentive),
+                      valueColor: const Color(0xFF1976D2),
+                    ),
+                    const Divider(height: 20, color: AppColors.border),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Your Earnings',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.text)),
+                        Text(
+                          formatCurrency(rec.salary),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20,
+                              color: AppColors.primaryDark),
+                        ),
+                      ],
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // Bonus card
+                  _PreviewCard(children: [
+                    const _PreviewCardLabel('BONUS (PAID SEPARATELY)'),
+                    const SizedBox(height: 12),
+                    _PreviewDataRow(
+                      icon: Icons.card_giftcard_outlined,
+                      label: 'Master Baker Bonus',
+                      value: formatCurrency(rec.bonusPerWorker),
+                      valueColor: AppColors.masterBaker,
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border:
+                            Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.info_outline,
+                            size: 14, color: Colors.amber.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Bonus is paid separately and is not included in the weekly/monthly payroll total.',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.amber.shade800),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  PREVIEW SHEET SUB-WIDGETS
+// ─────────────────────────────────────────────────────────
+class _PreviewCard extends StatelessWidget {
+  final List<Widget> children;
+  const _PreviewCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children),
+      );
+}
+
+class _PreviewCardLabel extends StatelessWidget {
+  final String text;
+  const _PreviewCardLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3,
+          height: 13,
+          decoration: BoxDecoration(
+              color: AppColors.masterBaker,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textHint,
+                letterSpacing: 0.8)),
+      ]);
+}
+
+class _PreviewDataRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _PreviewDataRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Icon(icon, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textHint)),
+          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor ?? AppColors.text)),
+        ]),
+      );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -672,11 +946,10 @@ class _HeroBanner extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        // 🔥 Colorful Gradient Palette matched to Helper
         gradient: const LinearGradient(
           colors: [
-            Color(0xFFFF7A00), // Deep vibrant orange
-            Color(0xFFFFA03A), // Lighter, bright orange
+            Color(0xFFFF7A00),
+            Color(0xFFFFA03A),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -730,7 +1003,7 @@ class _HeroBanner extends StatelessWidget {
                       fontWeight: FontWeight.w800, fontSize: 14)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFFFF7A00), // Matched to orange
+                foregroundColor: const Color(0xFFFF7A00),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 elevation: 0,
                 shape: RoundedRectangleBorder(

@@ -59,4 +59,6 @@ class UserModel {
   bool get isAdmin => role == 'admin';
   bool get isMasterBaker => role == 'master_baker';
   bool get isHelper => role == 'helper';
+  bool get isPacker => role == 'packer';
+bool get isSeller => role == 'seller';
 }

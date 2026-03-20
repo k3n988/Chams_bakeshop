@@ -4,6 +4,8 @@ import '../viewmodel/auth_viewmodel.dart';
 import '../../admin/view/screens/admin_dashboard.dart';
 import '../../master_baker/view/screens/master_baker_dashboard.dart';
 import '../../helper/view/screens/helper_dashboard.dart';
+import '../../packer/view/screens/packer_dashboard.dart';
+import '../../seller/view/screens/seller_dashboard.dart';
 
 class LoginColors {
   static const gradientStart = Color(0xFFFF7A00);
@@ -73,6 +75,12 @@ class _LoginScreenState extends State<LoginScreen>
       } else if (role == 'helper') {
         _emailCtrl.text = 'kenjeternal@helper.com';
         _passCtrl.text = 'ken123';
+      } else if (role == 'packer') {
+        _emailCtrl.text = 'toy@packer.com';
+        _passCtrl.text = '123';
+      } else if (role == 'seller') {
+        _emailCtrl.text = 'jan@seller.com';
+        _passCtrl.text = '123';
       }
     } else {
       _animCtrl.reverse();
@@ -114,6 +122,10 @@ class _LoginScreenState extends State<LoginScreen>
         destination = const AdminDashboard();
       } else if (user.isMasterBaker) {
         destination = const MasterBakerDashboard();
+      } else if (user.isPacker) {
+        destination = const PackerDashboard();
+      } else if (user.isSeller) {
+        destination = const SellerDashboard();
       } else {
         destination = const HelperDashboard();
       }
@@ -183,20 +195,19 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
 
                   /// LOGO
-               /// LOGO
-Image.asset(
-  'assets/logo.png',
-  width: double.infinity,  // fills available width
-  height: 150,             // control height only
-  fit: BoxFit.contain,
-  errorBuilder: (context, error, stackTrace) {
-    return const Icon(
-      Icons.bakery_dining,
-      size: 80,
-      color: LoginColors.gradientStart,
-    );
-  },
-),
+                  Image.asset(
+                    'assets/logo.png',
+                    width: double.infinity,
+                    height: 150,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(
+                        Icons.bakery_dining,
+                        size: 80,
+                        color: LoginColors.gradientStart,
+                      );
+                    },
+                  ),
 
                   const SizedBox(height: 20),
 
@@ -241,6 +252,8 @@ Image.asset(
                       DropdownMenuItem(
                           value: 'master_baker', child: Text('Master Baker')),
                       DropdownMenuItem(value: 'helper', child: Text('Helper')),
+                      DropdownMenuItem(value: 'packer', child: Text('Packer')),
+                      DropdownMenuItem(value: 'seller', child: Text('Seller')),
                     ],
                     onChanged: _onRoleChanged,
                   ),

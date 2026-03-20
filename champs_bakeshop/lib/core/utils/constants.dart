@@ -21,7 +21,9 @@ class AppColors {
   static const Color masterBaker = Color(0xFF5B8C5A);
   static const Color helper = Color(0xFF2E86AB);
   static const Color purple = Color(0xFF8E44AD);
-   static const Color warning      = Color(0xFFF39C12); // ← ADD THIS
+   static const Color warning      = Color(0xFFF39C12); 
+   static const Color packer = Color(0xFF7B1FA2); // purple
+static const Color seller = Color(0xFF00897B);  // teal// ← ADD THIS
 }
 
 // ═══════════════════════════════════════════════════════════
