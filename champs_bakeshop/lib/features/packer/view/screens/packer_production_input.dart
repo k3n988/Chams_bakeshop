@@ -18,12 +18,23 @@ class _PackerProductionInputScreenState
     extends State<PackerProductionInputScreen> {
   final _bundleCtrl = TextEditingController();
 
-  // ── Product selection ──────────────────────────────────────
-  static const _products = ['Otap', 'Ugoy', 'Biscuit', 'Other'];
-  String _selectedProduct = 'Otap';
+  String?   _selectedProduct;
+  DateTime  _entryDate = DateTime.now();
 
-  int get _bundles => int.tryParse(_bundleCtrl.text) ?? 0;
-  double get _previewSalary => _bundles * 4.0;
+  int    get _bundles        => int.tryParse(_bundleCtrl.text) ?? 0;
+  double get _previewSalary  => _bundles * 4.0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vm = context.read<PackerProductionViewModel>();
+      // Set first product as default when products load
+      if (vm.productNames.isNotEmpty && _selectedProduct == null) {
+        setState(() => _selectedProduct = vm.productNames.first);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -31,53 +42,104 @@ class _PackerProductionInputScreenState
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (_bundles <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter at least 1 bundle'),
-          backgroundColor: AppColors.danger,
+  // ── Date picker ────────────────────────────────────────────
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _entryDate,
+      firstDate: DateTime(DateTime.now().year - 1),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: AppColors.packer,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+          ),
         ),
-      );
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _entryDate = picked);
+    }
+  }
+
+  String get _dateLabel {
+    const months = [
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+    return '${months[_entryDate.month - 1]} ${_entryDate.day}, ${_entryDate.year}';
+  }
+
+  bool get _isToday {
+    final now = DateTime.now();
+    return _entryDate.year  == now.year &&
+           _entryDate.month == now.month &&
+           _entryDate.day   == now.day;
+  }
+
+  Future<void> _submit() async {
+    if (_selectedProduct == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select a product'),
+        backgroundColor: AppColors.danger,
+      ));
       return;
     }
 
-    final vm      = context.read<PackerProductionViewModel>();
-    final uid     = context.read<AuthViewModel>().currentUser!.id;
+    if (_bundles <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please enter at least 1 bundle'),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
+
+    final vm        = context.read<PackerProductionViewModel>();
+    final uid       = context.read<AuthViewModel>().currentUser!.id;
     final messenger = ScaffoldMessenger.of(context);
 
     final ok = await vm.addProduction(
       packerId:    uid,
-      productName: _selectedProduct,
+      productName: _selectedProduct!,
       bundleCount: _bundles,
+      entryDate:   _entryDate,
     );
 
     if (ok && mounted) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Production added! ✅'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Production added! ✅'),
+        backgroundColor: AppColors.success,
+      ));
       _bundleCtrl.clear();
       setState(() {});
     } else if (mounted && vm.error != null) {
-      messenger.showSnackBar(
-        SnackBar(
-            content: Text(vm.error!),
-            backgroundColor: AppColors.danger),
-      );
+      messenger.showSnackBar(SnackBar(
+          content: Text(vm.error!),
+          backgroundColor: AppColors.danger));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final vm  = context.watch<PackerProductionViewModel>();
-    final now = DateTime.now();
-    final dateLabel =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final timeLabel =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final uid = context.read<AuthViewModel>().currentUser!.id;
+
+    // Auto-select first product if not yet selected
+    if (_selectedProduct == null && vm.productNames.isNotEmpty) {
+      _selectedProduct = vm.productNames.first;
+    }
+
+    // Productions for selected date
+    final selectedProds = vm.selectedDayProductions.isNotEmpty
+        ? vm.selectedDayProductions
+        : (_isToday ? vm.todayProductions : <dynamic>[]);
+
+    final totalBundles =
+        selectedProds.fold<int>(0, (s, p) => s + (p.bundleCount as int));
+    final totalSalary = totalBundles * 4.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
@@ -100,16 +162,20 @@ class _PackerProductionInputScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date/time header ───────────────────────────────
-            _DateHeader(dateLabel: dateLabel, timeLabel: timeLabel),
-            const SizedBox(height: 20),
+            // ── Date selector ──────────────────────────────────
+            _DateSelectorCard(
+              dateLabel: _dateLabel,
+              isToday:   _isToday,
+              onTap:     _pickDate,
+            ),
+            const SizedBox(height: 16),
 
             // ── Info card ──────────────────────────────────────
             _InfoBanner(
               text: 'Each bundle earns ₱4.00. '
                   'You can add multiple entries per day.',
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // ── Input card ─────────────────────────────────────
             _WhiteCard(
@@ -120,21 +186,49 @@ class _PackerProductionInputScreenState
                   const _CardLabel('PRODUCTION ENTRY'),
                   const SizedBox(height: 16),
 
-                  // Product selector
+                  // ── Product from admin ────────────────────────
                   const Text('Product',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary)),
                   const SizedBox(height: 8),
-                  _ProductSelector(
-                    products:  _products,
-                    selected:  _selectedProduct,
-                    onChanged: (v) => setState(() => _selectedProduct = v),
-                  ),
+
+                  if (vm.isLoading && vm.productNames.isEmpty)
+                    const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.packer, strokeWidth: 2),
+                    )
+                  else if (vm.productNames.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color:
+                                AppColors.warning.withValues(alpha: 0.25)),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.warning_amber_outlined,
+                            size: 16, color: AppColors.warning),
+                        SizedBox(width: 8),
+                        Text('No products found. Ask admin to add products.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.warning)),
+                      ]),
+                    )
+                  else
+                    _ProductChips(
+                      products:  vm.productNames,
+                      selected:  _selectedProduct ?? '',
+                      onChanged: (v) => setState(() => _selectedProduct = v),
+                    ),
+
                   const SizedBox(height: 16),
 
-                  // Bundle count
+                  // ── Bundle count ──────────────────────────────
                   TextField(
                     controller: _bundleCtrl,
                     keyboardType: TextInputType.number,
@@ -144,7 +238,7 @@ class _PackerProductionInputScreenState
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       labelText: 'Number of Bundles',
-                      hintText: 'e.g. 25',
+                      hintText:  'e.g. 25',
                       prefixIcon: const Icon(
                           Icons.inventory_2_outlined,
                           color: AppColors.packer,
@@ -152,7 +246,7 @@ class _PackerProductionInputScreenState
                       suffixText: 'bundles',
                       suffixStyle: const TextStyle(
                           color: AppColors.textHint, fontSize: 13),
-                      filled: true,
+                      filled:    true,
                       fillColor:
                           AppColors.packer.withValues(alpha: 0.04),
                       border: OutlineInputBorder(
@@ -178,7 +272,7 @@ class _PackerProductionInputScreenState
 
             // ── Preview card ───────────────────────────────────
             _PreviewCard(
-              product: _selectedProduct,
+              product: _selectedProduct ?? '—',
               bundles: _bundles,
               salary:  _previewSalary,
             ),
@@ -189,15 +283,20 @@ class _PackerProductionInputScreenState
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: vm.isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5)
-                    : const Text('Add Production',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
+                icon: vm.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.5))
+                    : const Icon(Icons.add, color: Colors.white),
+                label: Text(
+                  vm.isLoading ? 'Adding...' : 'Add Production',
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.packer,
                   shape: RoundedRectangleBorder(
@@ -210,22 +309,25 @@ class _PackerProductionInputScreenState
 
             const SizedBox(height: 24),
 
-            // ── Today's entries so far ─────────────────────────
-            if (vm.todayProductions.isNotEmpty) ...[
-              const _CardLabel('TODAY\'S ENTRIES'),
+            // ── Entries for selected date ──────────────────────
+            if (selectedProds.isNotEmpty) ...[
+              _CardLabel(
+                  _isToday
+                      ? "TODAY'S ENTRIES"
+                      : 'ENTRIES FOR $_dateLabel'),
               const SizedBox(height: 10),
-              ...vm.todayProductions.map((p) => _EntryRow(prod: p)),
+              ...selectedProds.map((p) => _EntryRow(prod: p, packerId: uid, vm: vm)),
               const Divider(height: 20, color: AppColors.border),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total Today',
+                  const Text('Total',
                       style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                           color: AppColors.text)),
                   Text(
-                    '${vm.todayTotalBundles} bundles = ${formatCurrency(vm.todaySalary)}',
+                    '$totalBundles bundles = ${formatCurrency(totalSalary)}',
                     style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -241,12 +343,89 @@ class _PackerProductionInputScreenState
   }
 }
 
-// ── Product selector chips ────────────────────────────────────
-class _ProductSelector extends StatelessWidget {
-  final List<String> products;
-  final String       selected;
+// ── Date selector card ────────────────────────────────────────
+class _DateSelectorCard extends StatelessWidget {
+  final String     dateLabel;
+  final bool       isToday;
+  final VoidCallback onTap;
+  const _DateSelectorCard({
+    required this.dateLabel,
+    required this.isToday,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppColors.packer.withValues(alpha: 0.25)),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.packer.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.calendar_today_outlined,
+                  color: AppColors.packer, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Entry Date',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textHint,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(
+                    isToday ? 'Today — $dateLabel' : dateLabel,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.text),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.packer.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('Change',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.packer)),
+            ),
+          ]),
+        ),
+      );
+}
+
+// ── Dynamic product chips ─────────────────────────────────────
+class _ProductChips extends StatelessWidget {
+  final List<String>           products;
+  final String                 selected;
   final void Function(String) onChanged;
-  const _ProductSelector({
+  const _ProductChips({
     required this.products,
     required this.selected,
     required this.onChanged,
@@ -255,6 +434,7 @@ class _ProductSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Wrap(
         spacing: 8,
+        runSpacing: 8,
         children: products.map((p) {
           final isSelected = p == selected;
           return GestureDetector(
@@ -365,17 +545,41 @@ class _PreviewCard extends StatelessWidget {
       );
 }
 
-// ── Entry row ─────────────────────────────────────────────────
+// ── Entry row with delete ─────────────────────────────────────
 class _EntryRow extends StatelessWidget {
-  final dynamic prod;
-  const _EntryRow({required this.prod});
+  final dynamic                  prod;
+  final String                   packerId;
+  final PackerProductionViewModel vm;
+  const _EntryRow({
+    required this.prod,
+    required this.packerId,
+    required this.vm,
+  });
+
+  String _formatTime(String ts) {
+    try {
+      final dt = DateTime.parse(ts);
+      return '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return ts.length >= 16 ? ts.substring(11, 16) : '';
+    }
+  }
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.packer.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: AppColors.packer.withValues(alpha: 0.12)),
+        ),
         child: Row(children: [
           const Icon(Icons.inventory_2_outlined,
-              size: 14, color: AppColors.textHint),
+              size: 14, color: AppColors.packer),
           const SizedBox(width: 10),
           Expanded(
             child: Text(prod.productName,
@@ -387,51 +591,22 @@ class _EntryRow extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.packer)),
-          const SizedBox(width: 8),
-          Text(prod.timestamp.length >= 16
-              ? prod.timestamp.substring(11, 16)
-              : '',
+          const SizedBox(width: 10),
+          Text(_formatTime(prod.timestamp),
               style: const TextStyle(
                   fontSize: 11, color: AppColors.textHint)),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => vm.deleteProduction(prod.id, packerId),
+            child: Icon(Icons.delete_outline,
+                size: 16,
+                color: AppColors.danger.withValues(alpha: 0.6)),
+          ),
         ]),
       );
 }
 
 // ── Shared sub-widgets ────────────────────────────────────────
-class _DateHeader extends StatelessWidget {
-  final String dateLabel;
-  final String timeLabel;
-  const _DateHeader(
-      {required this.dateLabel, required this.timeLabel});
-
-  @override
-  Widget build(BuildContext context) => Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.packer.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.add_box_outlined,
-              color: AppColors.packer, size: 22),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Production Entry',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.text)),
-            Text('$dateLabel at $timeLabel',
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary)),
-          ],
-        ),
-      ]);
-}
-
 class _InfoBanner extends StatelessWidget {
   final String text;
   const _InfoBanner({required this.text});

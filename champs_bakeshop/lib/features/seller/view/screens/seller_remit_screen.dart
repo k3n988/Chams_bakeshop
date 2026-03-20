@@ -1,37 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
-
 import '../../../auth/viewmodel/auth_viewmodel.dart';
-
 import '../../viewmodel/seller_session_viewmodel.dart';
-import 'package:flutter/services.dart';
 
 class SellerRemitScreen extends StatefulWidget {
-  const SellerRemitScreen({super.key});
+  final RemitType remitType;
+
+  const SellerRemitScreen({
+    super.key,
+    required this.remitType,
+  });
 
   @override
   State<SellerRemitScreen> createState() => _SellerRemitScreenState();
 }
 
 class _SellerRemitScreenState extends State<SellerRemitScreen> {
-  final _returnCtrl    = TextEditingController();
-  final _remittedCtrl  = TextEditingController();
+  final _returnCtrl   = TextEditingController();
+  final _remittedCtrl = TextEditingController();
 
-  int get _returnPieces => int.tryParse(_returnCtrl.text) ?? 0;
-  double get _actualRemittance =>
-      double.tryParse(_remittedCtrl.text) ?? 0.0;
+  int    get _returnPieces    => int.tryParse(_returnCtrl.text) ?? 0;
+  double get _actualRemittance => double.tryParse(_remittedCtrl.text) ?? 0.0;
+
+  bool get _isMorning => widget.remitType == RemitType.morning;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill if editing existing remittance
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vm = context.read<SellerSessionViewModel>();
-      if (vm.hasRemittanceToday) {
-        _returnCtrl.text   = vm.returnPieces.toString();
-        _remittedCtrl.text = vm.actualRemittance.toStringAsFixed(0);
+      // Pre-fill if editing existing remittance
+      final existing = _isMorning
+          ? vm.morningRemittance
+          : vm.afternoonRemittance;
+      if (existing != null) {
+        _returnCtrl.text   = existing.returnPieces.toString();
+        _remittedCtrl.text =
+            existing.actualRemittance.toStringAsFixed(0);
       }
     });
   }
@@ -44,18 +52,13 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
   }
 
   // ── Live preview ───────────────────────────────────────────
-  int _piecesSold(int totalTaken) =>
-      (totalTaken - _returnPieces).clamp(0, totalTaken);
-
-  double _adjustedRemittance(int totalTaken) =>
-      _piecesSold(totalTaken) * 5.0;
-
-  double _variance(int totalTaken) =>
-      _actualRemittance - _adjustedRemittance(totalTaken);
+  int    _piecesSold(int total) => (total - _returnPieces).clamp(0, total);
+  double _adjusted(int total)   => _piecesSold(total) * 5.0;
+  double _variance(int total)   => _actualRemittance - _adjusted(total);
 
   Future<void> _submit() async {
-    final vm  = context.read<SellerSessionViewModel>();
-    final uid = context.read<AuthViewModel>().currentUser!.id;
+    final vm        = context.read<SellerSessionViewModel>();
+    final uid       = context.read<AuthViewModel>().currentUser!.id;
     final messenger = ScaffoldMessenger.of(context);
 
     if (_remittedCtrl.text.trim().isEmpty) {
@@ -66,7 +69,10 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
       return;
     }
 
-    final int totalTaken = vm.totalPiecesTaken;
+    final int totalTaken = _isMorning
+        ? vm.morningPiecesTaken
+        : vm.afternoonPiecesTaken;
+
     if (_returnPieces > totalTaken) {
       messenger.showSnackBar(const SnackBar(
         content: Text('Return pieces cannot exceed total pieces taken'),
@@ -75,17 +81,23 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
       return;
     }
 
+    final hasExisting = _isMorning
+        ? vm.hasMorningRemittance
+        : vm.hasAfternoonRemittance;
+
     bool ok;
-    if (vm.hasRemittanceToday) {
+    if (hasExisting) {
       ok = await vm.updateRemittance(
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
+        remitType:        widget.remitType,
       );
     } else {
       ok = await vm.createRemittance(
         sellerId:         uid,
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
+        remitType:        widget.remitType,
       );
     }
 
@@ -108,9 +120,20 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm         = context.watch<SellerSessionViewModel>();
-    final totalTaken = vm.totalPiecesTaken;
-    final isEdit     = vm.hasRemittanceToday;
+    final vm = context.watch<SellerSessionViewModel>();
+
+    final session    = _isMorning ? vm.morningSession : vm.afternoonSession;
+    final totalTaken = _isMorning
+        ? vm.morningPiecesTaken
+        : vm.afternoonPiecesTaken;
+    final hasExisting = _isMorning
+        ? vm.hasMorningRemittance
+        : vm.hasAfternoonRemittance;
+
+    final primaryColor = _isMorning
+        ? const Color(0xFF1976D2)
+        : AppColors.success;
+    final sessionLabel = _isMorning ? 'Morning' : 'Afternoon';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
@@ -122,11 +145,15 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
               size: 18, color: AppColors.text),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(isEdit ? 'Edit Remittance' : 'Evening Remittance',
-            style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppColors.text)),
+        title: Text(
+          hasExisting
+              ? 'Edit $sessionLabel Remittance'
+              : '$sessionLabel Remittance',
+          style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.text),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
@@ -134,7 +161,13 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Session summary ────────────────────────────────
-            _SessionSummaryBanner(vm: vm),
+            if (session != null)
+              _SessionSummaryBanner(
+                session:    session,
+                totalPieces: totalTaken,
+                color:      _isMorning ? AppColors.seller : AppColors.warning,
+                label:      sessionLabel,
+              ),
             const SizedBox(height: 20),
 
             // ── Input card ─────────────────────────────────────
@@ -143,17 +176,17 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _CardLabel('REMITTANCE DETAILS'),
+                  _CardLabel('REMITTANCE DETAILS',
+                      color: primaryColor),
                   const SizedBox(height: 16),
 
-                  // Return pieces
                   _InputField(
                     controller: _returnCtrl,
-                    label: 'Returned Pieces',
-                    hint: '0',
-                    icon: Icons.undo_outlined,
+                    label:  'Returned Pieces',
+                    hint:   '0',
+                    icon:   Icons.undo_outlined,
                     suffix: 'pieces',
-                    color: AppColors.warning,
+                    color:  AppColors.warning,
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 6),
@@ -161,7 +194,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
                     padding: const EdgeInsets.only(left: 12),
                     child: Text(
                       'Pieces sold: ${_piecesSold(totalTaken)} '
-                      '(${totalTaken} taken − $_returnPieces returned)',
+                      '($totalTaken taken − $_returnPieces returned)',
                       style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary),
@@ -170,14 +203,13 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Actual remittance
                   _InputField(
                     controller: _remittedCtrl,
-                    label: 'Actual Cash Remitted',
-                    hint: '0.00',
-                    icon: Icons.payments_outlined,
-                    suffix: '₱',
-                    color: AppColors.success,
+                    label:     'Actual Cash Remitted',
+                    hint:      '0.00',
+                    icon:      Icons.payments_outlined,
+                    suffix:    '₱',
+                    color:     AppColors.success,
                     onChanged: (_) => setState(() {}),
                     isDecimal: true,
                   ),
@@ -188,12 +220,12 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
 
             // ── Live breakdown ─────────────────────────────────
             _RemittanceBreakdown(
-              totalTaken:          totalTaken,
-              returnPieces:        _returnPieces,
-              piecesSold:          _piecesSold(totalTaken),
-              adjustedRemittance:  _adjustedRemittance(totalTaken),
-              actualRemittance:    _actualRemittance,
-              variance:            _variance(totalTaken),
+              totalTaken:         totalTaken,
+              returnPieces:       _returnPieces,
+              piecesSold:         _piecesSold(totalTaken),
+              adjustedRemittance: _adjusted(totalTaken),
+              actualRemittance:   _actualRemittance,
+              variance:           _variance(totalTaken),
             ),
             const SizedBox(height: 28),
 
@@ -204,7 +236,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
               child: ElevatedButton(
                 onPressed: vm.isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
+                  backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
@@ -212,7 +244,10 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
                 child: vm.isLoading
                     ? const CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5)
-                    : Text(isEdit ? 'Update Remittance' : 'Submit Remittance',
+                    : Text(
+                        hasExisting
+                            ? 'Update Remittance'
+                            : 'Submit Remittance',
                         style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -228,42 +263,49 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
 
 // ── Session summary banner ────────────────────────────────────
 class _SessionSummaryBanner extends StatelessWidget {
-  final SellerSessionViewModel vm;
-  const _SessionSummaryBanner({required this.vm});
+  final dynamic session;
+  final int     totalPieces;
+  final Color   color;
+  final String  label;
+  const _SessionSummaryBanner({
+    required this.session,
+    required this.totalPieces,
+    required this.color,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.seller.withValues(alpha: 0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: AppColors.seller.withValues(alpha: 0.20)),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
         ),
         child: Row(children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.seller.withValues(alpha: 0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.storefront_outlined,
-                color: AppColors.seller, size: 20),
+            child: Icon(Icons.storefront_outlined,
+                color: color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Morning Session',
-                    style: TextStyle(
+                Text('$label Session',
+                    style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.text)),
                 Text(
-                  '${vm.todaySession?.plantsaCount ?? 0} plantsa '
-                  '+ ${vm.todaySession?.subraPieces ?? 0} subra '
-                  '= ${vm.totalPiecesTaken} pieces',
+                  '${session.plantsaCount} plantsa '
+                  '+ ${session.subraPieces} subra '
+                  '= $totalPieces pieces',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textSecondary),
                 ),
@@ -277,11 +319,11 @@ class _SessionSummaryBanner extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 10, color: AppColors.textHint)),
               Text(
-                formatCurrency(vm.expectedRemittance),
-                style: const TextStyle(
+                formatCurrency(session.expectedRemittance),
+                style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.seller),
+                    color: color),
               ),
             ],
           ),
@@ -307,13 +349,13 @@ class _RemittanceBreakdown extends StatelessWidget {
     required this.variance,
   });
 
-  Color get _varianceColor {
+  Color get _vColor {
     if (variance > 0) return AppColors.success;
     if (variance < 0) return AppColors.danger;
     return AppColors.textHint;
   }
 
-  String get _varianceLabel {
+  String get _vLabel {
     if (variance > 0) return 'Overpaid';
     if (variance < 0) return 'Short';
     return 'Exact';
@@ -336,53 +378,47 @@ class _RemittanceBreakdown extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _CardLabel('BREAKDOWN'),
+            const _CardLabel('BREAKDOWN', color: AppColors.seller),
             const SizedBox(height: 14),
-            _BreakdownRow(
-              icon: Icons.inventory_2_outlined,
-              label: 'Total taken out',
-              value: '$totalTaken pieces',
-              color: AppColors.text,
-            ),
-            _BreakdownRow(
-              icon: Icons.undo_outlined,
-              label: 'Returned',
-              value: '−$returnPieces pieces',
-              color: AppColors.warning,
-            ),
-            _BreakdownRow(
-              icon: Icons.sell_outlined,
-              label: 'Sold',
-              value: '$piecesSold pieces',
-              color: AppColors.success,
-            ),
+            _BRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Total taken out',
+                value: '$totalTaken pieces',
+                color: AppColors.text),
+            _BRow(
+                icon: Icons.undo_outlined,
+                label: 'Returned',
+                value: '−$returnPieces pieces',
+                color: AppColors.warning),
+            _BRow(
+                icon: Icons.sell_outlined,
+                label: 'Sold',
+                value: '$piecesSold pieces',
+                color: AppColors.success),
             const Divider(height: 20, color: AppColors.border),
-            _BreakdownRow(
-              icon: Icons.calculate_outlined,
-              label: 'Should remit ($piecesSold × ₱5)',
-              value: formatCurrency(adjustedRemittance),
-              color: AppColors.primaryDark,
-              isBold: true,
-            ),
-            _BreakdownRow(
-              icon: Icons.payments_outlined,
-              label: 'Actual remitted',
-              value: formatCurrency(actualRemittance),
-              color: AppColors.primaryDark,
-              isBold: true,
-            ),
+            _BRow(
+                icon: Icons.calculate_outlined,
+                label: 'Should remit ($piecesSold × ₱5)',
+                value: formatCurrency(adjustedRemittance),
+                color: AppColors.primaryDark,
+                bold: true),
+            _BRow(
+                icon: Icons.payments_outlined,
+                label: 'Actual remitted',
+                value: formatCurrency(actualRemittance),
+                color: AppColors.primaryDark,
+                bold: true),
             const Divider(height: 20, color: AppColors.border),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(children: [
-                  Icon(Icons.balance_outlined,
-                      size: 16, color: _varianceColor),
+                  Icon(Icons.balance_outlined, size: 16, color: _vColor),
                   const SizedBox(width: 8),
-                  Text('Variance ($_varianceLabel)',
+                  Text('Variance ($_vLabel)',
                       style: TextStyle(
                           fontSize: 13,
-                          color: _varianceColor,
+                          color: _vColor,
                           fontWeight: FontWeight.w700)),
                 ]),
                 Text(
@@ -392,7 +428,7 @@ class _RemittanceBreakdown extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: _varianceColor),
+                      color: _vColor),
                 ),
               ],
             ),
@@ -401,19 +437,18 @@ class _RemittanceBreakdown extends StatelessWidget {
       );
 }
 
-class _BreakdownRow extends StatelessWidget {
+class _BRow extends StatelessWidget {
   final IconData icon;
   final String   label;
   final String   value;
   final Color    color;
-  final bool     isBold;
-
-  const _BreakdownRow({
+  final bool     bold;
+  const _BRow({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
-    this.isBold = false,
+    this.bold = false,
   });
 
   @override
@@ -430,8 +465,7 @@ class _BreakdownRow extends StatelessWidget {
           Text(value,
               style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      isBold ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
                   color: color)),
         ]),
       );
@@ -463,16 +497,15 @@ class _WhiteCard extends StatelessWidget {
 
 class _CardLabel extends StatelessWidget {
   final String text;
-  const _CardLabel(this.text);
+  final Color  color;
+  const _CardLabel(this.text, {required this.color});
 
   @override
   Widget build(BuildContext context) => Row(children: [
         Container(
-          width: 3,
-          height: 13,
+          width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.seller,
-              borderRadius: BorderRadius.circular(2)),
+              color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
         Text(text,
@@ -486,13 +519,13 @@ class _CardLabel extends StatelessWidget {
 
 class _InputField extends StatelessWidget {
   final TextEditingController controller;
-  final String   label;
-  final String   hint;
-  final IconData icon;
-  final String   suffix;
-  final Color    color;
+  final String                label;
+  final String                hint;
+  final IconData              icon;
+  final String                suffix;
+  final Color                 color;
   final void Function(String) onChanged;
-  final bool     isDecimal;
+  final bool                  isDecimal;
 
   const _InputField({
     required this.controller,
@@ -512,17 +545,18 @@ class _InputField extends StatelessWidget {
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.number,
         inputFormatters: isDecimal
-            ? [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))]
+            ? [FilteringTextInputFormatter.allow(
+                RegExp(r'^\d+\.?\d{0,2}'))]
             : [FilteringTextInputFormatter.digitsOnly],
         onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
-          hintText: hint,
+          hintText:  hint,
           prefixIcon: Icon(icon, color: color, size: 20),
           suffixText: suffix,
           suffixStyle:
               const TextStyle(color: AppColors.textHint, fontSize: 13),
-          filled: true,
+          filled:    true,
           fillColor: color.withValues(alpha: 0.04),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),

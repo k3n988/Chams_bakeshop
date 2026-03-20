@@ -46,10 +46,10 @@ class PackerSalaryViewModel extends ChangeNotifier {
     final entries = productionsByDate.entries.map((e) {
       final bundles = e.value.fold(0, (s, p) => s + p.bundleCount);
       return PackerDailyEntry(
-        date:        e.key,
-        productions: e.value,
+        date:         e.key,
+        productions:  e.value,
         totalBundles: bundles,
-        salary:      bundles * 4.0,
+        salary:       bundles * 4.0,
       );
     }).toList();
     entries.sort((a, b) => b.date.compareTo(a.date));
@@ -57,26 +57,23 @@ class PackerSalaryViewModel extends ChangeNotifier {
   }
 
   // ── Weekly aggregates ──────────────────────────────────────
-  int get totalBundles =>
-      _productions.fold(0, (s, p) => s + p.bundleCount);
-
-  double get grossSalary => totalBundles * 4.0;
-
+  int    get totalBundles  => _productions.fold(0, (s, p) => s + p.bundleCount);
+  double get grossSalary   => totalBundles * 4.0;
   double get valeDeduction => _weekPayroll?.valeDeduction ?? 0.0;
+  double get netSalary     => grossSalary - valeDeduction;
+  int    get daysWorked    => productionsByDate.keys.length;
 
-  double get netSalary => grossSalary - valeDeduction;
-
-  int get daysWorked => productionsByDate.keys.length;
-
-  // ── Monthly weekly breakdown ───────────────────────────────
+  // ── Monthly weekly breakdown (includes dailyEntries per week) ──
   List<PackerWeeklySummary> get weeklySummaries {
     final summaries = <PackerWeeklySummary>[];
+
     for (int i = 3; i >= 0; i--) {
       final wStart = _weekStart.subtract(Duration(days: 7 * i));
       final wEnd   = wStart.add(const Duration(days: 6));
       final wsStr  = wStart.toIso8601String().substring(0, 10);
       final weStr  = wEnd.toIso8601String().substring(0, 10);
 
+      // All productions in this week
       final weekProds = _productions
           .where((p) =>
               p.date.compareTo(wsStr) >= 0 &&
@@ -85,12 +82,29 @@ class PackerSalaryViewModel extends ChangeNotifier {
 
       final bundles = weekProds.fold(0, (s, p) => s + p.bundleCount);
 
+      // Build daily entries for this week
+      final dayMap = <String, List<PackerProductionModel>>{};
+      for (final p in weekProds) {
+        dayMap.putIfAbsent(p.date, () => []).add(p);
+      }
+      final weekDailyEntries = dayMap.entries.map((e) {
+        final b = e.value.fold(0, (s, p) => s + p.bundleCount);
+        return PackerDailyEntry(
+          date:         e.key,
+          productions:  e.value,
+          totalBundles: b,
+          salary:       b * 4.0,
+        );
+      }).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
       summaries.add(PackerWeeklySummary(
-        weekStart:  wsStr,
-        weekEnd:    weStr,
-        bundles:    bundles,
-        grossSalary: bundles * 4.0,
-        days:       weekProds.map((p) => p.date).toSet().length,
+        weekStart:    wsStr,
+        weekEnd:      weStr,
+        bundles:      bundles,
+        grossSalary:  bundles * 4.0,
+        days:         dayMap.keys.length,
+        dailyEntries: weekDailyEntries,
       ));
     }
     return summaries;
@@ -145,8 +159,11 @@ class PackerSalaryViewModel extends ChangeNotifier {
   Future<void> loadMonthly(String packerId) async {
     _setLoading(true);
     try {
-      final monthStart = _weekStart.subtract(const Duration(days: 21));
-      final fromDate   = monthStart.toIso8601String().substring(0, 10);
+      // go back 3 weeks from current week start
+      final monthStart =
+          _weekStart.subtract(const Duration(days: 21));
+      final fromDate =
+          monthStart.toIso8601String().substring(0, 10);
 
       _productions = await _service.getProductionsByMonth(
         packerId:   packerId,
@@ -165,7 +182,8 @@ class PackerSalaryViewModel extends ChangeNotifier {
   //  WEEK NAVIGATION
   // ─────────────────────────────────────────────────────────
   Future<void> changeWeek(int direction, String packerId) async {
-    _weekStart = _weekStart.add(Duration(days: 7 * direction));
+    _weekStart =
+        _weekStart.add(Duration(days: 7 * direction));
     await _loadWeekData(packerId);
   }
 
@@ -183,12 +201,14 @@ class PackerSalaryViewModel extends ChangeNotifier {
   }
 }
 
-// ── Helper data classes ───────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  HELPER DATA CLASSES
+// ══════════════════════════════════════════════════════════════
 class PackerDailyEntry {
-  final String date;
+  final String                      date;
   final List<PackerProductionModel> productions;
-  final int    totalBundles;
-  final double salary;
+  final int                         totalBundles;
+  final double                      salary;
 
   const PackerDailyEntry({
     required this.date,
@@ -199,11 +219,12 @@ class PackerDailyEntry {
 }
 
 class PackerWeeklySummary {
-  final String weekStart;
-  final String weekEnd;
-  final int    bundles;
-  final double grossSalary;
-  final int    days;
+  final String                 weekStart;
+  final String                 weekEnd;
+  final int                    bundles;
+  final double                 grossSalary;
+  final int                    days;
+  final List<PackerDailyEntry> dailyEntries; // ← NEW
 
   const PackerWeeklySummary({
     required this.weekStart,
@@ -211,5 +232,6 @@ class PackerWeeklySummary {
     required this.bundles,
     required this.grossSalary,
     required this.days,
+    required this.dailyEntries,
   });
 }

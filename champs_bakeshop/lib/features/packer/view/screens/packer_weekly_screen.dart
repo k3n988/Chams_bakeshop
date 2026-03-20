@@ -5,8 +5,16 @@ import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/packer_salary_viewmodel.dart';
 
-class PackerWeeklyScreen extends StatelessWidget {
+class PackerWeeklyScreen extends StatefulWidget {
   const PackerWeeklyScreen({super.key});
+
+  @override
+  State<PackerWeeklyScreen> createState() => _PackerWeeklyScreenState();
+}
+
+class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
+  /// Which date is currently expanded (null = none)
+  String? _expandedDate;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +23,10 @@ class PackerWeeklyScreen extends StatelessWidget {
 
     return RefreshIndicator(
       color: AppColors.packer,
-      onRefresh: () => vm.init(uid),
+      onRefresh: () async {
+        setState(() => _expandedDate = null);
+        await vm.init(uid);
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -32,8 +43,14 @@ class PackerWeeklyScreen extends StatelessWidget {
             _WeekNav(
               weekStart: vm.weekStart,
               weekEnd:   vm.weekEnd,
-              onPrev: () => vm.changeWeek(-1, uid),
-              onNext: () => vm.changeWeek(1, uid),
+              onPrev: () {
+                setState(() => _expandedDate = null);
+                vm.changeWeek(-1, uid);
+              },
+              onNext: () {
+                setState(() => _expandedDate = null);
+                vm.changeWeek(1, uid);
+              },
             ),
             const SizedBox(height: 16),
 
@@ -56,6 +73,14 @@ class PackerWeeklyScreen extends StatelessWidget {
 
               // ── Daily breakdown ────────────────────────────
               const _SectionLabel('DAILY BREAKDOWN'),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a day to see product details',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textHint
+                        .withValues(alpha: 0.7)),
+              ),
               const SizedBox(height: 10),
 
               if (vm.dailyEntries.isEmpty)
@@ -64,12 +89,351 @@ class PackerWeeklyScreen extends StatelessWidget {
                   message: 'No records for this week',
                 )
               else
-                ...vm.dailyEntries.map((e) => _WeekDayRow(entry: e)),
+                ...vm.dailyEntries.map((e) => _ExpandableDayCard(
+                      entry:        e,
+                      isExpanded:   _expandedDate == e.date,
+                      onTap: () => setState(() {
+                        _expandedDate =
+                            _expandedDate == e.date ? null : e.date;
+                      }),
+                    )),
             ],
           ],
         ),
       ),
     );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPANDABLE DAY CARD
+// ══════════════════════════════════════════════════════════════
+class _ExpandableDayCard extends StatelessWidget {
+  final PackerDailyEntry entry;
+  final bool             isExpanded;
+  final VoidCallback     onTap;
+
+  const _ExpandableDayCard({
+    required this.entry,
+    required this.isExpanded,
+    required this.onTap,
+  });
+
+  /// Group productions by product name → {name: totalBundles}
+  Map<String, int> get _byProduct {
+    final map = <String, int>{};
+    for (final p in entry.productions) {
+      map[p.productName] = (map[p.productName] ?? 0) + p.bundleCount;
+    }
+    return map;
+  }
+
+  String _formatTime(String ts) {
+    try {
+      final dt = DateTime.parse(ts);
+      return '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return ts.length >= 16 ? ts.substring(11, 16) : '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isExpanded
+              ? AppColors.packer.withValues(alpha: 0.40)
+              : AppColors.border,
+          width: isExpanded ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: isExpanded
+                  ? AppColors.packer.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ── Header row (always visible, tappable) ──────────
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                // Day number badge
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isExpanded
+                        ? AppColors.packer
+                        : AppColors.packer.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    entry.date.substring(8), // day number
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: isExpanded
+                            ? Colors.white
+                            : AppColors.packer),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatDate(entry.date),
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.text),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${entry.productions.length} entr${entry.productions.length == 1 ? 'y' : 'ies'} · ${entry.totalBundles} bundles',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatCurrency(entry.salary),
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark),
+                    ),
+                    const SizedBox(height: 4),
+                    Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: AppColors.packer,
+                    ),
+                  ],
+                ),
+              ]),
+            ),
+          ),
+
+          // ── Expanded breakdown ─────────────────────────────
+          if (isExpanded) ...[
+            Container(
+              height: 1,
+              color: AppColors.packer.withValues(alpha: 0.12),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Product breakdown ──────────────────────
+                  Row(children: [
+                    const Icon(Icons.inventory_2_outlined,
+                        size: 13, color: AppColors.packer),
+                    const SizedBox(width: 6),
+                    Text(
+                      'PRODUCT BREAKDOWN',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color:
+                              AppColors.packer.withValues(alpha: 0.8),
+                          letterSpacing: 0.8),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+
+                  // ── Per-product rows ───────────────────────
+                  ..._byProduct.entries.map((e) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.packer
+                              .withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.packer
+                                  .withValues(alpha: 0.12)),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                                color: AppColors.packer,
+                                shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(e.key,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.text)),
+                          ),
+                          Text('${e.value} bundles',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.packer)),
+                          const SizedBox(width: 12),
+                          Text(
+                            formatCurrency(e.value * 4.0),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.success),
+                          ),
+                        ]),
+                      )),
+
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 1,
+                    color: AppColors.packer.withValues(alpha: 0.10),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Daily total ────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.packer,
+                          AppColors.packer.withValues(alpha: 0.75),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            const Text('Daily Total',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${entry.totalBundles} bundles × ₱4.00',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          formatCurrency(entry.salary),
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ── Individual entry timestamps ────────────
+                  Row(children: [
+                    const Icon(Icons.access_time,
+                        size: 13, color: AppColors.textHint),
+                    const SizedBox(width: 6),
+                    Text(
+                      'ENTRY LOG',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textHint
+                              .withValues(alpha: 0.8),
+                          letterSpacing: 0.8),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+
+                  ...entry.productions.map((p) => Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(children: [
+                          const SizedBox(width: 4),
+                          const Icon(Icons.fiber_manual_record,
+                              size: 6,
+                              color: AppColors.textHint),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(p.productName,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color:
+                                        AppColors.textSecondary)),
+                          ),
+                          Text('${p.bundleCount} bundles',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.packer)),
+                          const SizedBox(width: 10),
+                          Text(
+                            _formatTime(p.timestamp),
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textHint),
+                          ),
+                        ]),
+                      )),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final dt = DateTime.parse(dateStr);
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return dateStr;
+    }
   }
 }
 
@@ -338,9 +702,9 @@ class _TakeHomeCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     _Pill(
-                      label: 'Gross',
-                      value: formatCurrency(vm.grossSalary),
-                      bgColor: Colors.white.withValues(alpha: 0.15),
+                      label:     'Gross',
+                      value:     formatCurrency(vm.grossSalary),
+                      bgColor:   Colors.white.withValues(alpha: 0.15),
                       textColor: Colors.white,
                     ),
                     const SizedBox(height: 4),
@@ -349,7 +713,7 @@ class _TakeHomeCard extends StatelessWidget {
                       value: vm.valeDeduction > 0
                           ? formatCurrency(vm.valeDeduction)
                           : '₱0.00',
-                      bgColor: Colors.red.withValues(alpha: 0.25),
+                      bgColor:   Colors.red.withValues(alpha: 0.25),
                       textColor: Colors.red.shade100,
                     ),
                   ],
@@ -375,8 +739,8 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(8),
@@ -386,69 +750,6 @@ class _Pill extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: textColor)),
-      );
-}
-
-// ── Day row ───────────────────────────────────────────────────
-class _WeekDayRow extends StatelessWidget {
-  final PackerDailyEntry entry;
-  const _WeekDayRow({required this.entry});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 1)),
-          ],
-        ),
-        child: Row(children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.packer.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              entry.date.substring(8),
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.packer),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(entry.date,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.text)),
-                Text('${entry.totalBundles} bundles',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textHint)),
-              ],
-            ),
-          ),
-          Text(formatCurrency(entry.salary),
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryDark)),
-        ]),
       );
 }
 

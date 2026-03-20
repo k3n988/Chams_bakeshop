@@ -8,6 +8,13 @@ import '../../viewmodel/admin_production_viewmodel.dart';
 import '../../viewmodel/admin_product_viewmodel.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
 
+// ── Placeholder imports (create these files later) ────────────
+import 'production_report_packer.dart';
+import 'production_report_seller.dart';
+
+// ══════════════════════════════════════════════════════════════
+//  ROOT SCREEN  — top tab bar
+// ══════════════════════════════════════════════════════════════
 class ProductionReportsScreen extends StatefulWidget {
   const ProductionReportsScreen({super.key});
 
@@ -17,7 +24,81 @@ class ProductionReportsScreen extends StatefulWidget {
 }
 
 class _ProductionReportsScreenState
-    extends State<ProductionReportsScreen> {
+    extends State<ProductionReportsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  static const _tabs = ['🧁  Baked', '🥖  Pandesal', '📦  Packer'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── Tab bar ────────────────────────────────────────────
+        Container(
+          color: Colors.white,
+          child: Column(
+            children: [
+              TabBar(
+                controller: _tab,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 2.5,
+                indicatorSize: TabBarIndicatorSize.label,
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500, fontSize: 13),
+                tabs: _tabs
+                    .map((t) => Tab(text: t))
+                    .toList(),
+              ),
+              Container(height: 1, color: AppColors.border),
+            ],
+          ),
+        ),
+
+        // ── Tab views ─────────────────────────────────────────
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: const [
+              _BakedReportsTab(),
+              ProductionReportSeller(),
+              ProductionReportPacker(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BAKED TAB  (original production_reports_screen content)
+// ══════════════════════════════════════════════════════════════
+class _BakedReportsTab extends StatefulWidget {
+  const _BakedReportsTab();
+
+  @override
+  State<_BakedReportsTab> createState() => _BakedReportsTabState();
+}
+
+class _BakedReportsTabState extends State<_BakedReportsTab> {
   DateTime _selectedMonth =
       DateTime(DateTime.now().year, DateTime.now().month);
   String? _selectedWeekStart;
@@ -49,15 +130,15 @@ class _ProductionReportsScreenState
     );
     if (picked != null) {
       setState(() {
-        _selectedMonth     = DateTime(picked.year, picked.month);
+        _selectedMonth    = DateTime(picked.year, picked.month);
         _selectedWeekStart = null;
       });
     }
   }
 
   List<String> _getWeeksInMonth() {
-    final year  = _selectedMonth.year;
-    final month = _selectedMonth.month;
+    final year     = _selectedMonth.year;
+    final month    = _selectedMonth.month;
     final firstDay = DateTime(year, month, 1);
     var monday =
         firstDay.subtract(Duration(days: firstDay.weekday - 1));
@@ -96,8 +177,8 @@ class _ProductionReportsScreenState
     AdminProductViewModel productVM,
     AdminUserViewModel userVM,
   ) {
-    final calc        = prodVM.computeDaily(prod, productVM.products);
-    final bakerName   = userVM.getUserName(prod.masterBakerId);
+    final calc      = prodVM.computeDaily(prod, productVM.products);
+    final bakerName = userVM.getUserName(prod.masterBakerId);
     final helperNames =
         prod.helperIds.map((id) => userVM.getUserName(id)).toList();
 
@@ -129,45 +210,41 @@ class _ProductionReportsScreenState
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary
-                        .withValues(alpha: 0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                      Icons.receipt_long_outlined,
+                  child: const Icon(Icons.receipt_long_outlined,
                       color: AppColors.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                    Text(prod.date,
-                        style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1A1A),
-                            letterSpacing: -0.3)),
-                    const Text('Production Detail',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint)),
-                  ]),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(prod.date,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1A1A1A),
+                              letterSpacing: -0.3)),
+                      const Text('Production Detail',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint)),
+                    ],
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.success
-                        .withValues(alpha: 0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: AppColors.success
-                            .withValues(alpha: 0.2)),
+                        color:
+                            AppColors.success.withValues(alpha: 0.2)),
                   ),
-                  child: Text(
-                      formatCurrency(calc.totalValue),
+                  child: Text(formatCurrency(calc.totalValue),
                       style: const TextStyle(
                           color: AppColors.success,
                           fontWeight: FontWeight.w800,
@@ -179,8 +256,7 @@ class _ProductionReportsScreenState
             Expanded(
               child: ListView(
                 controller: scrollCtrl,
-                padding:
-                    const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                 children: [
                   _SheetCard(children: [
                     const _SheetLabel('WORKERS'),
@@ -213,9 +289,8 @@ class _ProductionReportsScreenState
                     const SizedBox(height: 10),
                     ...prod.items.map((item) {
                       final p   = productVM.getById(item.productId);
-                      final val =
-                          (p?.pricePerSack ?? 0) *
-                              item.effectiveSacks;
+                      final val = (p?.pricePerSack ?? 0) *
+                          item.effectiveSacks;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(children: [
@@ -268,8 +343,7 @@ class _ProductionReportsScreenState
                             : '${calc.totalSacks} sacks'),
                     BreakdownRow(
                         label: 'Per Worker (base)',
-                        value: formatCurrency(
-                            calc.salaryPerWorker)),
+                        value: formatCurrency(calc.salaryPerWorker)),
                     const Divider(height: 20),
                     const Text('BAKER INCENTIVE',
                         style: TextStyle(
@@ -279,35 +353,35 @@ class _ProductionReportsScreenState
                             letterSpacing: 0.6)),
                     const SizedBox(height: 8),
                     Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                      const Text('₱100 / effective sack',
-                          style: TextStyle(fontSize: 13)),
-                      Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('₱100 / effective sack',
+                            style: TextStyle(fontSize: 13)),
+                        Column(
                           crossAxisAlignment:
                               CrossAxisAlignment.end,
                           children: [
-                        Text(
-                            formatCurrency(calc.bakerIncentive),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primaryDark,
-                                fontSize: 13)),
-                        Text(
-                          '${(calc.totalSacks + calc.totalExtraKg / 25.0).toStringAsFixed(2)} eff. sacks × ₱100',
-                          style: const TextStyle(
-                              fontSize: 10,
-                              color: AppColors.textHint),
+                            Text(formatCurrency(calc.bakerIncentive),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryDark,
+                                    fontSize: 13)),
+                            Text(
+                              '${(calc.totalSacks + calc.totalExtraKg / 25.0).toStringAsFixed(2)} eff. sacks × ₱100',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textHint),
+                            ),
+                          ],
                         ),
-                      ]),
-                    ]),
+                      ],
+                    ),
                     const Divider(height: 20),
                     BreakdownRow(
                         label: 'Baker Salary (est.)',
-                        value: formatCurrency(
-                            calc.salaryPerWorker +
-                                calc.bakerIncentive),
+                        value: formatCurrency(calc.salaryPerWorker +
+                            calc.bakerIncentive),
                         color: AppColors.primaryDark),
                     const Divider(height: 20),
                     const Text('BONUS (PAID SEPARATELY)',
@@ -319,28 +393,24 @@ class _ProductionReportsScreenState
                     const SizedBox(height: 8),
                     BreakdownRow(
                         label: 'Master Baker Bonus',
-                        value: formatCurrency(
-                            calc.bonusPerWorker),
+                        value: formatCurrency(calc.bonusPerWorker),
                         color: AppColors.masterBaker),
                     BreakdownRow(
                         label: 'Helper Bonus (each)',
-                        value: formatCurrency(
-                            calc.bonusPerWorker),
+                        value: formatCurrency(calc.bonusPerWorker),
                         color: AppColors.success),
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.amber.shade50,
-                        borderRadius:
-                            BorderRadius.circular(10),
-                        border: Border.all(
-                            color: Colors.amber.shade200),
+                        borderRadius: BorderRadius.circular(10),
+                        border:
+                            Border.all(color: Colors.amber.shade200),
                       ),
                       child: Row(children: [
                         Icon(Icons.info_outline,
-                            size: 14,
-                            color: Colors.amber.shade700),
+                            size: 14, color: Colors.amber.shade700),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -405,105 +475,104 @@ class _ProductionReportsScreenState
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-        // ── Header ──────────────────────────────────────
-        const _PageHeader(
-          title:    'Production Reports',
-          subtitle: 'View daily production history',
-          icon:     Icons.bar_chart_outlined,
-        ),
-        const SizedBox(height: 16),
-
-        // ── Month selector ───────────────────────────────
-        _MonthSelector(
-          label:  monthLabel,
-          onPrev: () => _changeMonth(-1),
-          onNext: () => _changeMonth(1),
-          onTap:  _pickMonth,
-        ),
-        const SizedBox(height: 10),
-
-        // ── Week selector ────────────────────────────────
-        _buildWeekSelector(weeks),
-        const SizedBox(height: 14),
-
-        // ── Month summary banner ─────────────────────────
-        if (monthFiltered.isNotEmpty)
-          _MonthSummaryBanner(
-            days:   monthFiltered.length,
-            sacks:  monthTotalSacks,
-            value:  monthTotalValue,
+          // ── Header ─────────────────────────────────────────
+          const _PageHeader(
+            title:    'Baked Production',
+            subtitle: 'Daily baked goods records',
+            icon:     Icons.bakery_dining_outlined,
           ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-        // ── Active filter chip ───────────────────────────
-        if (_selectedWeekStart != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary
-                      .withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
+          // ── Month selector ──────────────────────────────────
+          _MonthSelector(
+            label:  monthLabel,
+            onPrev: () => _changeMonth(-1),
+            onNext: () => _changeMonth(1),
+            onTap:  _pickMonth,
+          ),
+          const SizedBox(height: 10),
+
+          // ── Week selector ───────────────────────────────────
+          _buildWeekSelector(weeks),
+          const SizedBox(height: 14),
+
+          // ── Month summary banner ────────────────────────────
+          if (monthFiltered.isNotEmpty)
+            _MonthSummaryBanner(
+              days:  monthFiltered.length,
+              sacks: monthTotalSacks,
+              value: monthTotalValue,
+            ),
+          const SizedBox(height: 14),
+
+          // ── Active filter chip ──────────────────────────────
+          if (_selectedWeekStart != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                  const Icon(Icons.filter_list,
-                      size: 13, color: AppColors.primary),
-                  const SizedBox(width: 5),
-                  Text(
-                    '$_selectedWeekStart — ${_weekEnd(_selectedWeekStart!)}',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary),
+                      const Icon(Icons.filter_list,
+                          size: 13, color: AppColors.primary),
+                      const SizedBox(width: 5),
+                      Text(
+                        '$_selectedWeekStart — ${_weekEnd(_selectedWeekStart!)}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => setState(
+                            () => _selectedWeekStart = null),
+                        child: const Icon(Icons.close,
+                            size: 13, color: AppColors.primary),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => setState(
-                        () => _selectedWeekStart = null),
-                    child: const Icon(Icons.close,
-                        size: 13,
-                        color: AppColors.primary),
-                  ),
-                ]),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${filtered.length} record${filtered.length != 1 ? 's' : ''}',
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textHint),
-              ),
-            ]),
-          ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${filtered.length} record${filtered.length != 1 ? 's' : ''}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textHint),
+                ),
+              ]),
+            ),
 
-        // ── List ─────────────────────────────────────────
-        if (filtered.isEmpty)
-          _EmptyReports()
-        else
-          ...filtered.map((prod) {
-            final calc      =
-                prodVM.computeDaily(prod, productVM.products);
-            final bakerName =
-                userVM.getUserName(prod.masterBakerId);
+          // ── List ────────────────────────────────────────────
+          if (filtered.isEmpty)
+            _EmptyReports()
+          else
+            ...filtered.map((prod) {
+              final calc      =
+                  prodVM.computeDaily(prod, productVM.products);
+              final bakerName =
+                  userVM.getUserName(prod.masterBakerId);
 
-            return _ProductionCard(
-              prod:       prod,
-              calc:       calc,
-              bakerName:  bakerName,
-              productVM:  productVM,
-              onTap: () => _showDetailSheet(
-                  context, prod, prodVM, productVM, userVM),
-            );
-          }),
-      ]),
+              return _ProductionCard(
+                prod:      prod,
+                calc:      calc,
+                bakerName: bakerName,
+                productVM: productVM,
+                onTap: () => _showDetailSheet(
+                    context, prod, prodVM, productVM, userVM),
+              );
+            }),
+        ],
+      ),
     );
   }
 
@@ -542,8 +611,7 @@ class _ProductionReportsScreenState
           icon: Icon(Icons.chevron_left,
               color: canPrev
                   ? AppColors.primary
-                  : AppColors.textHint
-                      .withValues(alpha: 0.3)),
+                  : AppColors.textHint.withValues(alpha: 0.3)),
           onPressed: canPrev ? () => _changeWeek(-1) : null,
         ),
         Expanded(
@@ -556,34 +624,33 @@ class _ProductionReportsScreenState
               } else {
                 final next = idx + 1;
                 setState(() => _selectedWeekStart =
-                    next < weeks.length
-                        ? weeks[next]
-                        : null);
+                    next < weeks.length ? weeks[next] : null);
               }
             },
             onLongPress: () =>
                 setState(() => _selectedWeekStart = null),
             child: Column(children: [
               Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                Icon(Icons.date_range_outlined,
-                    size: 15,
-                    color: _selectedWeekStart != null
-                        ? AppColors.primary
-                        : AppColors.textHint),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: _selectedWeekStart != null
-                              ? AppColors.primary
-                              : AppColors.textHint),
-                      textAlign: TextAlign.center),
-                ),
-              ]),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.date_range_outlined,
+                      size: 15,
+                      color: _selectedWeekStart != null
+                          ? AppColors.primary
+                          : AppColors.textHint),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(label,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: _selectedWeekStart != null
+                                ? AppColors.primary
+                                : AppColors.textHint),
+                        textAlign: TextAlign.center),
+                  ),
+                ],
+              ),
               if (_selectedWeekStart == null)
                 const Text('Tap to filter by week',
                     style: TextStyle(
@@ -596,8 +663,7 @@ class _ProductionReportsScreenState
           icon: Icon(Icons.chevron_right,
               color: canNext
                   ? AppColors.primary
-                  : AppColors.textHint
-                      .withValues(alpha: 0.3)),
+                  : AppColors.textHint.withValues(alpha: 0.3)),
           onPressed: canNext ? () => _changeWeek(1) : null,
         ),
       ]),
@@ -605,9 +671,10 @@ class _ProductionReportsScreenState
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  PAGE HEADER
-// ─────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  SHARED WIDGETS
+// ══════════════════════════════════════════════════════════════
+
 class _PageHeader extends StatelessWidget {
   final String   title;
   final String   subtitle;
@@ -623,33 +690,30 @@ class _PageHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF7A00)
-                .withValues(alpha: 0.1),
+            color: const Color(0xFFFF7A00).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon,
-              color: const Color(0xFFFF7A00), size: 22),
+          child:
+              Icon(icon, color: const Color(0xFFFF7A00), size: 22),
         ),
         const SizedBox(width: 12),
-        Column(crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1A1A1A),
-                  letterSpacing: -0.3)),
-          Text(subtitle,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textHint)),
-        ]),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1A1A),
+                    letterSpacing: -0.3)),
+            Text(subtitle,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textHint)),
+          ],
+        ),
       ]);
 }
 
-// ─────────────────────────────────────────────────────────
-//  MONTH SELECTOR
-// ─────────────────────────────────────────────────────────
 class _MonthSelector extends StatelessWidget {
   final String       label;
   final VoidCallback onPrev;
@@ -684,20 +748,21 @@ class _MonthSelector extends StatelessWidget {
             child: GestureDetector(
               onTap: onTap,
               child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                const Icon(Icons.calendar_month,
-                    size: 16, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(label,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppColors.primary)),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down,
-                    size: 18, color: AppColors.primary),
-              ]),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.calendar_month,
+                      size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Text(label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.primary)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 18, color: AppColors.primary),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -708,9 +773,6 @@ class _MonthSelector extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  MONTH SUMMARY BANNER
-// ─────────────────────────────────────────────────────────
 class _MonthSummaryBanner extends StatelessWidget {
   final int    days;
   final int    sacks;
@@ -733,31 +795,31 @@ class _MonthSummaryBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF7A00)
-                  .withValues(alpha: 0.25),
+              color: const Color(0xFFFF7A00).withValues(alpha: 0.25),
               blurRadius: 14,
               offset: const Offset(0, 5),
             ),
           ],
         ),
         child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-          _BannerStat(
-              icon: Icons.calendar_today_outlined,
-              label: 'Days',
-              value: '$days'),
-          _BannerDivider(),
-          _BannerStat(
-              icon: Icons.inventory_2_outlined,
-              label: 'Sacks',
-              value: '$sacks'),
-          _BannerDivider(),
-          _BannerStat(
-              icon: Icons.attach_money,
-              label: 'Value',
-              value: formatCurrency(value)),
-        ]),
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _BannerStat(
+                icon: Icons.calendar_today_outlined,
+                label: 'Days',
+                value: '$days'),
+            _BannerDivider(),
+            _BannerStat(
+                icon: Icons.inventory_2_outlined,
+                label: 'Sacks',
+                value: '$sacks'),
+            _BannerDivider(),
+            _BannerStat(
+                icon: Icons.attach_money,
+                label: 'Value',
+                value: formatCurrency(value)),
+          ],
+        ),
       );
 }
 
@@ -793,9 +855,6 @@ class _BannerDivider extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.3));
 }
 
-// ─────────────────────────────────────────────────────────
-//  EMPTY REPORTS STATE
-// ─────────────────────────────────────────────────────────
 class _EmptyReports extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
@@ -826,15 +885,12 @@ class _EmptyReports extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  PRODUCTION CARD
-// ─────────────────────────────────────────────────────────
 class _ProductionCard extends StatelessWidget {
-  final ProductionModel      prod;
-  final dynamic              calc;
-  final String               bakerName;
+  final ProductionModel       prod;
+  final dynamic               calc;
+  final String                bakerName;
   final AdminProductViewModel productVM;
-  final VoidCallback         onTap;
+  final VoidCallback          onTap;
 
   const _ProductionCard({
     required this.prod,
@@ -867,115 +923,108 @@ class _ProductionCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                // ── Date + value ────────────────────────
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary
-                          .withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 16,
-                        color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(prod.date,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: Color(0xFF1A1A1A))),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.success
-                          .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: AppColors.success
-                              .withValues(alpha: 0.2)),
-                    ),
-                    child: Text(
-                        formatCurrency(calc.totalValue),
-                        style: const TextStyle(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13)),
-                  ),
-                ]),
-                const SizedBox(height: 12),
-
-                // ── Info chips ──────────────────────────
-                Wrap(spacing: 8, runSpacing: 6, children: [
-                  _InfoChip(
-                      icon: Icons.star_outline,
-                      label: bakerName,
-                      color: AppColors.masterBaker),
-                  _InfoChip(
-                      icon: Icons.groups_outlined,
-                      label: '${calc.totalWorkers} workers',
-                      color: AppColors.info),
-                  _InfoChip(
-                      icon: Icons.inventory_2_outlined,
-                      label: '${calc.totalSacks} sacks',
-                      color: AppColors.primary),
-                  _InfoChip(
-                      icon: Icons.calculate_outlined,
-                      label: '${formatCurrency(calc.salaryPerWorker)}/worker',
-                      color: const Color(0xFF388E3C)),
-                ]),
-                const SizedBox(height: 10),
-
-                // ── Product pills ───────────────────────
-                Wrap(
-                  spacing: 6, runSpacing: 6,
-                  children: prod.items.map((item) {
-                    final p   = productVM.getById(item.productId);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius:
-                            BorderRadius.circular(20),
+                        color: AppColors.primary
+                            .withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        '${item.sacks}× ${p?.name ?? "?"}',
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF666666)),
+                      child: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                          color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(prod.date,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: Color(0xFF1A1A1A))),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color:
+                            AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppColors.success
+                                .withValues(alpha: 0.2)),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-
-                // ── Tap hint ────────────────────────────
-                Row(
+                      child: Text(formatCurrency(calc.totalValue),
+                          style: const TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 6, children: [
+                    _InfoChip(
+                        icon: Icons.star_outline,
+                        label: bakerName,
+                        color: AppColors.masterBaker),
+                    _InfoChip(
+                        icon: Icons.groups_outlined,
+                        label: '${calc.totalWorkers} workers',
+                        color: AppColors.info),
+                    _InfoChip(
+                        icon: Icons.inventory_2_outlined,
+                        label: '${calc.totalSacks} sacks',
+                        color: AppColors.primary),
+                    _InfoChip(
+                        icon: Icons.calculate_outlined,
+                        label:
+                            '${formatCurrency(calc.salaryPerWorker)}/worker',
+                        color: const Color(0xFF388E3C)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6, runSpacing: 6,
+                    children: prod.items.map((item) {
+                      final p = productVM.getById(item.productId);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${item.sacks}× ${p?.name ?? "?"}',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF666666)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                  Text('View details',
-                      style: TextStyle(
-                          fontSize: 11,
+                      Text('View details',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.primary
+                                  .withValues(alpha: 0.7),
+                              fontStyle: FontStyle.italic)),
+                      const SizedBox(width: 3),
+                      Icon(Icons.chevron_right,
+                          size: 14,
                           color: AppColors.primary
-                              .withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic)),
-                  const SizedBox(width: 3),
-                  Icon(Icons.chevron_right,
-                      size: 14,
-                      color: AppColors.primary
-                          .withValues(alpha: 0.7)),
-                ]),
-              ]),
+                              .withValues(alpha: 0.7)),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -993,8 +1042,8 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 8, vertical: 4),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
@@ -1011,9 +1060,6 @@ class _InfoChip extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  DETAIL SHEET WIDGETS
-// ─────────────────────────────────────────────────────────
 class _SheetCard extends StatelessWidget {
   final List<Widget> children;
   const _SheetCard({required this.children});

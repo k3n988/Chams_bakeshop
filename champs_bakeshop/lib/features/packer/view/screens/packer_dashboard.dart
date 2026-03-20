@@ -102,26 +102,23 @@ class _PackerDashboardState extends State<PackerDashboard> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.packer.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                     color: AppColors.packer.withValues(alpha: 0.2)),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('📦', style: TextStyle(fontSize: 12)),
-                  SizedBox(width: 4),
-                  Text('Packer',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.packer)),
-                ],
-              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('📦', style: TextStyle(fontSize: 12)),
+                SizedBox(width: 4),
+                Text('Packer',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.packer)),
+              ]),
             ),
           ),
         ],
@@ -164,7 +161,6 @@ class _PackerHomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Greeting ──────────────────────────────────────
             _GreetingBanner(name: user.name),
             const SizedBox(height: 20),
 
@@ -172,7 +168,7 @@ class _PackerHomePage extends StatelessWidget {
             _TodaySummaryCard(vm: vm),
             const SizedBox(height: 16),
 
-            // ── Quick action ──────────────────────────────────
+            // ── Add Production button ─────────────────────────
             _AddProductionButton(userId: user.id),
             const SizedBox(height: 20),
 
@@ -182,12 +178,16 @@ class _PackerHomePage extends StatelessWidget {
               const SizedBox(height: 10),
               ...vm.todayProductions.asMap().entries.map(
                     (e) => _ProductionEntryCard(
-                      prod:  e.value,
-                      index: e.key,
+                      prod:     e.value,
+                      index:    e.key,
                       packerId: user.id,
                     ),
                   ),
-            ],
+              // ── Product breakdown ───────────────────────────
+              const SizedBox(height: 12),
+              _ProductBreakdownCard(vm: vm),
+            ] else
+              _EmptyToday(),
           ],
         ),
       ),
@@ -290,16 +290,16 @@ class _TodaySummaryCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _SummaryCell(
-              icon: Icons.inventory_2_outlined,
+              icon:  Icons.inventory_2_outlined,
               value: '${vm.todayTotalBundles}',
               label: 'Bundles Today',
               color: AppColors.packer,
             ),
             Container(width: 1, height: 44, color: AppColors.border),
             _SummaryCell(
-              icon: Icons.payments_outlined,
+              icon:  Icons.payments_outlined,
               value: formatCurrency(vm.todaySalary),
-              label: 'Today\'s Salary',
+              label: "Today's Salary",
               color: AppColors.success,
             ),
           ],
@@ -376,7 +376,7 @@ class _AddProductionButton extends StatelessWidget {
       );
 }
 
-// ── Production entry card ─────────────────────────────────────
+// ── Production entry card with timestamp ─────────────────────
 class _ProductionEntryCard extends StatelessWidget {
   final dynamic prod;
   final int     index;
@@ -386,6 +386,23 @@ class _ProductionEntryCard extends StatelessWidget {
     required this.index,
     required this.packerId,
   });
+
+  /// Parse timestamp and return formatted string e.g. "Mar 20, 2026 02:19"
+  String _formatTimestamp(String ts) {
+    try {
+      final dt = DateTime.parse(ts);
+      const months = [
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
+      ];
+      final date = '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+      final time =
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return '$date  $time';
+    } catch (_) {
+      return ts.length >= 16 ? ts.substring(0, 16).replaceAll('T', '  ') : ts;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -433,10 +450,18 @@ class _ProductionEntryCard extends StatelessWidget {
                         fontSize: 14,
                         color: AppColors.text)),
                 const SizedBox(height: 3),
-                Text(prod.timestamp.substring(11, 16),
+                // ── Full date + time ──────────────────────────
+                Row(children: [
+                  const Icon(Icons.access_time,
+                      size: 12, color: AppColors.textHint),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatTimestamp(prod.timestamp),
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary)),
+                        fontSize: 11,
+                        color: AppColors.textSecondary),
+                  ),
+                ]),
               ],
             ),
           ),
@@ -470,6 +495,110 @@ class _ProductionEntryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Product breakdown card ────────────────────────────────────
+class _ProductBreakdownCard extends StatelessWidget {
+  final PackerProductionViewModel vm;
+  const _ProductBreakdownCard({required this.vm});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: AppColors.packer.withValues(alpha: 0.20)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionLabel('PRODUCT BREAKDOWN'),
+            const SizedBox(height: 12),
+            ...vm.todayByProduct.entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(children: [
+                    Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(
+                          color: AppColors.packer,
+                          shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(e.key,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary)),
+                    ),
+                    Text('${e.value} bundles',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.packer)),
+                    const SizedBox(width: 12),
+                    Text(formatCurrency(e.value * 4.0),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.success)),
+                  ]),
+                )),
+            const Divider(height: 18, color: AppColors.border),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.text)),
+                Text(
+                  '${vm.todayTotalBundles} bundles = ${formatCurrency(vm.todaySalary)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: AppColors.packer),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
+// ── Empty today card ──────────────────────────────────────────
+class _EmptyToday extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(children: [
+          Icon(Icons.inventory_2_outlined,
+              size: 40,
+              color: AppColors.packer.withValues(alpha: 0.3)),
+          const SizedBox(height: 10),
+          const Text('No productions today yet',
+              style: TextStyle(
+                  color: AppColors.textHint, fontSize: 14)),
+          const SizedBox(height: 4),
+          const Text('Tap + Add Production to get started',
+              style: TextStyle(
+                  color: AppColors.textHint, fontSize: 12)),
+        ]),
+      );
 }
 
 // ── Shared ────────────────────────────────────────────────────

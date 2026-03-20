@@ -5,9 +5,6 @@ import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/packer_salary_viewmodel.dart';
 
-// ══════════════════════════════════════════════════════════════
-//  MONTHLY SCREEN
-// ══════════════════════════════════════════════════════════════
 class PackerMonthlyScreen extends StatefulWidget {
   const PackerMonthlyScreen({super.key});
 
@@ -17,6 +14,9 @@ class PackerMonthlyScreen extends StatefulWidget {
 }
 
 class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
+  /// Which week index is expanded (null = none)
+  int? _expandedWeek;
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +33,10 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
 
     return RefreshIndicator(
       color: AppColors.packer,
-      onRefresh: () => vm.loadMonthly(uid),
+      onRefresh: () async {
+        setState(() => _expandedWeek = null);
+        await vm.loadMonthly(uid);
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -89,19 +92,397 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
 
               const SizedBox(height: 16),
               const _SectionLabel('WEEKLY BREAKDOWN'),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a week to see details',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textHint.withValues(alpha: 0.7)),
+              ),
+              const SizedBox(height: 10),
 
+              // ── 4-week expandable rows ─────────────────────
               ...vm.weeklySummaries.asMap().entries.map((e) =>
-                  _WeekSummaryRow(
-                    index:   e.key,
-                    summary: e.value,
-                    isLast:  e.key == vm.weeklySummaries.length - 1,
+                  _ExpandableWeekRow(
+                    index:      e.key,
+                    summary:    e.value,
+                    isExpanded: _expandedWeek == e.key,
+                    onTap: () => setState(() {
+                      _expandedWeek =
+                          _expandedWeek == e.key ? null : e.key;
+                    }),
                   )),
             ],
           ],
         ),
       ),
     );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPANDABLE WEEK ROW
+// ══════════════════════════════════════════════════════════════
+class _ExpandableWeekRow extends StatelessWidget {
+  final int                index;
+  final PackerWeeklySummary summary;
+  final bool               isExpanded;
+  final VoidCallback       onTap;
+
+  const _ExpandableWeekRow({
+    required this.index,
+    required this.summary,
+    required this.isExpanded,
+    required this.onTap,
+  });
+
+  /// Group daily entries by product → {productName: totalBundles}
+  Map<String, int> get _byProduct {
+    final map = <String, int>{};
+    for (final day in summary.dailyEntries) {
+      for (final prod in day.productions) {
+        map[prod.productName] =
+            (map[prod.productName] ?? 0) + prod.bundleCount;
+      }
+    }
+    return map;
+  }
+
+  bool get _hasData => summary.grossSalary > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isExpanded
+              ? AppColors.packer.withValues(alpha: 0.40)
+              : _hasData
+                  ? AppColors.packer.withValues(alpha: 0.15)
+                  : AppColors.border,
+          width: isExpanded ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: isExpanded
+                  ? AppColors.packer.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ── Header row ─────────────────────────────────────
+          InkWell(
+            onTap: _hasData ? onTap : null,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 14),
+              child: Row(children: [
+                // Week badge
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isExpanded
+                        ? AppColors.packer
+                        : _hasData
+                            ? AppColors.packer.withValues(alpha: 0.10)
+                            : AppColors.border,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text('W${index + 1}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: isExpanded
+                              ? Colors.white
+                              : _hasData
+                                  ? AppColors.packer
+                                  : AppColors.textHint)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        summary.weekStart.isNotEmpty
+                            ? '${summary.weekStart} – ${summary.weekEnd}'
+                            : '— –– —',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.text),
+                      ),
+                      if (_hasData)
+                        Text(
+                          '${summary.days} days · ${summary.bundles} bundles',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint),
+                        ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _hasData
+                          ? formatCurrency(summary.grossSalary)
+                          : '₱0.00',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _hasData
+                              ? AppColors.primaryDark
+                              : AppColors.textHint),
+                    ),
+                    if (_hasData) ...[
+                      const SizedBox(height: 4),
+                      Icon(
+                        isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 18,
+                        color: AppColors.packer,
+                      ),
+                    ],
+                  ],
+                ),
+              ]),
+            ),
+          ),
+
+          // ── Expanded content ───────────────────────────────
+          if (isExpanded && _hasData) ...[
+            Container(
+                height: 1,
+                color: AppColors.packer.withValues(alpha: 0.12)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Product breakdown ────────────────────
+                  Row(children: [
+                    const Icon(Icons.inventory_2_outlined,
+                        size: 13, color: AppColors.packer),
+                    const SizedBox(width: 6),
+                    Text('PRODUCT BREAKDOWN',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.packer
+                                .withValues(alpha: 0.8),
+                            letterSpacing: 0.8)),
+                  ]),
+                  const SizedBox(height: 10),
+
+                  if (_byProduct.isEmpty)
+                    const Text('No product data',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint))
+                  else
+                    ..._byProduct.entries.map((e) => Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.packer
+                                .withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: AppColors.packer
+                                    .withValues(alpha: 0.12)),
+                          ),
+                          child: Row(children: [
+                            Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                    color: AppColors.packer,
+                                    shape: BoxShape.circle)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(e.key,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.text)),
+                            ),
+                            Text('${e.value} bundles',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.packer)),
+                            const SizedBox(width: 12),
+                            Text(
+                              formatCurrency(e.value * 4.0),
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.success),
+                            ),
+                          ]),
+                        )),
+
+                  const SizedBox(height: 10),
+                  Container(
+                      height: 1,
+                      color: AppColors.packer.withValues(alpha: 0.10)),
+                  const SizedBox(height: 10),
+
+                  // ── Weekly total card ────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.packer,
+                          AppColors.packer.withValues(alpha: 0.75),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            const Text('Week Total',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${summary.bundles} bundles × ₱4.00',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          formatCurrency(summary.grossSalary),
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── Per-day breakdown ────────────────────
+                  Row(children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        size: 13, color: AppColors.textHint),
+                    const SizedBox(width: 6),
+                    Text('DAILY BREAKDOWN',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textHint
+                                .withValues(alpha: 0.8),
+                            letterSpacing: 0.8)),
+                  ]),
+                  const SizedBox(height: 8),
+
+                  ...summary.dailyEntries.map((day) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F4F0),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.border),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.packer
+                                  .withValues(alpha: 0.10),
+                              borderRadius:
+                                  BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              day.date.substring(8),
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.packer),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(_formatDate(day.date),
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.text)),
+                                Text(
+                                    '${day.totalBundles} bundles',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color:
+                                            AppColors.textHint)),
+                              ],
+                            ),
+                          ),
+                          Text(formatCurrency(day.salary),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryDark)),
+                        ]),
+                      )),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final dt = DateTime.parse(dateStr);
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return dateStr;
+    }
   }
 }
 
@@ -240,95 +621,7 @@ class _GridStat extends StatelessWidget {
       );
 }
 
-// ── Week summary row ──────────────────────────────────────────
-class _WeekSummaryRow extends StatelessWidget {
-  final int               index;
-  final PackerWeeklySummary summary;
-  final bool              isLast;
-  const _WeekSummaryRow({
-    required this.index,
-    required this.summary,
-    required this.isLast,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isLast
-                ? AppColors.packer.withValues(alpha: 0.20)
-                : AppColors.border,
-          ),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 1)),
-          ],
-        ),
-        child: Row(children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: isLast
-                  ? AppColors.packer.withValues(alpha: 0.10)
-                  : AppColors.border,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text('W${index + 1}',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: isLast
-                        ? AppColors.packer
-                        : AppColors.textHint)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  summary.weekStart.isNotEmpty
-                      ? '${summary.weekStart} – ${summary.weekEnd}'
-                      : '— –– —',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.text),
-                ),
-                if (summary.days > 0)
-                  Text(
-                    '${summary.days} days · ${summary.bundles} bundles',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textHint),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            summary.grossSalary > 0
-                ? formatCurrency(summary.grossSalary)
-                : '₱0.00',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: summary.grossSalary > 0
-                    ? AppColors.primaryDark
-                    : AppColors.textHint),
-          ),
-        ]),
-      );
-}
-
-// ── Shared widgets ─────────────────────────────────────────────
+// ── Shared widgets ────────────────────────────────────────────
 class _PageHeader extends StatelessWidget {
   final String title;
   final String subtitle;

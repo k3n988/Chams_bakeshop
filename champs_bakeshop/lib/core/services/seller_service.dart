@@ -5,31 +5,32 @@ import '../models/seller_remittance_model.dart';
 class SellerService {
   final _db = Supabase.instance.client;
 
-  // ── Table names ────────────────────────────────────────────
-  static const _sessionTable     = 'seller_sessions';
-  static const _remittanceTable  = 'seller_remittances';
+  static const _sessionTable    = 'seller_sessions';
+  static const _remittanceTable = 'seller_remittances';
 
   // ════════════════════════════════════════════════════════════
-  //  SESSION  (morning — seller takes out pandesal)
+  //  SESSION
   // ════════════════════════════════════════════════════════════
 
-  /// Create a morning session (seller takes out plantsa + subra)
+  /// Create a session — morning or afternoon
   Future<SellerSessionModel?> createSession({
     required String sellerId,
     required String date,
     required int    plantsaCount,
     required int    subraPieces,
     required String takenOutAt,
+    String sessionType = 'morning',   // 'morning' | 'afternoon'
   }) async {
     try {
       final data = await _db
           .from(_sessionTable)
           .insert({
-            'seller_id':     sellerId,
-            'date':          date,
+            'seller_id':    sellerId,
+            'date':         date,
+            'session_type': sessionType,
             'plantsa_count': plantsaCount,
-            'subra_pieces':  subraPieces,
-            'taken_out_at':  takenOutAt,
+            'subra_pieces': subraPieces,
+            'taken_out_at': takenOutAt,
           })
           .select()
           .single();
@@ -40,10 +41,11 @@ class SellerService {
     }
   }
 
-  /// Fetch today's session for a seller (should be at most 1 per day)
-  Future<SellerSessionModel?> getSessionByDate({
+  /// Fetch today's session for a seller by type
+  Future<SellerSessionModel?> getSessionByDateAndType({
     required String sellerId,
     required String date,
+    required String sessionType,
   }) async {
     try {
       final data = await _db
@@ -51,6 +53,7 @@ class SellerService {
           .select()
           .eq('seller_id', sellerId)
           .eq('date', date)
+          .eq('session_type', sessionType)
           .maybeSingle();
 
       if (data == null) return null;
@@ -73,7 +76,8 @@ class SellerService {
           .eq('seller_id', sellerId)
           .gte('date', fromDate)
           .lte('date', toDate)
-          .order('date', ascending: false);
+          .order('date', ascending: false)
+          .order('session_type', ascending: true); // morning first
 
       return (data as List)
           .map((e) => SellerSessionModel.fromJson(e))
@@ -83,7 +87,7 @@ class SellerService {
     }
   }
 
-  /// Update a session (e.g. correction before remittance)
+  /// Update a session
   Future<SellerSessionModel?> updateSession({
     required String sessionId,
     required int    plantsaCount,
@@ -107,10 +111,10 @@ class SellerService {
   }
 
   // ════════════════════════════════════════════════════════════
-  //  REMITTANCE  (evening — seller remits cash + declares returns)
+  //  REMITTANCE
   // ════════════════════════════════════════════════════════════
 
-  /// Create evening remittance record
+  /// Create remittance record
   Future<SellerRemittanceModel?> createRemittance({
     required String sellerId,
     required String sessionId,
@@ -143,17 +147,15 @@ class SellerService {
     }
   }
 
-  /// Fetch remittance for a specific date
-  Future<SellerRemittanceModel?> getRemittanceByDate({
-    required String sellerId,
-    required String date,
+  /// Fetch remittance by session_id
+  Future<SellerRemittanceModel?> getRemittanceBySession({
+    required String sessionId,
   }) async {
     try {
       final data = await _db
           .from(_remittanceTable)
           .select()
-          .eq('seller_id', sellerId)
-          .eq('date', date)
+          .eq('session_id', sessionId)
           .maybeSingle();
 
       if (data == null) return null;
@@ -163,7 +165,7 @@ class SellerService {
     }
   }
 
-  /// Fetch all remittances within a date range (weekly / monthly)
+  /// Fetch all remittances within a date range
   Future<List<SellerRemittanceModel>> getRemittancesByRange({
     required String sellerId,
     required String fromDate,
@@ -186,7 +188,7 @@ class SellerService {
     }
   }
 
-  /// Update remittance (e.g. seller corrects return count)
+  /// Update remittance
   Future<SellerRemittanceModel?> updateRemittance({
     required String remittanceId,
     required int    returnPieces,
@@ -194,8 +196,6 @@ class SellerService {
     required int    totalPiecesTaken,
   }) async {
     try {
-      final adjustedRemittance = (totalPiecesTaken - returnPieces) * 5.0;
-
       final data = await _db
           .from(_remittanceTable)
           .update({
@@ -216,21 +216,35 @@ class SellerService {
   //  COMBINED DAILY VIEW
   // ════════════════════════════════════════════════════════════
 
-  /// Fetch both session and remittance for a date
-  /// Returns a map with keys 'session' and 'remittance'
   Future<Map<String, dynamic>> getDailyRecord({
     required String sellerId,
     required String date,
   }) async {
     try {
-      final results = await Future.wait([
-        getSessionByDate(sellerId: sellerId, date: date),
-        getRemittanceByDate(sellerId: sellerId, date: date),
-      ]);
+      final sessions = await getSessionsByRange(
+        sellerId: sellerId,
+        fromDate: date,
+        toDate:   date,
+      );
+
+      final morning   = sessions.where((s) => s.sessionType == 'morning').firstOrNull;
+      final afternoon = sessions.where((s) => s.sessionType == 'afternoon').firstOrNull;
+
+      SellerRemittanceModel? morningRemit;
+      SellerRemittanceModel? afternoonRemit;
+
+      if (morning != null) {
+        morningRemit = await getRemittanceBySession(sessionId: morning.id);
+      }
+      if (afternoon != null) {
+        afternoonRemit = await getRemittanceBySession(sessionId: afternoon.id);
+      }
 
       return {
-        'session':     results[0],   // SellerSessionModel?
-        'remittance':  results[1],   // SellerRemittanceModel?
+        'morning_session':    morning,
+        'afternoon_session':  afternoon,
+        'morning_remittance': morningRemit,
+        'afternoon_remittance': afternoonRemit,
       };
     } catch (e) {
       throw Exception('Failed to fetch daily record: $e');
@@ -241,7 +255,6 @@ class SellerService {
   //  ADMIN VIEWS
   // ════════════════════════════════════════════════════════════
 
-  /// Admin: fetch all seller remittances for a date range
   Future<List<SellerRemittanceModel>> getAllSellerRemittancesByRange({
     required String fromDate,
     required String toDate,
@@ -262,7 +275,6 @@ class SellerService {
     }
   }
 
-  /// Admin: fetch all seller sessions for a date range
   Future<List<SellerSessionModel>> getAllSellerSessionsByRange({
     required String fromDate,
     required String toDate,

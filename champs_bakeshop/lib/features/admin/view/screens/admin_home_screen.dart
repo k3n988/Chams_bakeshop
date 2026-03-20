@@ -25,11 +25,11 @@ class AdminHomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          // ── Hero banner ──────────────────────────────
+          // ── Hero banner ───────────────────────────────────
           _HeroBanner(),
           const SizedBox(height: 20),
 
-          // ── Stats grid ───────────────────────────────
+          // ── Stats grid ────────────────────────────────────
           const _SectionLabel('QUICK OVERVIEW'),
           const SizedBox(height: 12),
           GridView.count(
@@ -68,34 +68,38 @@ class AdminHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // ── Staff breakdown ───────────────────────────
+          // ── Staff breakdown ───────────────────────────────
           const _SectionLabel('STAFF BREAKDOWN'),
           const SizedBox(height: 12),
-          _StaffBreakdownCard(
-            bakers:  userVM.masterBakers.length,
-            helpers: userVM.nonAdminUsers.length -
-                userVM.masterBakers.length,
-            total:   userVM.nonAdminUsers.length,
-          ),
+          _StaffBreakdownCard(userVM: userVM),
           const SizedBox(height: 20),
 
-          // ── Quick actions ─────────────────────────────
+          // ── Quick actions ─────────────────────────────────
           const _SectionLabel('QUICK ACTIONS'),
           const SizedBox(height: 12),
-          _ActionTile(
-            icon:     Icons.people_outline,
-            label:    'Manage Staff',
-            subtitle: 'Add, edit, or remove employees',
-            color:    AppColors.masterBaker,
-            onTap:    () => onNavigate(1),
-          ),
-          _ActionTile(
-            icon:     Icons.inventory_2_outlined,
-            label:    'Products',
-            subtitle: 'Manage bakery products & pricing',
-            color:    AppColors.info,
-            onTap:    () => onNavigate(2),
-          ),
+
+          // Row 1: Users + Products (open via drawer)
+          Row(children: [
+            Expanded(
+              child: _QuickActionCard(
+                icon:    Icons.people_outlined,
+                label:   'Manage Users',
+                color:   AppColors.masterBaker,
+                onTap:   () => onNavigate(1),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _QuickActionCard(
+                icon:    Icons.inventory_2_outlined,
+                label:   'Products',
+                color:   AppColors.info,
+                onTap:   () => onNavigate(2),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+
           _ActionTile(
             icon:     Icons.bar_chart_outlined,
             label:    'Production Reports',
@@ -124,9 +128,7 @@ class AdminHomeScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  HERO BANNER
-// ─────────────────────────────────────────────────────────
+// ── Hero banner ───────────────────────────────────────────────
 class _HeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
@@ -141,8 +143,8 @@ class _HeroBanner extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF7A00)
-                  .withValues(alpha: 0.3),
+              color:
+                  const Color(0xFFFF7A00).withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -155,7 +157,8 @@ class _HeroBanner extends StatelessWidget {
               children: [
                 Text('Good ${_greeting()}!',
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color:
+                            Colors.white.withValues(alpha: 0.9),
                         fontSize: 13,
                         fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
@@ -196,9 +199,7 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-//  STAT CARD
-// ─────────────────────────────────────────────────────────
+// ── Stat card ─────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String   label;
@@ -262,104 +263,122 @@ class _StatCard extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  STAFF BREAKDOWN CARD
-// ─────────────────────────────────────────────────────────
+// ── Staff breakdown card ──────────────────────────────────────
 class _StaffBreakdownCard extends StatelessWidget {
-  final int bakers;
-  final int helpers;
-  final int total;
-
-  const _StaffBreakdownCard({
-    required this.bakers,
-    required this.helpers,
-    required this.total,
-  });
+  final AdminUserViewModel userVM;
+  const _StaffBreakdownCard({required this.userVM});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(children: [
-          _StaffRow(
+  Widget build(BuildContext context) {
+    final bakers   = userVM.masterBakers.length;
+    final helpers  = userVM.helpers.length;
+    final packers  = userVM.nonAdminUsers.where((u) => u.isPacker).length;
+    final sellers  = userVM.nonAdminUsers.where((u) => u.isSeller).length;
+    final total    = userVM.nonAdminUsers.length;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(children: [
+        _StaffRow(
             label: '👨‍🍳  Master Bakers',
             value: '$bakers',
-            color: AppColors.masterBaker,
-          ),
-          const SizedBox(height: 12),
-          _StaffRow(
+            color: AppColors.masterBaker),
+        const SizedBox(height: 10),
+        _StaffRow(
             label: '🧑‍🍳  Helpers',
             value: '$helpers',
-            color: AppColors.info,
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1),
-          ),
-          // Progress bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Total Staff',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14)),
-              Text('$total',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      color: AppColors.primaryDark)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Visual bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Row(children: [
-              if (total > 0) ...[
-                Flexible(
-                  flex: bakers,
-                  child: Container(
-                    height: 6,
-                    color: AppColors.masterBaker,
-                  ),
-                ),
-                Flexible(
-                  flex: helpers > 0 ? helpers : 0,
-                  child: Container(
-                    height: 6,
-                    color: AppColors.info,
-                  ),
-                ),
-              ] else
-                Expanded(
-                  child: Container(
-                    height: 6,
-                    color: AppColors.border,
-                  ),
-                ),
-            ]),
-          ),
-          const SizedBox(height: 8),
-          Row(children: [
-            _LegendDot(color: AppColors.masterBaker,
+            color: AppColors.helper),
+        const SizedBox(height: 10),
+        _StaffRow(
+            label: '📦  Packers',
+            value: '$packers',
+            color: AppColors.packer),
+        const SizedBox(height: 10),
+        _StaffRow(
+            label: '🥖  Sellers',
+            value: '$sellers',
+            color: AppColors.seller),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Divider(height: 1),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Total Staff',
+                style: TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 14)),
+            Text('$total',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: AppColors.primaryDark)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // Progress bar (all 4 roles)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: total > 0
+              ? Row(children: [
+                  if (bakers > 0)
+                    Flexible(
+                        flex: bakers,
+                        child: Container(
+                            height: 6,
+                            color: AppColors.masterBaker)),
+                  if (helpers > 0)
+                    Flexible(
+                        flex: helpers,
+                        child: Container(
+                            height: 6, color: AppColors.helper)),
+                  if (packers > 0)
+                    Flexible(
+                        flex: packers,
+                        child: Container(
+                            height: 6, color: AppColors.packer)),
+                  if (sellers > 0)
+                    Flexible(
+                        flex: sellers,
+                        child: Container(
+                            height: 6, color: AppColors.seller)),
+                ])
+              : Container(
+                  height: 6, color: AppColors.border),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          children: [
+            _LegendDot(
+                color: AppColors.masterBaker,
                 label: 'Bakers ($bakers)'),
-            const SizedBox(width: 16),
-            _LegendDot(color: AppColors.info,
+            _LegendDot(
+                color: AppColors.helper,
                 label: 'Helpers ($helpers)'),
-          ]),
-        ]),
-      );
+            _LegendDot(
+                color: AppColors.packer,
+                label: 'Packers ($packers)'),
+            _LegendDot(
+                color: AppColors.seller,
+                label: 'Sellers ($sellers)'),
+          ],
+        ),
+      ]),
+    );
+  }
 }
 
 class _StaffRow extends StatelessWidget {
@@ -367,9 +386,7 @@ class _StaffRow extends StatelessWidget {
   final String value;
   final Color  color;
   const _StaffRow(
-      {required this.label,
-      required this.value,
-      required this.color});
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) => Row(
@@ -377,8 +394,7 @@ class _StaffRow extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary)),
+                  fontSize: 13, color: AppColors.textSecondary)),
           Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: 12, vertical: 4),
@@ -388,7 +404,7 @@ class _StaffRow extends StatelessWidget {
             ),
             child: Text(value,
                 style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: color)),
           ),
@@ -414,15 +430,66 @@ class _LegendDot extends StatelessWidget {
           const SizedBox(width: 5),
           Text(label,
               style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textHint)),
+                  fontSize: 11, color: AppColors.textHint)),
         ],
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  ACTION TILE
-// ─────────────────────────────────────────────────────────
+// ── Quick action card (2-up grid) ─────────────────────────────
+class _QuickActionCard extends StatelessWidget {
+  final IconData     icon;
+  final String       label;
+  final Color        color;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: color.withValues(alpha: 0.20)),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
+              ),
+              Icon(Icons.arrow_forward_ios,
+                  size: 12, color: color.withValues(alpha: 0.6)),
+            ]),
+          ),
+        ),
+      );
+}
+
+// ── Action tile ───────────────────────────────────────────────
 class _ActionTile extends StatelessWidget {
   final IconData     icon;
   final String       label;
@@ -474,20 +541,21 @@ class _ActionTile extends StatelessWidget {
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Color(0xFF1A1A1A))),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint)),
-                  ]),
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A))),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint)),
+                    ],
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.all(6),
@@ -505,9 +573,7 @@ class _ActionTile extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────
-//  SECTION LABEL
-// ─────────────────────────────────────────────────────────
+// ── Section label ─────────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
