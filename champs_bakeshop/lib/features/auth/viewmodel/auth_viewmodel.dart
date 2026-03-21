@@ -16,15 +16,12 @@ class AuthViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _currentUser != null;
 
-  /// Authenticates against the public.users table directly.
-  /// No Supabase Auth required — perfect for internal staff apps.
   Future<bool> login(String email, String password, String selectedRole) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // Query public.users — matches email + password + role in one call
       final user = await _db.authenticateUser(
         email.trim().toLowerCase(),
         password,
@@ -43,8 +40,12 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
 
-    } catch (e) {
-      _errorMessage = 'Something went wrong. Please try again.';
+    } catch (e, stackTrace) {
+      // Shows the REAL error on screen so you can diagnose it
+      debugPrint('LOGIN ERROR: $e');
+      debugPrint('STACK: $stackTrace');
+
+      _errorMessage = 'Error: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       return false;
