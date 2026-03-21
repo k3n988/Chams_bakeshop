@@ -8,10 +8,12 @@ import '../../viewmodel/seller_session_viewmodel.dart';
 
 class SellerSessionInputScreen extends StatefulWidget {
   final SessionType sessionType;
+  final String?     date; // pass null = use today
 
   const SellerSessionInputScreen({
     super.key,
     required this.sessionType,
+    this.date,
   });
 
   @override
@@ -27,12 +29,18 @@ class _SellerSessionInputScreenState
   static const int    _piecesPerPlantsa = 25;
   static const double _pricePerPiece    = 5.0;
 
-  int    get _plantsa           => int.tryParse(_plantsaCtrl.text) ?? 0;
-  int    get _subra             => int.tryParse(_subraCtrl.text)   ?? 0;
-  int    get _totalPieces       => (_plantsa * _piecesPerPlantsa) + _subra;
+  int    get _plantsa            => int.tryParse(_plantsaCtrl.text) ?? 0;
+  int    get _subra              => int.tryParse(_subraCtrl.text)   ?? 0;
+  int    get _totalPieces        => (_plantsa * _piecesPerPlantsa) + _subra;
   double get _expectedRemittance => _totalPieces * _pricePerPiece;
 
-  bool get _isMorning => widget.sessionType == SessionType.morning;
+  bool   get _isMorning => widget.sessionType == SessionType.morning;
+
+  // Effective date shown in header
+  String get _effectiveDate {
+    if (widget.date != null) return widget.date!;
+    return DateTime.now().toIso8601String().substring(0, 10);
+  }
 
   @override
   void dispose() {
@@ -43,12 +51,11 @@ class _SellerSessionInputScreenState
 
   Future<void> _submit() async {
     if (_plantsa == 0 && _subra == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter at least 1 plantsa or subra pieces'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Please enter at least 1 plantsa or subra pieces'),
+        backgroundColor: AppColors.danger,
+      ));
       return;
     }
 
@@ -61,38 +68,33 @@ class _SellerSessionInputScreenState
       plantsaCount: _plantsa,
       subraPieces:  _subra,
       sessionType:  widget.sessionType,
+      date:         widget.date, // pass selected date
     );
 
     if (ok && mounted) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isMorning
-              ? 'Morning session started! Good luck selling 🥖'
-              : 'Afternoon session started! Good luck selling 🥖'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      messenger.showSnackBar(SnackBar(
+        content: Text(_isMorning
+            ? 'Morning session started! Good luck selling 🥖'
+            : 'Afternoon session started! Good luck selling 🥖'),
+        backgroundColor: AppColors.success,
+      ));
       Navigator.pop(context);
     } else if (mounted && vm.error != null) {
-      messenger.showSnackBar(
-        SnackBar(
-            content: Text(vm.error!),
-            backgroundColor: AppColors.danger),
-      );
+      messenger.showSnackBar(SnackBar(
+        content: Text(vm.error!),
+        backgroundColor: AppColors.danger,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final vm    = context.watch<SellerSessionViewModel>();
-    final today = DateTime.now();
-    final dateLabel =
-        '${today.year}-${today.month.toString().padLeft(2, '0')}-'
-        '${today.day.toString().padLeft(2, '0')}';
+    final vm = context.watch<SellerSessionViewModel>();
 
-    // Colors based on session type
-    final primaryColor = _isMorning ? AppColors.seller : AppColors.warning;
-    final sessionLabel = _isMorning ? 'Morning Session' : 'Afternoon Session';
+    final primaryColor =
+        _isMorning ? AppColors.seller : AppColors.warning;
+    final sessionLabel =
+        _isMorning ? 'Morning Session' : 'Afternoon Session';
     final sessionIcon  = _isMorning
         ? Icons.wb_sunny_outlined
         : Icons.wb_twilight_outlined;
@@ -118,36 +120,36 @@ class _SellerSessionInputScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date header ────────────────────────────────────
+            // ── Date header ──────────────────────────────────
             _DateHeader(
-              dateLabel:    dateLabel,
+              dateLabel:    _effectiveDate,
               sessionLabel: sessionLabel,
               icon:         sessionIcon,
               color:        primaryColor,
             ),
             const SizedBox(height: 20),
 
-            // ── Info card ──────────────────────────────────────
+            // ── Info card ────────────────────────────────────
             _InfoCard(
               icon:  Icons.info_outline,
               color: primaryColor,
-              text:  'Enter the number of plantsa and extra pieces (subra) '
-                  'you are taking out to sell. '
-                  'Each plantsa contains $_piecesPerPlantsa pieces '
-                  'of pandesal at ₱${_pricePerPiece.toStringAsFixed(0)} each.',
+              text:  'Enter the number of plantsa and extra pieces '
+                  '(subra) you are taking out to sell. '
+                  'Each plantsa has $_piecesPerPlantsa pieces '
+                  'at ₱${_pricePerPiece.toStringAsFixed(0)} each.',
             ),
             const SizedBox(height: 20),
 
-            // ── Input card ─────────────────────────────────────
+            // ── Input card ───────────────────────────────────
             _WhiteCard(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _CardLabel('PANDESAL TAKEN OUT', color: primaryColor),
+                  _CardLabel('PANDESAL TAKEN OUT',
+                      color: primaryColor),
                   const SizedBox(height: 16),
 
-                  // Plantsa input
                   _InputField(
                     controller: _plantsaCtrl,
                     label:  'Number of Plantsa',
@@ -161,7 +163,7 @@ class _SellerSessionInputScreenState
                   Padding(
                     padding: const EdgeInsets.only(left: 12),
                     child: Text(
-                      '$_plantsa plantsa × $_piecesPerPlantsa pieces'
+                      '$_plantsa plantsa × $_piecesPerPlantsa'
                       ' = ${_plantsa * _piecesPerPlantsa} pieces',
                       style: const TextStyle(
                           fontSize: 12,
@@ -171,7 +173,6 @@ class _SellerSessionInputScreenState
 
                   const SizedBox(height: 16),
 
-                  // Subra input
                   _InputField(
                     controller: _subraCtrl,
                     label:  'Subra (extra pieces)',
@@ -186,7 +187,7 @@ class _SellerSessionInputScreenState
             ),
             const SizedBox(height: 16),
 
-            // ── Live preview card ──────────────────────────────
+            // ── Preview card ─────────────────────────────────
             _PreviewCard(
               totalPieces:        _totalPieces,
               expectedRemittance: _expectedRemittance,
@@ -198,7 +199,7 @@ class _SellerSessionInputScreenState
             ),
             const SizedBox(height: 28),
 
-            // ── Submit button ──────────────────────────────────
+            // ── Submit ───────────────────────────────────────
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -214,7 +215,9 @@ class _SellerSessionInputScreenState
                     ? const CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5)
                     : Text(
-                        _isMorning ? 'Start Morning Selling' : 'Start Afternoon Selling',
+                        _isMorning
+                            ? 'Start Morning Selling'
+                            : 'Start Afternoon Selling',
                         style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -270,7 +273,8 @@ class _PreviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(children: [
-              Icon(Icons.receipt_outlined, size: 14, color: Colors.white70),
+              Icon(Icons.receipt_outlined,
+                  size: 14, color: Colors.white70),
               SizedBox(width: 6),
               Text('EXPECTED REMITTANCE',
                   style: TextStyle(
@@ -301,7 +305,8 @@ class _PreviewCard extends StatelessWidget {
                 _CalcRow(label: 'Subra', value: '$subra pieces'),
                 const Divider(height: 14, color: Colors.white30),
                 _CalcRow(
-                  label: 'Total × ₱${pricePerPiece.toStringAsFixed(0)}',
+                  label:
+                      'Total × ₱${pricePerPiece.toStringAsFixed(0)}',
                   value:
                       '$totalPieces pcs = ${formatCurrency(expectedRemittance)}',
                   isBold: true,
@@ -340,7 +345,6 @@ class _CalcRow extends StatelessWidget {
       );
 }
 
-// ── Shared sub-widgets ────────────────────────────────────────
 class _DateHeader extends StatelessWidget {
   final String   dateLabel;
   final String   sessionLabel;
@@ -444,7 +448,8 @@ class _CardLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: color, borderRadius: BorderRadius.circular(2)),
+              color: color,
+              borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
         Text(text,
@@ -486,8 +491,8 @@ class _InputField extends StatelessWidget {
           hintText:  hint,
           prefixIcon: Icon(icon, color: color, size: 20),
           suffixText: suffix,
-          suffixStyle:
-              const TextStyle(color: AppColors.textHint, fontSize: 13),
+          suffixStyle: const TextStyle(
+              color: AppColors.textHint, fontSize: 13),
           filled:    true,
           fillColor: color.withValues(alpha: 0.04),
           border: OutlineInputBorder(

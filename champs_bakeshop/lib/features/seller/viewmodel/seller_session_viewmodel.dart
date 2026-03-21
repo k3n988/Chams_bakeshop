@@ -3,22 +3,18 @@ import '../../../core/models/seller_session_model.dart';
 import '../../../core/models/seller_remittance_model.dart';
 import '../../../core/services/seller_service.dart';
 
-// ── Session / Remit type enums ────────────────────────────────
 enum SessionType { morning, afternoon }
 enum RemitType   { morning, afternoon }
 
 class SellerSessionViewModel extends ChangeNotifier {
   final _service = SellerService();
 
-  // ── State ──────────────────────────────────────────────────
   bool    _isLoading = false;
   String? _error;
 
-  // Morning
+  // Currently loaded date state
   SellerSessionModel?    _morningSession;
   SellerRemittanceModel? _morningRemittance;
-
-  // Afternoon
   SellerSessionModel?    _afternoonSession;
   SellerRemittanceModel? _afternoonRemittance;
 
@@ -28,25 +24,25 @@ class SellerSessionViewModel extends ChangeNotifier {
 
   DateTime _weekStart = DateTime.now();
 
-  // ── Getters ────────────────────────────────────────────────
+  // ── Basic getters ──────────────────────────────────────────
   bool    get isLoading => _isLoading;
   String? get error     => _error;
 
-  // ── Morning getters ────────────────────────────────────────
-  SellerSessionModel?    get todaySession       => _morningSession;
-  SellerSessionModel?    get morningSession     => _morningSession;
-  SellerRemittanceModel? get morningRemittance  => _morningRemittance;
+  // ── Morning ────────────────────────────────────────────────
+  SellerSessionModel?    get todaySession      => _morningSession;
+  SellerSessionModel?    get morningSession    => _morningSession;
+  SellerRemittanceModel? get morningRemittance => _morningRemittance;
 
   bool   get hasMorningSession    => _morningSession != null;
   bool   get hasMorningRemittance => _morningRemittance != null;
 
-  int    get morningPiecesTaken       => _morningSession?.totalPiecesTaken    ?? 0;
-  double get morningExpectedRemittance=> _morningSession?.expectedRemittance   ?? 0;
-  int    get morningReturnPieces      => _morningRemittance?.returnPieces      ?? 0;
-  int    get morningPiecesSold        => _morningRemittance?.piecesSold        ?? 0;
-  double get morningActualRemittance  => _morningRemittance?.actualRemittance  ?? 0;
+  int    get morningPiecesTaken        => _morningSession?.totalPiecesTaken    ?? 0;
+  double get morningExpectedRemittance => _morningSession?.expectedRemittance   ?? 0;
+  int    get morningReturnPieces       => _morningRemittance?.returnPieces      ?? 0;
+  int    get morningPiecesSold         => _morningRemittance?.piecesSold        ?? 0;
+  double get morningActualRemittance   => _morningRemittance?.actualRemittance  ?? 0;
 
-  // ── Afternoon getters ──────────────────────────────────────
+  // ── Afternoon ──────────────────────────────────────────────
   SellerSessionModel?    get afternoonSession    => _afternoonSession;
   SellerRemittanceModel? get afternoonRemittance => _afternoonRemittance;
 
@@ -59,9 +55,10 @@ class SellerSessionViewModel extends ChangeNotifier {
   int    get afternoonPiecesSold         => _afternoonRemittance?.piecesSold        ?? 0;
   double get afternoonActualRemittance   => _afternoonRemittance?.actualRemittance  ?? 0;
 
-  // ── Legacy compat getters (used by other screens) ──────────
+  // ── Combined ───────────────────────────────────────────────
   bool   get hasSessionToday    => hasMorningSession || hasAfternoonSession;
   bool   get hasRemittanceToday => hasMorningRemittance || hasAfternoonRemittance;
+  bool   get hasSessionForDate  => hasMorningSession || hasAfternoonSession;
 
   int    get totalPiecesTaken   => morningPiecesTaken + afternoonPiecesTaken;
   double get expectedRemittance => morningExpectedRemittance + afternoonExpectedRemittance;
@@ -71,25 +68,24 @@ class SellerSessionViewModel extends ChangeNotifier {
   double get adjustedRemittance => piecesSold * 5.0;
   double get variance           => actualRemittance - adjustedRemittance;
 
-  // ── Weekly list getters ────────────────────────────────────
+  // ── Weekly getters ─────────────────────────────────────────
   List<SellerSessionModel>    get sessions    => _sessions;
   List<SellerRemittanceModel> get remittances => _remittances;
 
-  // ── Week range ─────────────────────────────────────────────
   String get weekStart => _weekStart.toIso8601String().substring(0, 10);
   String get weekEnd {
     final end = _weekStart.add(const Duration(days: 6));
     return end.toIso8601String().substring(0, 10);
   }
 
-  // ── Weekly aggregates ──────────────────────────────────────
   int    get totalPiecesSoldRange =>
       _remittances.fold(0, (s, r) => s + r.piecesSold);
   double get totalActualRemittanceRange =>
       _remittances.fold(0.0, (s, r) => s + r.actualRemittance);
   double get totalAdjustedRemittanceRange =>
       _remittances.fold(0.0, (s, r) => s + r.adjustedRemittance);
-  int    get daysRemitted => _remittances.map((r) => r.date).toSet().length;
+  int    get daysRemitted =>
+      _remittances.map((r) => r.date).toSet().length;
   double get totalVariance =>
       _remittances.fold(0.0, (s, r) => s + r.variance);
   int    get totalReturns =>
@@ -105,8 +101,8 @@ class SellerSessionViewModel extends ChangeNotifier {
   }
 
   List<SellerSessionModel> get pendingRemittanceSessions {
-    final remittedDates = _remittances.map((r) => r.date).toSet();
-    return _sessions.where((s) => !remittedDates.contains(s.date)).toList();
+    final remittedIds = _remittances.map((r) => r.sessionId).toSet();
+    return _sessions.where((s) => !remittedIds.contains(s.id)).toList();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -114,8 +110,9 @@ class SellerSessionViewModel extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   Future<void> init(String sellerId) async {
     _setWeekToCurrentMonday();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
     await Future.wait([
-      loadTodayRecord(sellerId),
+      loadDateRecord(sellerId, today),
       loadWeeklyRemittances(sellerId),
     ]);
   }
@@ -127,32 +124,27 @@ class SellerSessionViewModel extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  LOAD TODAY — morning & afternoon sessions
+  //  LOAD ANY DATE
   // ─────────────────────────────────────────────────────────
-  Future<void> loadTodayRecord(String sellerId) async {
+  Future<void> loadDateRecord(String sellerId, String date) async {
     _setLoading(true);
     try {
-      final today = DateTime.now().toIso8601String().substring(0, 10);
-
-      // Fetch all today's sessions
       final sessions = await _service.getSessionsByRange(
         sellerId: sellerId,
-        fromDate: today,
-        toDate:   today,
+        fromDate: date,
+        toDate:   date,
       );
-
-      // Fetch all today's remittances
       final remittances = await _service.getRemittancesByRange(
         sellerId: sellerId,
-        fromDate: today,
-        toDate:   today,
+        fromDate: date,
+        toDate:   date,
       );
 
-      // Split by session_type field (morning / afternoon)
-      _morningSession   = sessions.where((s) => s.sessionType == 'morning').firstOrNull;
-      _afternoonSession = sessions.where((s) => s.sessionType == 'afternoon').firstOrNull;
+      _morningSession      = sessions.where((s) => s.sessionType == 'morning').firstOrNull;
+      _afternoonSession    = sessions.where((s) => s.sessionType == 'afternoon').firstOrNull;
+      _morningRemittance   = null;
+      _afternoonRemittance = null;
 
-      // Match remittances to sessions by session_id
       if (_morningSession != null) {
         _morningRemittance = remittances
             .where((r) => r.sessionId == _morningSession!.id)
@@ -163,13 +155,18 @@ class SellerSessionViewModel extends ChangeNotifier {
             .where((r) => r.sessionId == _afternoonSession!.id)
             .firstOrNull;
       }
-
       _error = null;
     } catch (e) {
       _error = e.toString();
     } finally {
       _setLoading(false);
     }
+  }
+
+  // ── Keep legacy method for compatibility ──────────────────
+  Future<void> loadTodayRecord(String sellerId) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await loadDateRecord(sellerId, today);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -194,35 +191,31 @@ class SellerSessionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  WEEK NAVIGATION
-  // ─────────────────────────────────────────────────────────
   Future<void> changeWeek(int direction, String sellerId) async {
     _weekStart = _weekStart.add(Duration(days: 7 * direction));
     await loadWeeklyRemittances(sellerId);
   }
 
   // ─────────────────────────────────────────────────────────
-  //  CREATE SESSION (morning or afternoon)
+  //  CREATE SESSION — accepts any date (not just today)
   // ─────────────────────────────────────────────────────────
   Future<bool> createSession({
     required String      sellerId,
     required int         plantsaCount,
     required int         subraPieces,
     required SessionType sessionType,
+    String?              date,        // if null → uses today
   }) async {
     _setLoading(true);
     try {
-      final now   = DateTime.now();
-      final date  = now.toIso8601String().substring(0, 10);
-      final tsStr = now.toIso8601String();
-      final typeStr = sessionType == SessionType.morning
-          ? 'morning'
-          : 'afternoon';
+      final now     = DateTime.now();
+      final dateStr = date ?? now.toIso8601String().substring(0, 10);
+      final tsStr   = now.toIso8601String();
+      final typeStr = sessionType == SessionType.morning ? 'morning' : 'afternoon';
 
       final session = await _service.createSession(
         sellerId:     sellerId,
-        date:         date,
+        date:         dateStr,
         plantsaCount: plantsaCount,
         subraPieces:  subraPieces,
         takenOutAt:   tsStr,
@@ -253,9 +246,10 @@ class SellerSessionViewModel extends ChangeNotifier {
   //  CREATE REMITTANCE
   // ─────────────────────────────────────────────────────────
   Future<bool> createRemittance({
-    required String   sellerId,
-    required int      returnPieces,
-    required double   actualRemittance,
+    required String    sellerId,
+    required int       returnPieces,
+    required double    actualRemittance,
+    required double    salary,
     required RemitType remitType,
   }) async {
     final session = remitType == RemitType.morning
@@ -263,16 +257,13 @@ class SellerSessionViewModel extends ChangeNotifier {
         : _afternoonSession;
 
     if (session == null) {
-      _error = 'No session found. Please create a session first.';
+      _error = 'No session found for this type.';
       notifyListeners();
       return false;
     }
 
     _setLoading(true);
     try {
-      final now   = DateTime.now();
-      final tsStr = now.toIso8601String();
-
       final remittance = await _service.createRemittance(
         sellerId:           sellerId,
         sessionId:          session.id,
@@ -281,7 +272,8 @@ class SellerSessionViewModel extends ChangeNotifier {
         actualRemittance:   actualRemittance,
         totalPiecesTaken:   session.totalPiecesTaken,
         expectedRemittance: session.expectedRemittance,
-        remittedAt:         tsStr,
+        salary:             salary,
+        remittedAt:         DateTime.now().toIso8601String(),
       );
 
       if (remittance != null) {
@@ -308,8 +300,9 @@ class SellerSessionViewModel extends ChangeNotifier {
   //  UPDATE REMITTANCE
   // ─────────────────────────────────────────────────────────
   Future<bool> updateRemittance({
-    required int      returnPieces,
-    required double   actualRemittance,
+    required int       returnPieces,
+    required double    actualRemittance,
+    required double    salary,
     required RemitType remitType,
   }) async {
     final existing = remitType == RemitType.morning
@@ -325,6 +318,7 @@ class SellerSessionViewModel extends ChangeNotifier {
         returnPieces:     returnPieces,
         actualRemittance: actualRemittance,
         totalPiecesTaken: existing.totalPiecesTaken,
+        salary:           salary,
       );
 
       if (updated != null) {
@@ -347,9 +341,6 @@ class SellerSessionViewModel extends ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  HELPERS
-  // ─────────────────────────────────────────────────────────
   void _setLoading(bool v) {
     _isLoading = v;
     notifyListeners();

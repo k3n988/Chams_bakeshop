@@ -13,6 +13,9 @@ class SellerRemittanceModel {
   final int    totalPiecesTaken;    // from morning session
   final double expectedRemittance;  // totalPiecesTaken * ₱5
 
+  // ── Salary (5% or 15% of adjusted remittance, set by admin) ─
+  final double salary;
+
   // ── Computed ───────────────────────────────────────────────
   /// Pieces actually sold
   int get piecesSold => totalPiecesTaken - returnPieces;
@@ -23,9 +26,8 @@ class SellerRemittanceModel {
   /// Positive = seller owes more | Negative = seller overpaid
   double get variance => actualRemittance - adjustedRemittance;
 
-  /// Seller daily salary = adjusted remittance (they earn on what they sell)
-  /// Adjust this formula to match your actual salary scheme
-  double get dailySalary => adjustedRemittance;
+  /// Legacy alias — kept for backward compatibility
+  double get dailySalary => salary;
 
   final String remittedAt;   // timestamp when remittance was done
   final DateTime createdAt;
@@ -41,6 +43,7 @@ class SellerRemittanceModel {
     required this.expectedRemittance,
     required this.remittedAt,
     required this.createdAt,
+    this.salary = 0.0,   // ← defaults to 0 so old records don't crash
   });
 
   // ── Serialization ──────────────────────────────────────────
@@ -54,6 +57,7 @@ class SellerRemittanceModel {
       actualRemittance:    (json['actual_remittance'] as num).toDouble(),
       totalPiecesTaken:    (json['total_pieces_taken'] as num).toInt(),
       expectedRemittance:  (json['expected_remittance'] as num).toDouble(),
+      salary:              (json['salary'] as num?)?.toDouble() ?? 0.0,
       remittedAt:          json['remitted_at'] as String,
       createdAt:           DateTime.parse(json['created_at'] as String),
     );
@@ -68,6 +72,7 @@ class SellerRemittanceModel {
         'actual_remittance':   actualRemittance,
         'total_pieces_taken':  totalPiecesTaken,
         'expected_remittance': expectedRemittance,
+        'salary':              salary,
         'remitted_at':         remittedAt,
         'created_at':          createdAt.toIso8601String(),
       };
@@ -80,6 +85,7 @@ class SellerRemittanceModel {
         'actual_remittance':   actualRemittance,
         'total_pieces_taken':  totalPiecesTaken,
         'expected_remittance': expectedRemittance,
+        'salary':              salary,
         'remitted_at':         remittedAt,
       };
 
@@ -92,6 +98,7 @@ class SellerRemittanceModel {
     double?   actualRemittance,
     int?      totalPiecesTaken,
     double?   expectedRemittance,
+    double?   salary,
     String?   remittedAt,
     DateTime? createdAt,
   }) {
@@ -104,6 +111,7 @@ class SellerRemittanceModel {
       actualRemittance:    actualRemittance    ?? this.actualRemittance,
       totalPiecesTaken:    totalPiecesTaken    ?? this.totalPiecesTaken,
       expectedRemittance:  expectedRemittance  ?? this.expectedRemittance,
+      salary:              salary              ?? this.salary,
       remittedAt:          remittedAt          ?? this.remittedAt,
       createdAt:           createdAt           ?? this.createdAt,
     );
@@ -111,5 +119,6 @@ class SellerRemittanceModel {
 
   @override
   String toString() =>
-      'SellerRemittanceModel(id: $id, date: $date, sold: $piecesSold, actual: $actualRemittance, variance: $variance)';
+      'SellerRemittanceModel(id: $id, date: $date, sold: $piecesSold, '
+      'actual: $actualRemittance, salary: $salary, variance: $variance)';
 }

@@ -90,6 +90,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
       ok = await vm.updateRemittance(
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
+        salary:           _adjusted(totalTaken) * 0.05,
         remitType:        widget.remitType,
       );
     } else {
@@ -97,6 +98,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
         sellerId:         uid,
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
+        salary:           _adjusted(totalTaken) * 0.05,
         remitType:        widget.remitType,
       );
     }

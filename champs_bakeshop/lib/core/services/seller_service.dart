@@ -114,38 +114,7 @@ class SellerService {
   //  REMITTANCE
   // ════════════════════════════════════════════════════════════
 
-  /// Create remittance record
-  Future<SellerRemittanceModel?> createRemittance({
-    required String sellerId,
-    required String sessionId,
-    required String date,
-    required int    returnPieces,
-    required double actualRemittance,
-    required int    totalPiecesTaken,
-    required double expectedRemittance,
-    required String remittedAt,
-  }) async {
-    try {
-      final data = await _db
-          .from(_remittanceTable)
-          .insert({
-            'seller_id':           sellerId,
-            'session_id':          sessionId,
-            'date':                date,
-            'return_pieces':       returnPieces,
-            'actual_remittance':   actualRemittance,
-            'total_pieces_taken':  totalPiecesTaken,
-            'expected_remittance': expectedRemittance,
-            'remitted_at':         remittedAt,
-          })
-          .select()
-          .single();
 
-      return SellerRemittanceModel.fromJson(data);
-    } catch (e) {
-      throw Exception('Failed to create remittance: $e');
-    }
-  }
 
   /// Fetch remittance by session_id
   Future<SellerRemittanceModel?> getRemittanceBySession({
@@ -189,11 +158,54 @@ class SellerService {
   }
 
   /// Update remittance
+  // ════════════════════════════════════════════════════════════
+  //  REMITTANCE
+  // ════════════════════════════════════════════════════════════
+
+  /// Create remittance record
+  Future<SellerRemittanceModel?> createRemittance({
+    required String sellerId,
+    required String sessionId,
+    required String date,
+    required int    returnPieces,
+    required double actualRemittance,
+    required int    totalPiecesTaken,
+    required double expectedRemittance,
+    required double salary, // 👈 ADDED SALARY HERE
+    required String remittedAt,
+  }) async {
+    try {
+      final data = await _db
+          .from(_remittanceTable)
+          .insert({
+            'seller_id':           sellerId,
+            'session_id':          sessionId,
+            'date':                date,
+            'return_pieces':       returnPieces,
+            'actual_remittance':   actualRemittance,
+            'total_pieces_taken':  totalPiecesTaken,
+            'expected_remittance': expectedRemittance,
+            'salary':              salary, // 👈 ADDED TO SUPABASE INSERT
+            'remitted_at':         remittedAt,
+          })
+          .select()
+          .single();
+
+      return SellerRemittanceModel.fromJson(data);
+    } catch (e) {
+      throw Exception('Failed to create remittance: $e');
+    }
+  }
+
+  // ... (keep your getRemittanceBySession and getRemittancesByRange as they are) ...
+
+  /// Update remittance
   Future<SellerRemittanceModel?> updateRemittance({
     required String remittanceId,
     required int    returnPieces,
     required double actualRemittance,
     required int    totalPiecesTaken,
+    required double salary, // 👈 ADDED SALARY HERE
   }) async {
     try {
       final data = await _db
@@ -201,6 +213,7 @@ class SellerService {
           .update({
             'return_pieces':     returnPieces,
             'actual_remittance': actualRemittance,
+            'salary':            salary, // 👈 ADDED TO SUPABASE UPDATE
           })
           .eq('id', remittanceId)
           .select()
