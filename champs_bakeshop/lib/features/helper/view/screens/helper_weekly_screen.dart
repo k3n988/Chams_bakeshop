@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
-import '../../../../core/widgets/common_widgets.dart';
+
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
 
@@ -14,53 +14,24 @@ class HelperWeeklyScreen extends StatefulWidget {
 }
 
 class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
-  DateTime _selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
-
-  static const _monthNames = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrentWeek());
+  }
 
   String get _userId =>
       context.read<AuthViewModel>().currentUser!.id;
 
-  void _loadForMonth() {
+  bool get _isCurrentWeek {
     final vm = context.read<HelperSalaryViewModel>();
-    vm.loadWeeklySalaryForMonth(
-        _userId, _selectedMonth.year, _selectedMonth.month);
-    vm.loadPaidWeeks(_userId); // ✅ load paid status
+    return vm.weekStart == getWeekStart(DateTime.now());
   }
 
-  void _changeMonth(int direction) {
-    setState(() {
-      _selectedMonth = DateTime(
-          _selectedMonth.year, _selectedMonth.month + direction);
-    });
-    _loadForMonth();
-  }
-
-  Future<void> _pickMonth() async {
-    final now    = DateTime.now();
-    final picked = await showDatePicker(
-      context:          context,
-      initialDate:      _selectedMonth,
-      firstDate:        DateTime(now.year - 3),
-      lastDate:         DateTime(now.year + 1, 12),
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
-      helpText:         'SELECT MONTH',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme:
-              const ColorScheme.light(primary: AppColors.info),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked == null) return;
-    setState(
-        () => _selectedMonth = DateTime(picked.year, picked.month));
-    _loadForMonth();
+  void _loadCurrentWeek() {
+    final vm = context.read<HelperSalaryViewModel>();
+    vm.loadWeeklySalary(_userId);
+    vm.loadPaidWeeks(_userId);
   }
 
   void _changeWeek(int dir) {
@@ -69,22 +40,27 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
     vm.loadPaidWeeks(_userId);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _loadForMonth());
+  void _goToCurrentWeek() {
+    final vm = context.read<HelperSalaryViewModel>();
+    // Reset to current week
+    final currentWeekStart = getWeekStart(DateTime.now());
+    if (vm.weekStart == currentWeekStart) return;
+    final diff = DateTime.parse(currentWeekStart)
+            .difference(DateTime.parse(vm.weekStart))
+            .inDays ~/
+        7;
+    for (var i = 0; i < diff.abs(); i++) {
+      vm.changeWeek(diff > 0 ? 1 : -1, _userId);
+    }
+    vm.loadPaidWeeks(_userId);
   }
 
-  // ── Paid check ───────────────────────────────────────────────
   bool _isWeekPaid(HelperSalaryViewModel vm) {
     if (vm.weekStart.isEmpty) return false;
     return vm.paidWeekStarts.contains(vm.weekStart);
   }
 
-  // ── Preview sheet ────────────────────────────────────────────
-  void _showDayPreview(
-      String date, double salary, bool weekPaid) {
+  void _showDayPreview(String date, double salary, bool weekPaid) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -95,12 +71,10 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
         maxChildSize:     0.85,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFFF7F7F8),
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(24)),
+            color:        Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(children: [
-            // Handle
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 40, height: 4,
@@ -108,15 +82,13 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2)),
             ),
-
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
+                    color: AppColors.info.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.today_outlined,
@@ -125,62 +97,58 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(date,
-                        style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.text,
-                            letterSpacing: -0.3)),
-                    const Text('Production Detail',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint)),
-                  ]),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(date,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.text,
+                              letterSpacing: -0.3)),
+                      const Text('Production Detail',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint)),
+                    ],
+                  ),
                 ),
-                // ✅ Paid / Unpaid badge
                 _StatusBadge(paid: weekPaid),
               ]),
             ),
-
-            const Divider(height: 20),
-
-            // Content
+            const Divider(height: 20, color: AppColors.border),
             Expanded(
               child: ListView(
                 controller: scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                 children: [
-                  // ── Salary breakdown ───────────────────
-                  _PreviewCard(children: [
-                    _PreviewLabel('YOUR SALARY'),
+                  _SheetCard(children: [
+                    const _SheetLabel('YOUR SALARY'),
                     const SizedBox(height: 12),
-                    _PreviewRow(
-                      icon:  Icons.calculate_outlined,
-                      label: 'Per Worker (base)',
-                      value: formatCurrency(salary),
+                    _SheetRow(
+                      icon:       Icons.calculate_outlined,
+                      label:      'Per Worker (base)',
+                      value:      formatCurrency(salary),
                       valueColor: AppColors.info,
                     ),
-                    const Divider(height: 20),
+                    const Divider(height: 20, color: AppColors.border),
                     Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                      const Text('Earnings This Day',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
-                      Text(formatCurrency(salary),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 22,
-                              color: AppColors.primaryDark)),
-                    ]),
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Earnings This Day',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.text)),
+                        Text(formatCurrency(salary),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                color: AppColors.primaryDark,
+                                letterSpacing: -0.5)),
+                      ],
+                    ),
                   ]),
                   const SizedBox(height: 12),
-
-                  // ── Payment status ─────────────────────
                   _PaymentStatusCard(paid: weekPaid),
                 ],
               ),
@@ -193,71 +161,106 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm         = context.watch<HelperSalaryViewModel>();
-    final monthLabel =
-        '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
-    final weekPaid   = _isWeekPaid(vm);
+    final vm       = context.watch<HelperSalaryViewModel>();
+    final weekPaid = _isWeekPaid(vm);
+    final isThisWeek = _isCurrentWeek;
 
     return RefreshIndicator(
       color:     AppColors.info,
-      onRefresh: () async => _loadForMonth(),
+      onRefresh: () async => _loadCurrentWeek(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(
-              title:    'Weekly Salary',
-              subtitle: 'Summary for your selected week',
-            ),
 
-            _MonthSelector(
-              label:  monthLabel,
-              onPrev: () => _changeMonth(-1),
-              onNext: () => _changeMonth(1),
-              onTap:  _pickMonth,
+            // ── Page header ──────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Weekly Salary',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.text,
+                            letterSpacing: -0.5)),
+                    SizedBox(height: 2),
+                    Text('Summary for your selected week',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+                if (!isThisWeek)
+                  GestureDetector(
+                    onTap: _goToCurrentWeek,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppColors.info.withValues(alpha: 0.2)),
+                      ),
+                      child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.today_outlined,
+                                size: 13, color: AppColors.info),
+                            SizedBox(width: 5),
+                            Text('This Week',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.info)),
+                          ]),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            WeekSelector(
-              weekStart: vm.weekStart,
-              weekEnd:   vm.weekEnd,
-              onPrev:    () => _changeWeek(-1),
-              onNext:    () => _changeWeek(1),
+            // ── Week navigator ───────────────────────────
+            _WeekNavigator(
+              weekStart:     vm.weekStart,
+              weekEnd:       vm.weekEnd,
+              isCurrentWeek: isThisWeek,
+              onPrev:        () => _changeWeek(-1),
+              onNext:        isThisWeek ? null : () => _changeWeek(1),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
+            // ── Content ──────────────────────────────────
             if (vm.isLoading)
               const _LoadingCard()
             else if (vm.error != null)
-              _ErrorCard(message: vm.error!, onRetry: _loadForMonth)
+              _ErrorCard(message: vm.error!, onRetry: _loadCurrentWeek)
             else ...[
-
-              // ✅ Week paid/unpaid banner
               _WeekStatusBanner(paid: weekPaid),
               const SizedBox(height: 14),
 
-              // ── Stats row ──────────────────────────────
+              // Stats row
               Row(children: [
-                Expanded(
-                    child: _StatTile(
+                Expanded(child: _StatTile(
                   icon:  Icons.payments_outlined,
                   label: 'Gross',
                   value: formatCurrency(vm.grossSalary),
                   color: AppColors.masterBaker,
                 )),
                 const SizedBox(width: 10),
-                Expanded(
-                    child: _StatTile(
+                Expanded(child: _StatTile(
                   icon:  Icons.calendar_today_outlined,
                   label: 'Days',
                   value: '${vm.daysWorked}',
                   color: AppColors.info,
                 )),
                 const SizedBox(width: 10),
-                Expanded(
-                    child: _StatTile(
+                Expanded(child: _StatTile(
                   icon:  Icons.account_balance_wallet_outlined,
                   label: 'Net',
                   value: formatCurrency(vm.finalSalary),
@@ -266,23 +269,20 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
               ]),
               const SizedBox(height: 14),
 
-              // ── Deductions card ────────────────────────
               _DeductionsCard(vm: vm),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
 
-              // ── Daily transactions ─────────────────────
+              // Daily transactions
               if (vm.weeklyDaily.isNotEmpty) ...[
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _SectionLabel('DAILY TRANSACTIONS'),
+                    const _SectionLabel('DAILY TRANSACTIONS'),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.info
-                            .withValues(alpha: 0.1),
+                        color: AppColors.info.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -295,31 +295,30 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
-                // ✅ Weekly total row
+                // Week total pill
                 Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary
-                        .withValues(alpha: 0.06),
+                    color: AppColors.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: AppColors.primary
-                            .withValues(alpha: 0.15)),
+                        color: AppColors.primary.withValues(alpha: 0.15)),
                   ),
                   child: Row(children: [
                     const Icon(Icons.summarize_outlined,
                         size: 16, color: AppColors.primary),
                     const SizedBox(width: 8),
                     const Expanded(
-                        child: Text('Week Total (Gross)',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary))),
+                      child: Text('Week Total (Gross)',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary)),
+                    ),
                     Text(
                       formatCurrency(vm.grossSalary),
                       style: const TextStyle(
@@ -330,20 +329,17 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                   ]),
                 ),
 
-                // ✅ Each daily transaction — tappable
-                ...vm.weeklyDaily.map((d) =>
+                ...vm.weeklyDaily.asMap().entries.map((e) =>
                     _DailyTransactionTile(
-                      date:     d.key,
-                      salary:   d.value,
+                      date:     e.value.key,
+                      salary:   e.value.value,
+                      index:    e.key,
                       weekPaid: weekPaid,
-                      onTap: () =>
-                          _showDayPreview(d.key, d.value, weekPaid),
+                      onTap:    () => _showDayPreview(
+                          e.value.key, e.value.value, weekPaid),
                     )),
               ] else
-                EmptyState(
-                  icon:    Icons.today_outlined,
-                  message: 'No records for this week',
-                ),
+                const _EmptyWeek(),
             ],
           ],
         ),
@@ -353,7 +349,132 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  WEEK STATUS BANNER  ← NEW
+//  WEEK NAVIGATOR
+// ─────────────────────────────────────────────────────────────
+class _WeekNavigator extends StatelessWidget {
+  final String       weekStart;
+  final String       weekEnd;
+  final bool         isCurrentWeek;
+  final VoidCallback onPrev;
+  final VoidCallback? onNext;
+
+  const _WeekNavigator({
+    required this.weekStart,
+    required this.weekEnd,
+    required this.isCurrentWeek,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  String _fmt(String dateStr) {
+    if (dateStr.isEmpty) return '—';
+    try {
+      final d = DateTime.parse(dateStr);
+      const m = [
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
+      ];
+      return '${m[d.month - 1]} ${d.day}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = weekStart.isEmpty
+        ? '—'
+        : '${_fmt(weekStart)} – ${_fmt(weekEnd)}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color:        Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border:       Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color:      Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset:     const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        _WkBtn(icon: Icons.chevron_left, onTap: onPrev),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.date_range_outlined,
+                    size: 15,
+                    color: isCurrentWeek
+                        ? AppColors.info
+                        : AppColors.textHint),
+                const SizedBox(width: 8),
+                Text(label,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize:   13,
+                        color: isCurrentWeek
+                            ? AppColors.info
+                            : AppColors.primaryDark,
+                        letterSpacing: -0.2)),
+                if (isCurrentWeek) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.info,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('THIS WEEK',
+                        style: TextStyle(
+                            fontSize:   8,
+                            fontWeight: FontWeight.w800,
+                            color:      Colors.white,
+                            letterSpacing: 0.5)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        _WkBtn(
+          icon:     Icons.chevron_right,
+          onTap:    onNext,
+          disabled: onNext == null,
+        ),
+      ]),
+    );
+  }
+}
+
+class _WkBtn extends StatelessWidget {
+  final IconData      icon;
+  final VoidCallback? onTap;
+  final bool          disabled;
+  const _WkBtn(
+      {required this.icon, this.onTap, this.disabled = false});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap:        disabled ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 14),
+          child: Icon(icon,
+              size:  20,
+              color: disabled ? AppColors.border : AppColors.info),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  WEEK STATUS BANNER
 // ─────────────────────────────────────────────────────────────
 class _WeekStatusBanner extends StatelessWidget {
   final bool paid;
@@ -379,8 +500,8 @@ class _WeekStatusBanner extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: paid
-                  ? AppColors.success.withValues(alpha: 0.1)
-                  : Colors.orange.withValues(alpha: 0.1),
+                  ? AppColors.success.withValues(alpha: 0.10)
+                  : Colors.orange.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -394,170 +515,236 @@ class _WeekStatusBanner extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(
-                paid
-                    ? 'Week Salary Released'
-                    : 'Week Salary Pending',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: paid
-                        ? AppColors.success
-                        : Colors.orange),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                paid
-                    ? 'Admin has released your salary for this week.'
-                    : 'Your salary for this week is pending admin approval.',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: paid
-                        ? AppColors.success.withValues(alpha: 0.8)
-                        : Colors.orange.withValues(alpha: 0.8)),
-              ),
-            ]),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  paid ? 'Week Salary Released' : 'Week Salary Pending',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize:   13,
+                      color: paid ? AppColors.success : Colors.orange),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  paid
+                      ? 'Admin has released your salary for this week.'
+                      : 'Your salary for this week is pending admin approval.',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color:    paid
+                          ? AppColors.success.withValues(alpha: 0.8)
+                          : Colors.orange.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
           ),
         ]),
       );
 }
 
 // ─────────────────────────────────────────────────────────────
-//  DAILY TRANSACTION TILE  ← NEW (replaces _DailyBreakdownTile)
+//  DAILY TRANSACTION TILE
 // ─────────────────────────────────────────────────────────────
 class _DailyTransactionTile extends StatelessWidget {
-  final String date;
-  final double salary;
-  final bool   weekPaid;
+  final String       date;
+  final double       salary;
+  final int          index;
+  final bool         weekPaid;
   final VoidCallback onTap;
 
   const _DailyTransactionTile({
     required this.date,
     required this.salary,
+    required this.index,
     required this.weekPaid,
     required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween:    Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 250 + index * 50),
+      curve:    Curves.easeOut,
+      builder: (_, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(
+            offset: Offset(0, 10 * (1 - v)), child: child),
+      ),
+      child: GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: weekPaid
-                  ? AppColors.success.withValues(alpha: 0.25)
-                  : AppColors.border,
-              width: weekPaid ? 1.5 : 1,
-            ),
+            color:        Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border:       Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2)),
+                  color:      Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset:     const Offset(0, 2)),
             ],
           ),
-          child: Row(children: [
-            Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.today_outlined,
-                  color: AppColors.primary, size: 18),
-            ),
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(date,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppColors.text)),
-                const SizedBox(height: 2),
-                Row(children: [
-                  // ✅ Paid badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: weekPaid
-                          ? AppColors.success
-                              .withValues(alpha: 0.1)
-                          : Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                        color: weekPaid
-                            ? AppColors.success
-                                .withValues(alpha: 0.25)
-                            : Colors.orange
-                                .withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                      Icon(
-                        weekPaid
-                            ? Icons.check_circle
-                            : Icons.schedule,
-                        size: 9,
-                        color: weekPaid
-                            ? AppColors.success
-                            : Colors.orange,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        weekPaid ? 'Paid' : 'Unpaid',
-                        style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: weekPaid
-                                ? AppColors.success
-                                : Colors.orange),
-                      ),
-                    ]),
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(11),
                   ),
-                  const SizedBox(width: 6),
-                  Text('Tap to view details',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.info
-                              .withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic)),
-                ]),
+                  child: const Icon(Icons.today_outlined,
+                      color: AppColors.primary, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(date,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize:   14,
+                              color:      AppColors.text,
+                              letterSpacing: -0.3)),
+                      const SizedBox(height: 3),
+                      Text('Base salary',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color:    AppColors.textHint)),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(formatCurrency(salary),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize:   15,
+                            color:      AppColors.primaryDark,
+                            letterSpacing: -0.3)),
+                    const SizedBox(height: 5),
+                    _PaidBadge(paid: weekPaid),
+                  ],
+                ),
               ]),
             ),
-
-            Column(crossAxisAlignment: CrossAxisAlignment.end,
+            // Footer strip
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.04),
+                borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(16)),
+                border: Border(
+                    top: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-              Text(formatCurrency(salary),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      color: AppColors.primaryDark)),
-              const SizedBox(height: 2),
-              Icon(Icons.chevron_right,
-                  size: 16,
-                  color: AppColors.info.withValues(alpha: 0.5)),
-            ]),
+                  Text('View breakdown',
+                      style: TextStyle(
+                          fontSize:   11,
+                          color: AppColors.info.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 3),
+                  Icon(Icons.keyboard_arrow_down,
+                      size:  14,
+                      color: AppColors.info.withValues(alpha: 0.7)),
+                ],
+              ),
+            ),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  EMPTY STATE
+// ─────────────────────────────────────────────────────────────
+class _EmptyWeek extends StatelessWidget {
+  const _EmptyWeek();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        decoration: BoxDecoration(
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border:       Border.all(color: AppColors.border),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.07),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.today_outlined,
+                size: 36, color: AppColors.info),
+          ),
+          const SizedBox(height: 14),
+          const Text('No records for this week',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize:   15,
+                  color:      AppColors.text)),
+          const SizedBox(height: 4),
+          const Text('No productions were recorded this week',
+              style: TextStyle(
+                  fontSize: 12, color: AppColors.textHint)),
+        ]),
       );
 }
 
 // ─────────────────────────────────────────────────────────────
-//  STATUS BADGE (used in preview sheet header)
+//  REUSABLE WIDGETS
 // ─────────────────────────────────────────────────────────────
+class _PaidBadge extends StatelessWidget {
+  final bool paid;
+  const _PaidBadge({required this.paid});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: paid
+              ? AppColors.success.withValues(alpha: 0.10)
+              : Colors.orange.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: paid
+                ? AppColors.success.withValues(alpha: 0.25)
+                : Colors.orange.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            paid ? Icons.check_circle : Icons.schedule,
+            size:  10,
+            color: paid ? AppColors.success : Colors.orange,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            paid ? 'Paid' : 'Unpaid',
+            style: TextStyle(
+                fontSize:   10,
+                fontWeight: FontWeight.w700,
+                color: paid ? AppColors.success : Colors.orange),
+          ),
+        ]),
+      );
+}
+
 class _StatusBadge extends StatelessWidget {
   final bool paid;
   const _StatusBadge({required this.paid});
@@ -568,8 +755,8 @@ class _StatusBadge extends StatelessWidget {
             horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: paid
-              ? AppColors.success.withValues(alpha: 0.1)
-              : Colors.orange.withValues(alpha: 0.1),
+              ? AppColors.success.withValues(alpha: 0.10)
+              : Colors.orange.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: paid
@@ -580,14 +767,14 @@ class _StatusBadge extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(
             paid ? Icons.check_circle : Icons.schedule,
-            size: 14,
+            size:  14,
             color: paid ? AppColors.success : Colors.orange,
           ),
           const SizedBox(width: 4),
           Text(
             paid ? 'Paid' : 'Unpaid',
             style: TextStyle(
-                fontSize: 12,
+                fontSize:   12,
                 fontWeight: FontWeight.w700,
                 color: paid ? AppColors.success : Colors.orange),
           ),
@@ -595,9 +782,6 @@ class _StatusBadge extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-//  PAYMENT STATUS CARD (used in preview sheet)
-// ─────────────────────────────────────────────────────────────
 class _PaymentStatusCard extends StatelessWidget {
   final bool paid;
   const _PaymentStatusCard({required this.paid});
@@ -607,8 +791,8 @@ class _PaymentStatusCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: paid
-              ? AppColors.success.withValues(alpha: 0.06)
-              : Colors.orange.withValues(alpha: 0.06),
+              ? AppColors.success.withValues(alpha: 0.05)
+              : Colors.orange.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: paid
@@ -621,8 +805,8 @@ class _PaymentStatusCard extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: paid
-                  ? AppColors.success.withValues(alpha: 0.1)
-                  : Colors.orange.withValues(alpha: 0.1),
+                  ? AppColors.success.withValues(alpha: 0.10)
+                  : Colors.orange.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -636,53 +820,49 @@ class _PaymentStatusCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(
-                paid ? 'Salary Paid' : 'Pending Payment',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: paid
-                        ? AppColors.success
-                        : Colors.orange),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                paid
-                    ? 'Your salary for this week has been released by admin.'
-                    : 'Your salary for this week is pending admin approval.',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: paid
-                        ? AppColors.success.withValues(alpha: 0.8)
-                        : Colors.orange.withValues(alpha: 0.8)),
-              ),
-            ]),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  paid ? 'Salary Paid' : 'Pending Payment',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize:   14,
+                      color: paid ? AppColors.success : Colors.orange),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  paid
+                      ? 'Your salary for this week has been released.'
+                      : 'Pending admin approval for this week.',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color:    paid
+                          ? AppColors.success.withValues(alpha: 0.8)
+                          : Colors.orange.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
           ),
         ]),
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-//  PREVIEW SHEET SUB-WIDGETS
-// ─────────────────────────────────────────────────────────────
-class _PreviewCard extends StatelessWidget {
+class _SheetCard extends StatelessWidget {
   final List<Widget> children;
-  const _PreviewCard({required this.children});
+  const _SheetCard({required this.children});
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color:        Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
+          border:       Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color:      Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
-                offset: const Offset(0, 2)),
+                offset:     const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -691,9 +871,9 @@ class _PreviewCard extends StatelessWidget {
       );
 }
 
-class _PreviewLabel extends StatelessWidget {
+class _SheetLabel extends StatelessWidget {
   final String text;
-  const _PreviewLabel(this.text);
+  const _SheetLabel(this.text);
 
   @override
   Widget build(BuildContext context) => Row(children: [
@@ -706,20 +886,19 @@ class _PreviewLabel extends StatelessWidget {
         const SizedBox(width: 8),
         Text(text,
             style: const TextStyle(
-                fontSize: 11,
+                fontSize:   11,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textHint,
+                color:      AppColors.textHint,
                 letterSpacing: 0.8)),
       ]);
 }
 
-class _PreviewRow extends StatelessWidget {
+class _SheetRow extends StatelessWidget {
   final IconData icon;
   final String   label;
   final String   value;
   final Color?   valueColor;
-
-  const _PreviewRow({
+  const _SheetRow({
     required this.icon,
     required this.label,
     required this.value,
@@ -735,8 +914,7 @@ class _PreviewRow extends StatelessWidget {
           Expanded(
               child: Text(label,
                   style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textHint))),
+                      fontSize: 13, color: AppColors.textHint))),
           Text(value,
               style: TextStyle(
                   fontSize:   13,
@@ -746,9 +924,28 @@ class _PreviewRow extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-//  STAT TILE
-// ─────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3, height: 13,
+          decoration: BoxDecoration(
+              color: AppColors.info,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontSize:   11,
+                fontWeight: FontWeight.w800,
+                color:      AppColors.textHint,
+                letterSpacing: 0.8)),
+      ]);
+}
+
 class _StatTile extends StatelessWidget {
   final IconData icon;
   final String   label;
@@ -765,14 +962,14 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color:        Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.18)),
+          border:       Border.all(color: color.withValues(alpha: 0.18)),
           boxShadow: [
             BoxShadow(
                 color:      color.withValues(alpha: 0.06),
                 blurRadius: 8,
-                offset:     const Offset(0, 2))
+                offset:     const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -781,7 +978,7 @@ class _StatTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color:        color.withValues(alpha: 0.1),
+                color:        color.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 17),
@@ -805,9 +1002,6 @@ class _StatTile extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-//  DEDUCTIONS CARD
-// ─────────────────────────────────────────────────────────────
 class _DeductionsCard extends StatelessWidget {
   final HelperSalaryViewModel vm;
   const _DeductionsCard({required this.vm});
@@ -823,13 +1017,13 @@ class _DeductionsCard extends StatelessWidget {
             BoxShadow(
                 color:      Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
-                offset:     const Offset(0, 2))
+                offset:     const Offset(0, 2)),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionLabel('DEDUCTIONS BREAKDOWN'),
+            const _SectionLabel('DEDUCTIONS BREAKDOWN'),
             const SizedBox(height: 14),
             _DedRow(
               label: 'Oven  (₱${AppConstants.helperOvenDeductionPerDay.toStringAsFixed(0)}/day × ${vm.daysWorked}d)',
@@ -843,35 +1037,37 @@ class _DeductionsCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  const Text('TAKE-HOME PAY',
-                      style: TextStyle(
-                          fontSize:   10,
-                          fontWeight: FontWeight.w800,
-                          color:      AppColors.textHint,
-                          letterSpacing: 0.8)),
-                  const SizedBox(height: 4),
-                  Text(formatCurrency(vm.finalSalary),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize:   26,
-                          color:      AppColors.primaryDark)),
-                ]),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('TAKE-HOME PAY',
+                        style: TextStyle(
+                            fontSize:   10,
+                            fontWeight: FontWeight.w800,
+                            color:      AppColors.textHint,
+                            letterSpacing: 0.8)),
+                    const SizedBox(height: 4),
+                    Text(formatCurrency(vm.finalSalary),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize:   26,
+                            color:      AppColors.primaryDark,
+                            letterSpacing: -0.5)),
+                  ],
+                ),
                 Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                  _NetChip(
-                      label: 'Gross',
-                      value: formatCurrency(vm.grossSalary),
-                      color: AppColors.masterBaker),
-                  const SizedBox(height: 4),
-                  _NetChip(
-                      label: 'Deductions',
-                      value:
-                          '-${formatCurrency(vm.totalDeductions)}',
-                      color: AppColors.danger),
-                ]),
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _NetChip(
+                        label: 'Gross',
+                        value: formatCurrency(vm.grossSalary),
+                        color: AppColors.masterBaker),
+                    const SizedBox(height: 4),
+                    _NetChip(
+                        label: 'Deductions',
+                        value: '-${formatCurrency(vm.totalDeductions)}',
+                        color: AppColors.danger),
+                  ],
+                ),
               ],
             ),
           ],
@@ -888,22 +1084,23 @@ class _DedRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-          Flexible(
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary))),
-          Text(
-            value > 0 ? '-${formatCurrency(value)}' : '—',
-            style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: value > 0
-                    ? AppColors.danger
-                    : AppColors.textHint),
-          ),
-        ]),
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+                child: Text(label,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color:    AppColors.textSecondary))),
+            Text(
+              value > 0 ? '-${formatCurrency(value)}' : '—',
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: value > 0
+                      ? AppColors.danger
+                      : AppColors.textHint),
+            ),
+          ],
+        ),
       );
 }
 
@@ -911,10 +1108,11 @@ class _NetChip extends StatelessWidget {
   final String label;
   final String value;
   final Color  color;
-  const _NetChip(
-      {required this.label,
-      required this.value,
-      required this.color});
+  const _NetChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -943,87 +1141,15 @@ class _NetChip extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-//  SHARED HELPERS
-// ─────────────────────────────────────────────────────────────
-class _MonthSelector extends StatelessWidget {
-  final String       label;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  final VoidCallback onTap;
-
-  const _MonthSelector({
-    required this.label,
-    required this.onPrev,
-    required this.onNext,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color:        Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppColors.info.withValues(alpha: 0.25)),
-        ),
-        child: Row(children: [
-          IconButton(
-              icon:      const Icon(Icons.chevron_left),
-              color:     AppColors.info,
-              onPressed: onPrev),
-          Expanded(
-            child: GestureDetector(
-              onTap: onTap,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.calendar_month_outlined,
-                      size: 18, color: AppColors.info),
-                  const SizedBox(width: 8),
-                  Text(label,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize:   15,
-                          color:      AppColors.info)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down,
-                      size: 18, color: AppColors.info),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-              icon:      const Icon(Icons.chevron_right),
-              color:     AppColors.info,
-              onPressed: onNext),
-        ]),
-      );
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(text,
-      style: const TextStyle(
-          fontSize:      11,
-          fontWeight:    FontWeight.w800,
-          color:         AppColors.textHint,
-          letterSpacing: 0.8));
-}
-
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
 
   @override
-  Widget build(BuildContext context) => const Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 48),
-          child: Center(
-              child: CircularProgressIndicator(
-                  color: AppColors.info, strokeWidth: 2.5)),
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: CircularProgressIndicator(
+              color: AppColors.info, strokeWidth: 2.5),
         ),
       );
 }
@@ -1037,9 +1163,9 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.05),
+          color:        AppColors.danger.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
+          border:       Border.all(
               color: AppColors.danger.withValues(alpha: 0.2)),
         ),
         child: Column(children: [

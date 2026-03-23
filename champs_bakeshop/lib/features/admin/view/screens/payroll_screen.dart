@@ -47,7 +47,6 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen>
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // ── Tab bar ────────────────────────────────────────────
       Container(
         color: Colors.white,
         child: Column(children: [
@@ -68,8 +67,6 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen>
           Container(height: 1, color: AppColors.border),
         ]),
       ),
-
-      // ── Tab views ─────────────────────────────────────────
       Expanded(
         child: TabBarView(
           controller: _tab,
@@ -97,14 +94,50 @@ class _BakerHelperPayrollTab extends StatefulWidget {
 
 class _BakerHelperPayrollTabState
     extends State<_BakerHelperPayrollTab> {
-  DateTime _selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
+  // ── Default: current month ───────────────────────────────────
+  late DateTime _selectedMonth;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
     WidgetsBinding.instance
-        .addPostFrameCallback((_) => _load());
+        .addPostFrameCallback((_) => _loadCurrentWeek());
+  }
+
+  // ── Current week helpers ─────────────────────────────────────
+  String get _currentWeekStart => getWeekStart(DateTime.now());
+
+  bool get _isCurrentWeek {
+    final payVM = context.read<AdminPayrollViewModel>();
+    return payVM.weekStart == _currentWeekStart;
+  }
+
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
+  }
+
+  String get _monthLabel {
+    const names = [
+      'January','February','March','April','May','June',
+      'July','August','September','October','November','December'
+    ];
+    return '${names[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+  }
+
+  // ── Loaders ──────────────────────────────────────────────────
+  void _loadCurrentWeek() {
+    final payVM  = context.read<AdminPayrollViewModel>();
+    final prodVM = context.read<AdminProductViewModel>();
+    final userVM = context.read<AdminUserViewModel>();
+    payVM.loadWeeklyPayroll(
+        _currentWeekStart,
+        prodVM.products,
+        userVM.userNameMap,
+        userVM.userRoleMap);
   }
 
   void _load() {
@@ -112,7 +145,7 @@ class _BakerHelperPayrollTabState
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
     final ws     = payVM.weekStart.isEmpty
-        ? getWeekStart(DateTime.now())
+        ? _currentWeekStart
         : payVM.weekStart;
     payVM.loadWeeklyPayroll(
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
@@ -122,15 +155,18 @@ class _BakerHelperPayrollTabState
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
+    // Block going forward past current week
+    if (dir > 0 && _isCurrentWeek) return;
     payVM.changeWeek(
         dir, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
   }
 
   void _changeMonth(int dir) {
-    setState(() {
-      _selectedMonth = DateTime(
-          _selectedMonth.year, _selectedMonth.month + dir);
-    });
+    final next =
+        DateTime(_selectedMonth.year, _selectedMonth.month + dir);
+    final now = DateTime.now();
+    if (next.isAfter(DateTime(now.year, now.month))) return;
+    setState(() => _selectedMonth = next);
     final firstDay =
         DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final monday =
@@ -143,41 +179,41 @@ class _BakerHelperPayrollTabState
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
   }
 
-  void _pickMonth() async {
+  Future<void> _pickMonth() async {
     final now    = DateTime.now();
     final picked = await showDatePicker(
-      context: context,
+      context:     context,
       initialDate: _selectedMonth,
-      firstDate: DateTime(now.year - 2),
-      lastDate: DateTime(now.year + 1, 12),
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
-      helpText: 'SELECT MONTH',
+      firstDate:   DateTime(2024),
+      lastDate:    now,
+      helpText:    'Select Month',
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-              primary: AppColors.primary),
+              primary:   AppColors.primary,
+              onSurface: AppColors.text),
         ),
         child: child!,
       ),
     );
     if (picked != null && mounted) {
-      setState(() {
-        _selectedMonth = DateTime(picked.year, picked.month);
-      });
+      setState(() =>
+          _selectedMonth = DateTime(picked.year, picked.month));
       _changeMonth(0);
     }
   }
 
+  // ── Dialogs ──────────────────────────────────────────────────
   void _showDeductionDialog(PayrollEntry entry) {
-    final isHelper  = entry.role != 'master_baker';
-    final autoOven  = isHelper ? entry.daysWorked * 20.0 : 0.0;
-    final ovenCtrl  = TextEditingController(
+    final isHelper = entry.role != 'master_baker';
+    final autoOven = isHelper ? entry.daysWorked * 20.0 : 0.0;
+    final ovenCtrl = TextEditingController(
         text: entry.ovenDeduction.toStringAsFixed(0));
-    final gasCtrl   = TextEditingController(
+    final gasCtrl  = TextEditingController(
         text: entry.gasDeduction.toStringAsFixed(0));
-    final valeCtrl  = TextEditingController(
+    final valeCtrl = TextEditingController(
         text: entry.valeDeduction.toStringAsFixed(0));
-    final wifiCtrl  = TextEditingController(
+    final wifiCtrl = TextEditingController(
         text: entry.wifiDeduction.toStringAsFixed(0));
 
     showDialog(
@@ -207,8 +243,8 @@ class _BakerHelperPayrollTabState
                         fontWeight: FontWeight.w800)),
                 Text(entry.name,
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textHint,
+                        fontSize:   12,
+                        color:      AppColors.textHint,
                         fontWeight: FontWeight.w400)),
               ],
             ),
@@ -264,17 +300,17 @@ class _BakerHelperPayrollTabState
               _DeducField(
                   controller: gasCtrl,
                   label: 'Gas (₱)',
-                  icon: Icons.local_fire_department_outlined),
+                  icon:  Icons.local_fire_department_outlined),
               const SizedBox(height: 12),
               _DeducField(
                   controller: valeCtrl,
                   label: 'Vale (₱)',
-                  icon: Icons.money_outlined),
+                  icon:  Icons.money_outlined),
               const SizedBox(height: 12),
               _DeducField(
                   controller: wifiCtrl,
                   label: 'Wifi (₱)',
-                  icon: Icons.wifi),
+                  icon:  Icons.wifi),
               const SizedBox(height: 8),
             ],
           ),
@@ -307,8 +343,7 @@ class _BakerHelperPayrollTabState
                     backgroundColor: AppColors.success,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10)),
                     margin: const EdgeInsets.all(12)));
               }
             },
@@ -354,8 +389,7 @@ class _BakerHelperPayrollTabState
               color: AppColors.success.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color:
-                      AppColors.success.withValues(alpha: 0.2)),
+                  color: AppColors.success.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -367,8 +401,8 @@ class _BakerHelperPayrollTabState
                 Text(formatCurrency(entry.finalSalary),
                     style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        color: AppColors.success,
-                        fontSize: 20)),
+                        color:      AppColors.success,
+                        fontSize:   20)),
               ],
             ),
           ),
@@ -378,8 +412,7 @@ class _BakerHelperPayrollTabState
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel')),
           FilledButton.icon(
-            icon: const Icon(Icons.check_circle_outline,
-                size: 18),
+            icon:  const Icon(Icons.check_circle_outline, size: 18),
             label: const Text('Confirm Paid'),
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.success),
@@ -399,13 +432,11 @@ class _BakerHelperPayrollTabState
                   content: Text(ok
                       ? '${entry.name} marked as paid!'
                       : 'Error saving payment.'),
-                  backgroundColor: ok
-                      ? AppColors.success
-                      : AppColors.danger,
+                  backgroundColor:
+                      ok ? AppColors.success : AppColors.danger,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10)),
                   margin: const EdgeInsets.all(12),
                 ));
               }
@@ -448,7 +479,7 @@ class _BakerHelperPayrollTabState
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel')),
           FilledButton.icon(
-            icon: const Icon(Icons.payments_outlined, size: 18),
+            icon:  const Icon(Icons.payments_outlined, size: 18),
             label: const Text('Pay All'),
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.success),
@@ -465,13 +496,11 @@ class _BakerHelperPayrollTabState
                   content: Text(ok
                       ? 'All employees marked as paid!'
                       : 'Error saving payments.'),
-                  backgroundColor: ok
-                      ? AppColors.success
-                      : AppColors.danger,
+                  backgroundColor:
+                      ok ? AppColors.success : AppColors.danger,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10)),
                   margin: const EdgeInsets.all(12),
                 ));
               }
@@ -485,65 +514,146 @@ class _BakerHelperPayrollTabState
   @override
   Widget build(BuildContext context) {
     final payVM = context.watch<AdminPayrollViewModel>();
-    const monthNames = [
-      'January','February','March','April','May','June',
-      'July','August','September','October','November','December'
-    ];
-    final monthLabel =
-        '${monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+
+    // ── Sort: unpaid first, paid last ────────────────────────
+    final sortedEntries = [...payVM.entries]
+      ..sort((a, b) {
+        if (a.isPaid == b.isPaid) return 0;
+        return a.isPaid ? 1 : -1; // unpaid floats to top
+      });
+
     final unpaidEntries =
-        payVM.entries.where((e) => !e.isPaid).toList();
+        sortedEntries.where((e) => !e.isPaid).toList();
     final paidCount =
-        payVM.entries.where((e) => e.isPaid).length;
+        sortedEntries.where((e) => e.isPaid).length;
+
+    final isThisWeek = payVM.weekStart.isNotEmpty &&
+        payVM.weekStart == _currentWeekStart;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PageHeader(
-            title:    'Baker / Helper Payroll',
-            subtitle: 'Automated salary computation',
-            icon:     Icons.payments_outlined,
+
+          // ── Page header ──────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const _PageHeader(
+                title:    'Baker / Helper Payroll',
+                subtitle: 'Automated salary computation',
+                icon:     Icons.payments_outlined,
+              ),
+              // This week shortcut
+              if (!isThisWeek)
+                GestureDetector(
+                  onTap: _loadCurrentWeek,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: AppColors.primary
+                              .withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.today_outlined,
+                              size: 12,
+                              color: AppColors.primary),
+                          SizedBox(width: 4),
+                          Text('This Week',
+                              style: TextStyle(
+                                  fontSize:   11,
+                                  fontWeight: FontWeight.w700,
+                                  color:      AppColors.primary)),
+                        ]),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
 
-          _MonthSelector(
-              label: monthLabel,
-              onPrev: () => _changeMonth(-1),
-              onNext: () => _changeMonth(1),
-              onTap:  _pickMonth),
+          // ── Month navigator ──────────────────────────────
+          _MonthNavigator(
+            label:          _monthLabel,
+            isCurrentMonth: _isCurrentMonth,
+            onPrev:         () => _changeMonth(-1),
+            onNext:         _isCurrentMonth
+                ? null
+                : () => _changeMonth(1),
+            onTap: _pickMonth,
+          ),
           const SizedBox(height: 10),
 
-          _buildWeekSelector(payVM),
+          // ── Week navigator ───────────────────────────────
+          _WeekNavigator(
+            weekStart:     payVM.weekStart,
+            weekEnd:       payVM.weekEnd,
+            isCurrentWeek: isThisWeek,
+            onPrev:        () => _changeWeek(-1),
+            onNext:        isThisWeek ? null : () => _changeWeek(1),
+          ),
           const SizedBox(height: 16),
 
+          // ── Content ──────────────────────────────────────
           if (payVM.isLoading)
             const Center(
                 child: CircularProgressIndicator(
                     color: AppColors.primary))
-          else if (payVM.entries.isEmpty)
+          else if (sortedEntries.isEmpty)
             const _EmptyPayroll(
                 message: 'No production data for this week.')
           else ...[
             _PaymentProgressBar(
               paidCount:   paidCount,
-              totalCount:  payVM.entries.length,
+              totalCount:  sortedEntries.length,
               unpaid:      unpaidEntries,
               isPaying:    payVM.isPaying,
-              onPayAll:
-                  () => _confirmMarkAllPaid(unpaidEntries),
+              onPayAll:    () => _confirmMarkAllPaid(unpaidEntries),
               accentColor: AppColors.primary,
             ),
             const SizedBox(height: 16),
 
-            ...payVM.entries.map((e) => _EmployeeCard(
-                  entry:            e,
-                  onEditDeductions: () =>
-                      _showDeductionDialog(e),
-                  onMarkPaid: () => _confirmMarkPaid(e),
-                  isPaying:   payVM.isPaying,
-                )),
+            // ── Unpaid section label ─────────────────────
+            if (unpaidEntries.isNotEmpty) ...[
+              _SectionDivider(
+                label: 'UNPAID  ·  ${unpaidEntries.length}',
+                color: AppColors.danger,
+              ),
+              const SizedBox(height: 8),
+              ...unpaidEntries.map((e) => _EmployeeCard(
+                    entry:            e,
+                    onEditDeductions: () => _showDeductionDialog(e),
+                    onMarkPaid:       () => _confirmMarkPaid(e),
+                    isPaying:         payVM.isPaying,
+                  )),
+              const SizedBox(height: 8),
+            ],
+
+            // ── Paid section label ───────────────────────
+            if (paidCount > 0) ...[
+              _SectionDivider(
+                label: 'PAID  ·  $paidCount',
+                color: AppColors.success,
+              ),
+              const SizedBox(height: 8),
+              ...sortedEntries
+                  .where((e) => e.isPaid)
+                  .map((e) => _EmployeeCard(
+                        entry:            e,
+                        onEditDeductions: () =>
+                            _showDeductionDialog(e),
+                        onMarkPaid: () => _confirmMarkPaid(e),
+                        isPaying:   payVM.isPaying,
+                      )),
+              const SizedBox(height: 8),
+            ],
 
             _TotalPayrollBanner(total: payVM.totalPayroll),
           ],
@@ -551,52 +661,270 @@ class _BakerHelperPayrollTabState
       ),
     );
   }
+}
 
-  Widget _buildWeekSelector(AdminPayrollViewModel payVM) =>
-      Container(
+// ─────────────────────────────────────────────────────────────
+//  MONTH NAVIGATOR
+// ─────────────────────────────────────────────────────────────
+class _MonthNavigator extends StatelessWidget {
+  final String        label;
+  final bool          isCurrentMonth;
+  final VoidCallback  onPrev;
+  final VoidCallback? onNext;
+  final VoidCallback  onTap;
+
+  const _MonthNavigator({
+    required this.label,
+    required this.isCurrentMonth,
+    required this.onPrev,
+    required this.onNext,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border:       Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color:      Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset:     const Offset(0, 2),
             ),
           ],
         ),
         child: Row(children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left,
-                color: AppColors.primary),
-            onPressed: () => _changeWeek(-1),
-          ),
+          _PayNavBtn(icon: Icons.chevron_left, onTap: onPrev),
           Expanded(
-            child: Column(children: [
-              Text(
-                '${payVM.weekStart}  →  ${payVM.weekEnd}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: AppColors.primary),
-                textAlign: TextAlign.center,
+            child: GestureDetector(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_month_outlined,
+                        size:  15,
+                        color: isCurrentMonth
+                            ? AppColors.primary
+                            : AppColors.textHint),
+                    const SizedBox(width: 8),
+                    Text(label,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize:   14,
+                            color: isCurrentMonth
+                                ? AppColors.primary
+                                : AppColors.text,
+                            letterSpacing: -0.2)),
+                    if (isCurrentMonth) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('THIS MONTH',
+                            style: TextStyle(
+                                fontSize:   8,
+                                fontWeight: FontWeight.w800,
+                                color:      Colors.white,
+                                letterSpacing: 0.5)),
+                      ),
+                    ],
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down,
+                        size: 18, color: AppColors.textHint),
+                  ],
+                ),
               ),
-              const Text('Week Range',
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textHint)),
-            ]),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right,
-                color: AppColors.primary),
-            onPressed: () => _changeWeek(1),
+          _PayNavBtn(
+            icon:     Icons.chevron_right,
+            onTap:    onNext,
+            disabled: onNext == null,
           ),
         ]),
       );
 }
 
+// ─────────────────────────────────────────────────────────────
+//  WEEK NAVIGATOR
+// ─────────────────────────────────────────────────────────────
+class _WeekNavigator extends StatelessWidget {
+  final String        weekStart;
+  final String        weekEnd;
+  final bool          isCurrentWeek;
+  final VoidCallback  onPrev;
+  final VoidCallback? onNext;
 
+  const _WeekNavigator({
+    required this.weekStart,
+    required this.weekEnd,
+    required this.isCurrentWeek,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  String _fmt(String dateStr) {
+    if (dateStr.isEmpty) return '—';
+    try {
+      final d = DateTime.parse(dateStr);
+      const m = [
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
+      ];
+      return '${m[d.month - 1]} ${d.day}';
+    } catch (_) { return dateStr; }
+  }
+
+  String get _label {
+    if (weekStart.isEmpty) return '—';
+    final s = DateTime.tryParse(weekStart);
+    final e = DateTime.tryParse(weekEnd);
+    if (s == null || e == null) return '$weekStart – $weekEnd';
+    const m = [
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+    if (s.month == e.month) {
+      return '${m[s.month - 1]} ${s.day}–${e.day}, ${s.year}';
+    }
+    return '${m[s.month - 1]} ${s.day} – ${m[e.month - 1]} ${e.day}, ${e.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: isCurrentWeek
+              ? AppColors.primary.withValues(alpha: 0.05)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isCurrentWeek
+                ? AppColors.primary.withValues(alpha: 0.25)
+                : AppColors.border,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color:      Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset:     const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(children: [
+          _PayNavBtn(icon: Icons.chevron_left, onTap: onPrev),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.date_range_outlined,
+                      size:  15,
+                      color: isCurrentWeek
+                          ? AppColors.primary
+                          : AppColors.textHint),
+                  const SizedBox(width: 8),
+                  Text(_label,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize:   13,
+                          color: isCurrentWeek
+                              ? AppColors.primary
+                              : AppColors.primaryDark,
+                          letterSpacing: -0.2)),
+                  if (isCurrentWeek) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('THIS WEEK',
+                          style: TextStyle(
+                              fontSize:   8,
+                              fontWeight: FontWeight.w800,
+                              color:      Colors.white,
+                              letterSpacing: 0.5)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          _PayNavBtn(
+            icon:     Icons.chevron_right,
+            onTap:    onNext,
+            disabled: onNext == null,
+          ),
+        ]),
+      );
+}
+
+class _PayNavBtn extends StatelessWidget {
+  final IconData      icon;
+  final VoidCallback? onTap;
+  final bool          disabled;
+  const _PayNavBtn(
+      {required this.icon, this.onTap, this.disabled = false});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap:        disabled ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 14),
+          child: Icon(icon,
+              size:  20,
+              color: disabled
+                  ? AppColors.border
+                  : AppColors.primary),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SECTION DIVIDER (Unpaid / Paid labels)
+// ─────────────────────────────────────────────────────────────
+class _SectionDivider extends StatelessWidget {
+  final String label;
+  final Color  color;
+  const _SectionDivider({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3, height: 13,
+          decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(label,
+            style: TextStyle(
+                fontSize:   11,
+                fontWeight: FontWeight.w800,
+                color:      color,
+                letterSpacing: 0.8)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: color.withValues(alpha: 0.2),
+          ),
+        ),
+      ]);
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SHARED WIDGETS
@@ -613,15 +941,15 @@ class _TotalPayrollBanner extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin:  Alignment.topLeft,
+            end:    Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF7A00).withValues(alpha: 0.3),
+              color:      const Color(0xFFFF7A00).withValues(alpha: 0.3),
               blurRadius: 14,
-              offset: const Offset(0, 5),
+              offset:     const Offset(0, 5),
             ),
           ],
         ),
@@ -633,10 +961,10 @@ class _TotalPayrollBanner extends StatelessWidget {
               children: [
                 Text('TOTAL PAYROLL',
                     style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w700,
+                        color:         Colors.white70,
+                        fontWeight:    FontWeight.w700,
                         letterSpacing: 1,
-                        fontSize: 11)),
+                        fontSize:      11)),
                 SizedBox(height: 4),
                 Text('This week',
                     style: TextStyle(
@@ -645,9 +973,9 @@ class _TotalPayrollBanner extends StatelessWidget {
             ),
             Text(formatCurrency(total),
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 26,
+                    color:         Colors.white,
+                    fontWeight:    FontWeight.w900,
+                    fontSize:      26,
                     letterSpacing: -0.5)),
           ],
         ),
@@ -655,12 +983,12 @@ class _TotalPayrollBanner extends StatelessWidget {
 }
 
 class _PaymentProgressBar extends StatelessWidget {
-  final int          paidCount;
-  final int          totalCount;
+  final int           paidCount;
+  final int           totalCount;
   final List<dynamic> unpaid;
-  final bool         isPaying;
-  final VoidCallback onPayAll;
-  final Color        accentColor;
+  final bool          isPaying;
+  final VoidCallback  onPayAll;
+  final Color         accentColor;
   const _PaymentProgressBar({
     required this.paidCount,
     required this.totalCount,
@@ -680,16 +1008,16 @@ class _PaymentProgressBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
+        color:        color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border:       Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(children: [
         Row(children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color:        color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -710,13 +1038,13 @@ class _PaymentProgressBar extends StatelessWidget {
                       : '${totalCount - paidCount} unpaid',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: color),
+                      fontSize:   13,
+                      color:      color),
                 ),
                 Text('$paidCount of $totalCount paid',
                     style: const TextStyle(
                         fontSize: 11,
-                        color: AppColors.textHint)),
+                        color:    AppColors.textHint)),
               ],
             ),
           ),
@@ -728,7 +1056,7 @@ class _PaymentProgressBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 8),
                 textStyle: const TextStyle(
-                    fontSize: 12,
+                    fontSize:   12,
                     fontWeight: FontWeight.w700),
               ),
               child: const Text('Pay All'),
@@ -738,10 +1066,10 @@ class _PaymentProgressBar extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: progress,
+            value:           progress,
             backgroundColor: color.withValues(alpha: 0.15),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 5,
+            valueColor:      AlwaysStoppedAnimation<Color>(color),
+            minHeight:       5,
           ),
         ),
       ]),
@@ -771,18 +1099,18 @@ class _EmployeeCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:        Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: e.isPaid
             ? Border.all(
-                color: AppColors.success.withValues(alpha: 0.3),
+                color: AppColors.danger.withValues(alpha: 0.25),
                 width: 1.5)
-            : null,
+            : Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color:      Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
-            offset: const Offset(0, 8),
+            offset:     const Offset(0, 8),
           ),
         ],
       ),
@@ -795,7 +1123,7 @@ class _EmployeeCard extends StatelessWidget {
               Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
-                  color: roleColor.withValues(alpha: 0.1),
+                  color:        roleColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -805,8 +1133,8 @@ class _EmployeeCard extends StatelessWidget {
                       : '?',
                   style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      color: roleColor),
+                      fontSize:   18,
+                      color:      roleColor),
                 ),
               ),
               const SizedBox(width: 12),
@@ -817,7 +1145,7 @@ class _EmployeeCard extends StatelessWidget {
                     Text(e.name,
                         style: const TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 15)),
+                            fontSize:   15)),
                     const SizedBox(height: 3),
                     Row(children: [
                       RoleBadge(role: e.role),
@@ -825,7 +1153,7 @@ class _EmployeeCard extends StatelessWidget {
                       Text('${e.daysWorked} days',
                           style: const TextStyle(
                               fontSize: 11,
-                              color: AppColors.textHint)),
+                              color:    AppColors.textHint)),
                     ]),
                   ],
                 ),
@@ -835,13 +1163,13 @@ class _EmployeeCard extends StatelessWidget {
                 children: [
                   Text(formatCurrency(e.finalSalary),
                       style: const TextStyle(
-                          fontSize: 20,
+                          fontSize:   20,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF1A1A1A))),
+                          color:      Color(0xFF1A1A1A))),
                   const Text('Take-Home',
                       style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.textHint)),
+                          color:    AppColors.textHint)),
                 ],
               ),
             ]),
@@ -892,7 +1220,7 @@ class _EmployeeCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                     textStyle: const TextStyle(
-                        fontSize: 12,
+                        fontSize:   12,
                         fontWeight: FontWeight.w700),
                     shape: RoundedRectangleBorder(
                         borderRadius:
@@ -901,47 +1229,46 @@ class _EmployeeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
+              // ── PAID = red badge  |  UNPAID = green button ──
               e.isPaid
                   ? Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: AppColors.success
-                            .withValues(alpha: 0.1),
+                        color: AppColors.danger
+                            .withValues(alpha: 0.08),
                         borderRadius:
                             BorderRadius.circular(10),
                         border: Border.all(
-                            color: AppColors.success
+                            color: AppColors.danger
                                 .withValues(alpha: 0.25)),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.check_circle,
-                              size: 16,
-                              color: AppColors.success),
+                              size:  16,
+                              color: AppColors.danger),
                           SizedBox(width: 6),
                           Text('Paid',
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize:   12,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.success)),
+                                  color:      AppColors.danger)),
                         ],
                       ),
                     )
                   : FilledButton.icon(
-                      onPressed:
-                          isPaying ? null : onMarkPaid,
-                      icon: const Icon(
-                          Icons.payments_outlined,
-                          size: 16),
+                      onPressed: isPaying ? null : onMarkPaid,
+                      icon:  const Icon(
+                          Icons.payments_outlined, size: 16),
                       label: const Text('Mark Paid'),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.success,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         textStyle: const TextStyle(
-                            fontSize: 12,
+                            fontSize:   12,
                             fontWeight: FontWeight.w700),
                         shape: RoundedRectangleBorder(
                             borderRadius:
@@ -971,7 +1298,8 @@ class _PageHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF7A00).withValues(alpha: 0.1),
+            color:        const Color(0xFFFF7A00)
+                .withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon,
@@ -983,78 +1311,17 @@ class _PageHeader extends StatelessWidget {
           children: [
             Text(title,
                 style: const TextStyle(
-                    fontSize: 18,
+                    fontSize:   18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A1A),
+                    color:      Color(0xFF1A1A1A),
                     letterSpacing: -0.3)),
             Text(subtitle,
                 style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.textHint)),
+                    color:    AppColors.textHint)),
           ],
         ),
       ]);
-}
-
-class _MonthSelector extends StatelessWidget {
-  final String       label;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  final VoidCallback onTap;
-  const _MonthSelector({
-    required this.label,
-    required this.onPrev,
-    required this.onNext,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left,
-                color: AppColors.primary),
-            onPressed: onPrev,
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: onTap,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.calendar_month,
-                      size: 16, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Text(label,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppColors.primary)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down,
-                      size: 18, color: AppColors.primary),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right,
-                color: AppColors.primary),
-            onPressed: onNext,
-          ),
-        ]),
-      );
 }
 
 class _EmptyPayroll extends StatelessWidget {
@@ -1079,13 +1346,13 @@ class _EmptyPayroll extends StatelessWidget {
           const Text('No data',
               style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: Color(0xFF1A1A1A))),
+                  fontSize:   15,
+                  color:      Color(0xFF1A1A1A))),
           const SizedBox(height: 6),
           Text(message,
               style: const TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary)),
+                  color:    AppColors.textSecondary)),
         ]),
       );
 }

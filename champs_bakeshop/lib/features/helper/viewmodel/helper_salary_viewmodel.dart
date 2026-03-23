@@ -51,35 +51,34 @@ class HelperSalaryViewModel extends ChangeNotifier {
   double get finalSalary => _grossSalary - totalDeductions;
 
   // ── Monthly ──────────────────────────────────────────────────
-  List<WeeklySummary> _monthlyWeeks       = [];
-  double _monthlyTotalSalary              = 0;
-  double _monthlyGrossSalary              = 0;
-  double _monthlyTotalDeductions          = 0;
-  double _monthlyAvgPerWeek               = 0;
-  int    _monthlyTotalDays                = 0;
-  int    _monthlyTotalSacks               = 0;
-  double _monthlyOvenTotal                = 0;
-  double _monthlyGasTotal                 = 0;
-  double _monthlyValeTotal                = 0;
-  double _monthlyWifiTotal                = 0;
+  List<WeeklySummary> _monthlyWeeks      = [];
+  double _monthlyTotalSalary             = 0;
+  double _monthlyGrossSalary             = 0;
+  double _monthlyTotalDeductions         = 0;
+  double _monthlyAvgPerWeek              = 0;
+  int    _monthlyTotalDays               = 0;
+  int    _monthlyTotalSacks              = 0;
+  double _monthlyOvenTotal               = 0;
+  double _monthlyGasTotal                = 0;
+  double _monthlyValeTotal               = 0;
+  double _monthlyWifiTotal               = 0;
 
-  List<WeeklySummary> get monthlyWeeks          => _monthlyWeeks;
-  double get monthlyTotalSalary                 => _monthlyTotalSalary;
-  double get monthlyGrossSalary                 => _monthlyGrossSalary;
-  double get monthlyTotalDeductions             => _monthlyTotalDeductions;
-  double get monthlyAvgPerWeek                  => _monthlyAvgPerWeek;
-  int    get monthlyTotalDays                   => _monthlyTotalDays;
-  int    get monthlyTotalSacks                  => _monthlyTotalSacks;
-  double get monthlyOvenTotal                   => _monthlyOvenTotal;
-  double get monthlyGasTotal                    => _monthlyGasTotal;
-  double get monthlyValeTotal                   => _monthlyValeTotal;
-  double get monthlyWifiTotal                   => _monthlyWifiTotal;
+  List<WeeklySummary> get monthlyWeeks       => _monthlyWeeks;
+  double get monthlyTotalSalary              => _monthlyTotalSalary;
+  double get monthlyGrossSalary              => _monthlyGrossSalary;
+  double get monthlyTotalDeductions          => _monthlyTotalDeductions;
+  double get monthlyAvgPerWeek               => _monthlyAvgPerWeek;
+  int    get monthlyTotalDays                => _monthlyTotalDays;
+  int    get monthlyTotalSacks               => _monthlyTotalSacks;
+  double get monthlyOvenTotal                => _monthlyOvenTotal;
+  double get monthlyGasTotal                 => _monthlyGasTotal;
+  double get monthlyValeTotal                => _monthlyValeTotal;
+  double get monthlyWifiTotal                => _monthlyWifiTotal;
 
   // ── Paid weeks ───────────────────────────────────────────────
   Set<String> _paidWeekStarts = {};
   Set<String> get paidWeekStarts => _paidWeekStarts;
 
-  /// Returns true if the production date falls in a paid week.
   bool isWeekPaid(String date) {
     final d = DateTime.tryParse(date);
     if (d == null) return false;
@@ -88,7 +87,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
     return _paidWeekStarts.contains(ws);
   }
 
-  // ── Internal ─────────────────────────────────────────────────
+  // ── Internal helpers ─────────────────────────────────────────
   void _begin() {
     _isLoading = true;
     _error     = null;
@@ -117,12 +116,9 @@ class HelperSalaryViewModel extends ChangeNotifier {
   //  PAID WEEKS
   // ═══════════════════════════════════════════════════
 
-  /// Loads all week-start dates where this user has been paid.
-  /// Call alongside loadDailyRecords on dashboard init.
   Future<void> loadPaidWeeks(String userId) async {
     try {
-      final rows = await _db.getPaidWeekStartsForUser(userId);
-      _paidWeekStarts = rows;
+      _paidWeekStarts = await _db.getPaidWeekStartsForUser(userId);
       notifyListeners();
     } catch (_) {
       // Silent — paid status is non-critical
@@ -133,6 +129,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
   //  DAILY
   // ═══════════════════════════════════════════════════
 
+  /// All productions ever — used by dashboard/history.
   Future<void> loadDailyRecords(String userId) async {
     _begin();
     try {
@@ -147,6 +144,25 @@ class HelperSalaryViewModel extends ChangeNotifier {
     _end();
   }
 
+  /// Productions for a single specific date.
+  /// Used by the Daily tab day navigator.
+  Future<void> loadDailyRecordsForDate(
+      String userId, String date) async {
+    _begin();
+    try {
+      final productions =
+          await _db.getProductionsByDateRange(date, date);
+      final products = await _db.getAllProducts();
+      _dailyRecords =
+          _buildDailyRecords(userId, productions, products);
+    } catch (e) {
+      _end('Failed to load records.\n${_friendlyError(e)}');
+      return;
+    }
+    _end();
+  }
+
+  /// Productions for a full month — used by monthly summary.
   Future<void> loadDailyRecordsForMonth(
       String userId, int year, int month) async {
     _begin();
@@ -154,7 +170,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
       final prefix  = '$year-${month.toString().padLeft(2, '0')}';
       final lastDay = DateTime(year, month + 1, 0).day;
       final start   = '$prefix-01';
-      final end =
+      final end     =
           '$prefix-${lastDay.toString().padLeft(2, '0')}';
 
       final productions =
@@ -171,6 +187,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
     _end();
   }
 
+  /// Shared builder — filters to this helper and maps to records.
   List<HelperDailyRecord> _buildDailyRecords(
     String userId,
     List<ProductionModel> productions,
@@ -226,20 +243,19 @@ class HelperSalaryViewModel extends ChangeNotifier {
       _valeDeduction = ded?.vale ?? 0;
       _wifiDeduction = ded?.wifi ?? 0;
     } catch (e) {
-      _end(
-          'Failed to load weekly salary.\n${_friendlyError(e)}');
+      _end('Failed to load weekly salary.\n${_friendlyError(e)}');
       return;
     }
     _end();
   }
 
   void changeWeek(int direction, String userId) {
-    final d = DateTime.parse(_weekStart);
+    final d    = DateTime.parse(_weekStart);
     _weekStart = d
         .add(Duration(days: direction * 7))
         .toString()
         .split(' ')[0];
-    _weekEnd = getWeekEnd(_weekStart);
+    _weekEnd   = getWeekEnd(_weekStart);
     loadWeeklySalary(userId);
   }
 
@@ -269,7 +285,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
       final firstDay = DateTime(y, m, 1);
       final lastDay  = DateTime(y, m + 1, 0);
       final start    = '$prefix-01';
-      final end =
+      final end      =
           '$prefix-${lastDay.day.toString().padLeft(2, '0')}';
 
       final results = await Future.wait([
@@ -291,10 +307,10 @@ class HelperSalaryViewModel extends ChangeNotifier {
         for (final d in allDeds) (d as dynamic).weekStart: d,
       };
 
-      final weeks    = <WeeklySummary>[];
-      var weekStart  =
+      final weeks   = <WeeklySummary>[];
+      var weekStart =
           firstDay.subtract(Duration(days: firstDay.weekday - 1));
-      int weekNum    = 1;
+      int weekNum   = 1;
 
       while (!weekStart.isAfter(lastDay)) {
         final weekEnd =
@@ -302,9 +318,11 @@ class HelperSalaryViewModel extends ChangeNotifier {
         final wsStr = weekStart.toString().split(' ')[0];
         final weStr = weekEnd.toString().split(' ')[0];
 
-        final weekProds = monthProds.where((p) =>
-            p.date.compareTo(wsStr) >= 0 &&
-            p.date.compareTo(weStr) <= 0).toList();
+        final weekProds = monthProds
+            .where((p) =>
+                p.date.compareTo(wsStr) >= 0 &&
+                p.date.compareTo(weStr) <= 0)
+            .toList();
 
         double gross = 0;
         int    sacks = 0;
@@ -315,8 +333,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
         }
 
         final days = weekProds.length;
-        final oven =
-            days * AppConstants.helperOvenDeductionPerDay;
+        final oven = days * AppConstants.helperOvenDeductionPerDay;
         final ded  = dedMap[wsStr];
         final gas  = (ded?.gas  as double?) ?? 0.0;
         final vale = (ded?.vale as double?) ?? 0.0;
@@ -367,8 +384,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
           ? _monthlyTotalSalary / weeks.length
           : 0;
     } catch (e) {
-      _end(
-          'Failed to load monthly summary.\n${_friendlyError(e)}');
+      _end('Failed to load monthly summary.\n${_friendlyError(e)}');
       return;
     }
     _end();

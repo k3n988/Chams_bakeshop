@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
-import '../../../../core/widgets/common_widgets.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
 
@@ -14,62 +13,68 @@ class HelperDailyScreen extends StatefulWidget {
 }
 
 class _HelperDailyScreenState extends State<HelperDailyScreen> {
-  DateTime _selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month);
-
-  static const _monthNames = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December',
-  ];
-
-  String get _userId =>
-      context.read<AuthViewModel>().currentUser!.id;
-
-  void _load() {
-    final vm = context.read<HelperSalaryViewModel>();
-    vm.loadDailyRecordsForMonth(
-        _userId, _selectedMonth.year, _selectedMonth.month);
-    vm.loadPaidWeeks(_userId); // ✅ load paid status
-  }
-
-  void _changeMonth(int direction) {
-    setState(() {
-      _selectedMonth = DateTime(
-          _selectedMonth.year, _selectedMonth.month + direction);
-    });
-    _load();
-  }
-
-  Future<void> _pickMonth() async {
-    final now    = DateTime.now();
-    final picked = await showDatePicker(
-      context:          context,
-      initialDate:      _selectedMonth,
-      firstDate:        DateTime(now.year - 3),
-      lastDate:         DateTime(now.year + 1, 12),
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
-      helpText:         'SELECT MONTH',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme:
-              const ColorScheme.light(primary: AppColors.info),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked == null) return;
-    setState(
-        () => _selectedMonth = DateTime(picked.year, picked.month));
-    _load();
-  }
+  // Default: today
+  late DateTime _selectedDate;
 
   @override
   void initState() {
     super.initState();
+    _selectedDate = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  // ── Paid week check ──────────────────────────────────────────
+  String get _userId =>
+      context.read<AuthViewModel>().currentUser!.id;
+
+  String get _dateStr =>
+      '${_selectedDate.year}-'
+      '${_selectedDate.month.toString().padLeft(2, '0')}-'
+      '${_selectedDate.day.toString().padLeft(2, '0')}';
+
+  bool get _isToday {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
+  void _goDay(int dir) {
+    // Block future dates
+    final next = _selectedDate.add(Duration(days: dir));
+    if (next.isAfter(DateTime.now())) return;
+    setState(() => _selectedDate = next);
+    _load();
+  }
+
+  Future<void> _pickDate() async {
+    final now    = DateTime.now();
+    final picked = await showDatePicker(
+      context:     context,
+      initialDate: _selectedDate,
+      firstDate:   DateTime(2024),
+      lastDate:    now,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary:   AppColors.info,
+            onSurface: AppColors.text,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+      _load();
+    }
+  }
+
+  void _load() {
+    final vm = context.read<HelperSalaryViewModel>();
+    vm.loadDailyRecordsForDate(_userId, _dateStr);
+    vm.loadPaidWeeks(_userId);
+  }
+
   String _weekStartOf(String date) {
     final d = DateTime.tryParse(date);
     if (d == null) return '';
@@ -80,21 +85,20 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
   bool _isPaid(String date, Set<String> paidWeeks) =>
       paidWeeks.contains(_weekStartOf(date));
 
-  // ── Preview sheet ────────────────────────────────────────────
   void _showPreview(HelperDailyRecord rec, bool paid) {
     showModalBottomSheet(
-      context: context,
+      context:         context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.60,
         minChildSize:     0.4,
         maxChildSize:     0.88,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFFF7F7F8),
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(24)),
+            color:        Colors.white,
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(24)),
           ),
           child: Column(children: [
             // Handle
@@ -113,7 +117,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
+                    color: AppColors.info.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.receipt_long_outlined,
@@ -122,61 +126,27 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(rec.date,
-                        style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.text,
-                            letterSpacing: -0.3)),
-                    const Text('Production Detail',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint)),
-                  ]),
-                ),
-                // ✅ Paid/Unpaid badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: paid
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: paid
-                          ? AppColors.success.withValues(alpha: 0.3)
-                          : Colors.orange.withValues(alpha: 0.3),
-                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(rec.date,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.text,
+                              letterSpacing: -0.3)),
+                      const Text('Production Detail',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint)),
+                    ],
                   ),
-                  child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                    Icon(
-                      paid ? Icons.check_circle : Icons.schedule,
-                      size: 14,
-                      color: paid
-                          ? AppColors.success
-                          : Colors.orange,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      paid ? 'Paid' : 'Unpaid',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: paid
-                              ? AppColors.success
-                              : Colors.orange),
-                    ),
-                  ]),
                 ),
+                // Paid/Unpaid badge
+                _PaidBadge(paid: paid, large: true),
               ]),
             ),
 
-            const Divider(height: 20),
+            const Divider(height: 20, color: AppColors.border),
 
             // Content
             Expanded(
@@ -184,72 +154,72 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                 controller: scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                 children: [
-                  // ── Production summary ─────────────────
-                  _PreviewCard(children: [
-                    _PreviewLabel('PRODUCTION SUMMARY'),
+                  // Production summary
+                  _SheetCard(children: [
+                    const _SheetLabel('PRODUCTION SUMMARY'),
                     const SizedBox(height: 12),
-                    _PreviewRow(
+                    _SheetRow(
                       icon:  Icons.groups_outlined,
                       label: 'Total Workers',
                       value: '${rec.totalWorkers}',
                     ),
-                    _PreviewRow(
+                    _SheetRow(
                       icon:  Icons.inventory_2_outlined,
                       label: 'Total Sacks',
                       value: '${rec.totalSacks} sacks',
                     ),
-                    _PreviewRow(
-                      icon:  Icons.attach_money,
-                      label: 'Batch Value',
-                      value: formatCurrency(rec.totalValue),
+                    _SheetRow(
+                      icon:       Icons.attach_money,
+                      label:      'Batch Value',
+                      value:      formatCurrency(rec.totalValue),
                       valueColor: AppColors.info,
                     ),
                   ]),
                   const SizedBox(height: 12),
 
-                  // ── Salary breakdown ───────────────────
-                  _PreviewCard(children: [
-                    _PreviewLabel('SALARY BREAKDOWN'),
+                  // Salary breakdown
+                  _SheetCard(children: [
+                    const _SheetLabel('SALARY BREAKDOWN'),
                     const SizedBox(height: 12),
-                    _PreviewRow(
-                      icon:  Icons.calculate_outlined,
-                      label: 'Per Worker (base)',
-                      value: formatCurrency(rec.salary),
+                    _SheetRow(
+                      icon:       Icons.calculate_outlined,
+                      label:      'Per Worker (base)',
+                      value:      formatCurrency(rec.salary),
                       valueColor: AppColors.info,
                     ),
-                    const Divider(height: 20),
+                    const Divider(height: 20, color: AppColors.border),
                     Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                      const Text('Your Earnings',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
-                      Text(
-                        formatCurrency(rec.salary),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                            color: AppColors.primaryDark),
-                      ),
-                    ]),
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Your Earnings',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.text)),
+                        Text(
+                          formatCurrency(rec.salary),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 22,
+                              color: AppColors.primaryDark,
+                              letterSpacing: -0.5),
+                        ),
+                      ],
+                    ),
                   ]),
                   const SizedBox(height: 12),
 
-                  // ── Payment status card ────────────────
+                  // Payment status
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: paid
-                          ? AppColors.success
-                              .withValues(alpha: 0.06)
-                          : Colors.orange.withValues(alpha: 0.06),
+                          ? AppColors.success.withValues(alpha: 0.05)
+                          : Colors.orange.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: paid
-                            ? AppColors.success
-                                .withValues(alpha: 0.2)
+                            ? AppColors.success.withValues(alpha: 0.2)
                             : Colors.orange.withValues(alpha: 0.2),
                       ),
                     ),
@@ -258,12 +228,9 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: paid
-                              ? AppColors.success
-                                  .withValues(alpha: 0.1)
-                              : Colors.orange
-                                  .withValues(alpha: 0.1),
-                          borderRadius:
-                              BorderRadius.circular(10),
+                              ? AppColors.success.withValues(alpha: 0.10)
+                              : Colors.orange.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           paid
@@ -278,34 +245,32 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                          Text(
-                            paid
-                                ? 'Salary Paid'
-                                : 'Pending Payment',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                                color: paid
-                                    ? AppColors.success
-                                    : Colors.orange),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            paid
-                                ? 'Your salary for this week has been released by admin.'
-                                : 'Your salary for this week is pending admin approval.',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: paid
-                                    ? AppColors.success
-                                        .withValues(alpha: 0.8)
-                                    : Colors.orange
-                                        .withValues(alpha: 0.8)),
-                          ),
-                        ]),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              paid ? 'Salary Paid' : 'Pending Payment',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: paid
+                                      ? AppColors.success
+                                      : Colors.orange),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              paid
+                                  ? 'Your salary for this week has been released.'
+                                  : 'Pending admin approval for this week.',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: paid
+                                      ? AppColors.success
+                                          .withValues(alpha: 0.8)
+                                      : Colors.orange
+                                          .withValues(alpha: 0.8)),
+                            ),
+                          ],
+                        ),
                       ),
                     ]),
                   ),
@@ -320,63 +285,121 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm         = context.watch<HelperSalaryViewModel>();
-    final monthLabel =
-        '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
-    final records    = vm.dailyRecords;
-    final monthTotal = records.fold(0.0, (s, r) => s + r.salary);
-    final monthSacks = records.fold(0, (s, r) => s + r.totalSacks);
-    final paidWeeks  = vm.paidWeekStarts;
+    final vm        = context.watch<HelperSalaryViewModel>();
+    final records   = vm.dailyRecords
+        .where((r) => r.date == _dateStr)
+        .toList();
+    final paidWeeks = vm.paidWeekStarts;
+    final hasData   = records.isNotEmpty;
+    final totalEarned =
+        records.fold(0.0, (s, r) => s + r.salary);
 
     return RefreshIndicator(
       color:     AppColors.info,
       onRefresh: () async => _load(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(
-              title:    'Daily Salary',
-              subtitle: 'Earnings per production day',
+
+            // ── Page header ──────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Daily Salary',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.text,
+                            letterSpacing: -0.5)),
+                    SizedBox(height: 2),
+                    Text('Earnings per production day',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+                if (!_isToday)
+                  GestureDetector(
+                    onTap: () {
+                      setState(
+                          () => _selectedDate = DateTime.now());
+                      _load();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.info
+                            .withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppColors.info
+                                .withValues(alpha: 0.2)),
+                      ),
+                      child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.today_outlined,
+                                size: 13,
+                                color: AppColors.info),
+                            SizedBox(width: 5),
+                            Text('Today',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.info)),
+                          ]),
+                    ),
+                  ),
+              ],
             ),
-            _MonthSelector(
-              label:  monthLabel,
-              onPrev: () => _changeMonth(-1),
-              onNext: () => _changeMonth(1),
-              onTap:  _pickMonth,
+            const SizedBox(height: 16),
+
+            // ── Day navigator ────────────────────────────
+            _DayNavigator(
+              selectedDate: _selectedDate,
+              isToday:      _isToday,
+              onPrev:       () => _goDay(-1),
+              onNext:       _isToday ? null : () => _goDay(1),
+              onTap:        _pickDate,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
+            // ── Stat card ────────────────────────────────
+            _DailyStatCard(
+              hasData:      hasData,
+              totalEarned:  totalEarned,
+              recordsCount: records.length,
+            ),
+            const SizedBox(height: 16),
+
+            // ── Records ──────────────────────────────────
+            const _SectionLabel('RECORDS'),
+            const SizedBox(height: 10),
 
             if (vm.isLoading)
               const _LoadingCard()
             else if (vm.error != null)
               _ErrorCard(message: vm.error!, onRetry: _load)
-            else if (records.isEmpty)
-              EmptyState(
-                icon: Icons.receipt_long_outlined,
-                message:
-                    'No records for ${_monthNames[_selectedMonth.month - 1]}',
-              )
-            else ...[
-              _MonthlySummaryBar(
-                days:   records.length,
-                sacks:  monthSacks,
-                total:  monthTotal,
-              ),
-              const SizedBox(height: 12),
-              ...records.asMap().entries.map((entry) {
-                final rec  = entry.value;
+            else if (!hasData)
+              _NoDayRecord(isToday: _isToday)
+            else
+              ...records.asMap().entries.map((e) {
+                final rec  = e.value;
                 final paid = _isPaid(rec.date, paidWeeks);
                 return _DailyCard(
                   record: rec,
-                  index:  entry.key,
+                  index:  e.key,
                   paid:   paid,
                   onTap:  () => _showPreview(rec, paid),
                 );
               }),
-            ],
           ],
         ),
       ),
@@ -385,82 +408,307 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MONTH SUMMARY BAR
+//  DAY NAVIGATOR
 // ─────────────────────────────────────────────────────────────
-class _MonthlySummaryBar extends StatelessWidget {
-  final int    days;
-  final int    sacks;
-  final double total;
-  const _MonthlySummaryBar(
-      {required this.days, required this.sacks, required this.total});
+class _DayNavigator extends StatelessWidget {
+  final DateTime     selectedDate;
+  final bool         isToday;
+  final VoidCallback onPrev;
+  final VoidCallback? onNext;
+  final VoidCallback onTap;
+
+  const _DayNavigator({
+    required this.selectedDate,
+    required this.isToday,
+    required this.onPrev,
+    required this.onNext,
+    required this.onTap,
+  });
+
+  String get _label {
+    if (isToday) return 'Today';
+    final yesterday =
+        DateTime.now().subtract(const Duration(days: 1));
+    if (selectedDate.year == yesterday.year &&
+        selectedDate.month == yesterday.month &&
+        selectedDate.day == yesterday.day) return 'Yesterday';
+    const months = [
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+    return '${months[selectedDate.month - 1]} '
+        '${selectedDate.day}, ${selectedDate.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color:        AppColors.info.withValues(alpha: 0.07),
+        color:        Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppColors.info.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _MiniStat(
-              icon: Icons.work_history_outlined,
-              label: 'Days',
-              value: '$days'),
-          _VertDivider(),
-          _MiniStat(
-              icon: Icons.inventory_2_outlined,
-              label: 'Sacks',
-              value: '$sacks'),
-          _VertDivider(),
-          _MiniStat(
-              icon: Icons.payments_outlined,
-              label: 'Total',
-              value: formatCurrency(total)),
+        border:       Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color:  Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
+      child: Row(children: [
+        _NavBtn(icon: Icons.chevron_left, onTap: onPrev),
+        Expanded(
+          child: GestureDetector(
+            onTap: onTap,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isToday
+                        ? Icons.today
+                        : Icons.calendar_today_outlined,
+                    size: 15,
+                    color: isToday
+                        ? AppColors.info
+                        : AppColors.textHint,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _label,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize:   14,
+                        color: isToday
+                            ? AppColors.info
+                            : AppColors.text,
+                        letterSpacing: -0.2),
+                  ),
+                  if (isToday) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.info,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('TODAY',
+                          style: TextStyle(
+                              fontSize:   9,
+                              fontWeight: FontWeight.w800,
+                              color:      Colors.white,
+                              letterSpacing: 0.5)),
+                    ),
+                  ],
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 18, color: AppColors.textHint),
+                ],
+              ),
+            ),
+          ),
+        ),
+        _NavBtn(
+          icon:     Icons.chevron_right,
+          onTap:    onNext,
+          disabled: onNext == null,
+        ),
+      ]),
     );
   }
 }
 
-class _VertDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 1,
-        height: 36,
-        color: AppColors.info.withValues(alpha: 0.2));
-}
-
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
-  final String   label;
-  final String   value;
-  const _MiniStat(
-      {required this.icon,
-      required this.label,
-      required this.value});
+class _NavBtn extends StatelessWidget {
+  final IconData      icon;
+  final VoidCallback? onTap;
+  final bool          disabled;
+  const _NavBtn(
+      {required this.icon, this.onTap, this.disabled = false});
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-        Icon(icon, size: 18, color: AppColors.info),
-        const SizedBox(height: 4),
-        Text(value,
-            style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize:   14,
-                color:      AppColors.text)),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textHint)),
-      ]);
+  Widget build(BuildContext context) => InkWell(
+        onTap:        disabled ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 14),
+          child: Icon(icon,
+              size:  20,
+              color: disabled
+                  ? AppColors.border
+                  : AppColors.info),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────
-//  DAILY RECORD CARD  ← updated with paid badge + tap
+//  DAILY STAT CARD
+// ─────────────────────────────────────────────────────────────
+class _DailyStatCard extends StatelessWidget {
+  final bool   hasData;
+  final double totalEarned;
+  final int    recordsCount;
+
+  const _DailyStatCard({
+    required this.hasData,
+    required this.totalEarned,
+    required this.recordsCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: hasData
+            ? const LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                begin:  Alignment.topLeft,
+                end:    Alignment.bottomRight,
+              )
+            : null,
+        color: hasData ? null : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border:       hasData
+            ? null
+            : Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: hasData
+                ? AppColors.info.withValues(alpha: 0.28)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset:     const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: hasData
+          ? Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Earned Today',
+                        style: TextStyle(
+                            fontSize:   12,
+                            color: Colors.white
+                                .withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatCurrency(totalEarned),
+                      style: const TextStyle(
+                          fontSize:   26,
+                          fontWeight: FontWeight.w900,
+                          color:      Colors.white,
+                          letterSpacing: -0.8),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$recordsCount batch${recordsCount > 1 ? 'es' : ''} recorded',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white
+                              .withValues(alpha: 0.85)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.payments_outlined,
+                    color: Colors.white, size: 28),
+              ),
+            ])
+          : Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.border
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.payments_outlined,
+                    color: AppColors.textHint, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('No earnings yet',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize:   14,
+                          color:      AppColors.text)),
+                  SizedBox(height: 2),
+                  Text('No production recorded for this day',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:    AppColors.textHint)),
+                ],
+              ),
+            ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  EMPTY STATE
+// ─────────────────────────────────────────────────────────────
+class _NoDayRecord extends StatelessWidget {
+  final bool isToday;
+  const _NoDayRecord({required this.isToday});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        decoration: BoxDecoration(
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border:       Border.all(color: AppColors.border),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.07),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.receipt_long_outlined,
+                size: 36, color: AppColors.info),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            isToday
+                ? 'No production today yet'
+                : 'No production on this day',
+            style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize:   15,
+                color:      AppColors.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isToday
+                ? 'Your records will appear here once added'
+                : 'No records were found for this date',
+            style: const TextStyle(
+                fontSize: 12, color: AppColors.textHint),
+          ),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  DAILY RECORD CARD
 // ─────────────────────────────────────────────────────────────
 class _DailyCard extends StatelessWidget {
   final HelperDailyRecord record;
@@ -479,7 +727,7 @@ class _DailyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween:    Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 250 + index * 40),
+      duration: Duration(milliseconds: 250 + index * 50),
       curve:    Curves.easeOut,
       builder: (_, v, child) => Opacity(
         opacity: v,
@@ -491,128 +739,102 @@ class _DailyCard extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: paid
-                  ? AppColors.success.withValues(alpha: 0.3)
-                  : AppColors.border,
-              width: paid ? 1.5 : 1,
-            ),
+            color:        Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border:       Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color:     Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
-                offset: const Offset(0, 2),
+                offset:    const Offset(0, 2),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              // Icon
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+          child: Column(children: [
+            // Main row
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_outlined,
+                      color: AppColors.info, size: 20),
                 ),
-                child: const Icon(Icons.receipt_long_outlined,
-                    color: AppColors.info, size: 22),
-              ),
-              const SizedBox(width: 14),
-
-              // Date + meta
-              Expanded(
-                child: Column(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(record.date,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize:   15,
-                          color:      AppColors.text)),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${record.totalWorkers} workers  ·  ${record.totalSacks} sacks',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textHint),
+                      Text(
+                        'Batch ${index + 1}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize:   14,
+                            color:      AppColors.text,
+                            letterSpacing: -0.3),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${record.totalWorkers} workers  ·  '
+                        '${record.totalSacks} sacks',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color:    AppColors.textHint),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Batch total: ${formatCurrency(record.totalValue)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textHint),
-                  ),
-                ]),
-              ),
-
-              // Right: salary + badges
-              Column(
+                ),
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                Text(
-                  formatCurrency(record.salary),
-                  style: const TextStyle(
-                      fontSize:   17,
-                      fontWeight: FontWeight.w900,
-                      color:      AppColors.primaryDark),
-                ),
-                const SizedBox(height: 4),
-                // ✅ Paid / Unpaid badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: paid
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: paid
-                          ? AppColors.success
-                              .withValues(alpha: 0.25)
-                          : Colors.orange.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                    Icon(
-                      paid ? Icons.check_circle : Icons.schedule,
-                      size: 10,
-                      color:
-                          paid ? AppColors.success : Colors.orange,
-                    ),
-                    const SizedBox(width: 3),
                     Text(
-                      paid ? 'Paid' : 'Unpaid',
-                      style: TextStyle(
-                          fontSize:   10,
-                          fontWeight: FontWeight.w700,
-                          color: paid
-                              ? AppColors.success
-                              : Colors.orange),
+                      formatCurrency(record.salary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize:   15,
+                          color:      AppColors.primaryDark,
+                          letterSpacing: -0.3),
                     ),
-                  ]),
+                    const SizedBox(height: 5),
+                    _PaidBadge(paid: paid),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                // ✅ Tap hint
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text('Details',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.info
-                              .withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic)),
-                  Icon(Icons.chevron_right,
-                      size: 12,
-                      color:
-                          AppColors.info.withValues(alpha: 0.7)),
-                ]),
               ]),
-            ]),
-          ),
+            ),
+
+            // Footer strip
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.04),
+                borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(16)),
+                border: Border(
+                    top: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('View breakdown',
+                      style: TextStyle(
+                          fontSize:  11,
+                          color: AppColors.info
+                              .withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 3),
+                  Icon(Icons.keyboard_arrow_down,
+                      size: 14,
+                      color: AppColors.info
+                          .withValues(alpha: 0.7)),
+                ],
+              ),
+            ),
+          ]),
         ),
       ),
     );
@@ -620,35 +842,54 @@ class _DailyCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  PREVIEW SHEET SUB-WIDGETS
+//  PAID BADGE
 // ─────────────────────────────────────────────────────────────
-class _PreviewCard extends StatelessWidget {
-  final List<Widget> children;
-  const _PreviewCard({required this.children});
+class _PaidBadge extends StatelessWidget {
+  final bool paid;
+  final bool large;
+  const _PaidBadge({required this.paid, this.large = false});
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(
+            horizontal: large ? 10 : 7,
+            vertical:   large ? 5  : 3),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
+          color: paid
+              ? AppColors.success.withValues(alpha: 0.10)
+              : Colors.orange.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(large ? 8 : 6),
+          border: Border.all(
+            color: paid
+                ? AppColors.success.withValues(alpha: 0.25)
+                : Colors.orange.withValues(alpha: 0.25),
+          ),
         ),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            paid ? Icons.check_circle : Icons.schedule,
+            size:  large ? 14 : 10,
+            color: paid ? AppColors.success : Colors.orange,
+          ),
+          SizedBox(width: large ? 4 : 3),
+          Text(
+            paid ? 'Paid' : 'Unpaid',
+            style: TextStyle(
+                fontSize:   large ? 12 : 10,
+                fontWeight: FontWeight.w700,
+                color:
+                    paid ? AppColors.success : Colors.orange),
+          ),
+        ]),
       );
 }
 
-class _PreviewLabel extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────
+//  SECTION LABEL
+// ─────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
   final String text;
-  const _PreviewLabel(this.text);
+  const _SectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) => Row(children: [
@@ -661,20 +902,69 @@ class _PreviewLabel extends StatelessWidget {
         const SizedBox(width: 8),
         Text(text,
             style: const TextStyle(
-                fontSize: 11,
+                fontSize:   11,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textHint,
+                color:      AppColors.textHint,
                 letterSpacing: 0.8)),
       ]);
 }
 
-class _PreviewRow extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────
+//  SHEET SUB-WIDGETS
+// ─────────────────────────────────────────────────────────────
+class _SheetCard extends StatelessWidget {
+  final List<Widget> children;
+  const _SheetCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border:       Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+                color:     Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset:    const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children),
+      );
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+  const _SheetLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 3, height: 13,
+          decoration: BoxDecoration(
+              color: AppColors.info,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        Text(text,
+            style: const TextStyle(
+                fontSize:   11,
+                fontWeight: FontWeight.w800,
+                color:      AppColors.textHint,
+                letterSpacing: 0.8)),
+      ]);
+}
+
+class _SheetRow extends StatelessWidget {
   final IconData icon;
   final String   label;
   final String   value;
   final Color?   valueColor;
 
-  const _PreviewRow({
+  const _SheetRow({
     required this.icon,
     required this.label,
     required this.value,
@@ -702,78 +992,17 @@ class _PreviewRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MONTH SELECTOR
-// ─────────────────────────────────────────────────────────────
-class _MonthSelector extends StatelessWidget {
-  final String       label;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  final VoidCallback onTap;
-
-  const _MonthSelector({
-    required this.label,
-    required this.onPrev,
-    required this.onNext,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color:        Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: AppColors.info.withValues(alpha: 0.25)),
-      ),
-      child: Row(children: [
-        IconButton(
-            icon:      const Icon(Icons.chevron_left),
-            color:     AppColors.info,
-            onPressed: onPrev),
-        Expanded(
-          child: GestureDetector(
-            onTap: onTap,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.calendar_month_outlined,
-                    size: 18, color: AppColors.info),
-                const SizedBox(width: 8),
-                Text(label,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize:   15,
-                        color:      AppColors.info)),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_drop_down,
-                    size: 18, color: AppColors.info),
-              ],
-            ),
-          ),
-        ),
-        IconButton(
-            icon:      const Icon(Icons.chevron_right),
-            color:     AppColors.info,
-            onPressed: onNext),
-      ]),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  LOADING + ERROR CARDS
+//  LOADING + ERROR
 // ─────────────────────────────────────────────────────────────
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
 
   @override
-  Widget build(BuildContext context) => const Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 48),
-          child: Center(
-              child: CircularProgressIndicator(
-                  color: AppColors.info, strokeWidth: 2.5)),
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: CircularProgressIndicator(
+              color: AppColors.info, strokeWidth: 2.5),
         ),
       );
 }
@@ -787,9 +1016,9 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.05),
+          color:        AppColors.danger.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
+          border:       Border.all(
               color: AppColors.danger.withValues(alpha: 0.2)),
         ),
         child: Column(children: [

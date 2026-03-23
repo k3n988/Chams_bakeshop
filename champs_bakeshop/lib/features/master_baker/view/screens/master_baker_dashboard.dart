@@ -547,7 +547,7 @@ class _TodayStat extends StatelessWidget {
 //  RECENT RECORDS LIST  (with tappable preview)
 // ─────────────────────────────────────────────────────────
 class _RecentRecords extends StatelessWidget {
-  final List<dynamic> records;
+  final List<BakerDashboardRecord> records;
   const _RecentRecords({required this.records});
 
   @override
@@ -575,7 +575,7 @@ class _RecentRecords extends StatelessWidget {
 
     return Column(
       children: records.take(5).toList().asMap().entries.map((entry) {
-        final i = entry.key;
+        final i   = entry.key;
         final rec = entry.value;
 
         return TweenAnimationBuilder<double>(
@@ -606,8 +606,8 @@ class _RecentRecords extends StatelessWidget {
                 ],
               ),
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 4),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 leading: Container(
                   width: 42,
                   height: 42,
@@ -654,14 +654,13 @@ class _RecentRecords extends StatelessWidget {
     );
   }
 
-  // ── Production Preview Bottom Sheet ──────────────────────
-  void _showPreviewSheet(BuildContext context, dynamic rec) {
+  void _showPreviewSheet(BuildContext context, BakerDashboardRecord rec) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.55,
         minChildSize: 0.4,
         maxChildSize: 0.85,
         builder: (_, scrollCtrl) => Container(
@@ -670,7 +669,7 @@ class _RecentRecords extends StatelessWidget {
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(children: [
-            // ── Handle ──────────────────────────────────────
+            // Handle
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 40,
@@ -680,7 +679,7 @@ class _RecentRecords extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2)),
             ),
 
-            // ── Header ──────────────────────────────────────
+            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(children: [
@@ -710,7 +709,6 @@ class _RecentRecords extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Baker badge
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 5),
@@ -718,11 +716,9 @@ class _RecentRecords extends StatelessWidget {
                     color: AppColors.masterBaker.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color:
-                            AppColors.masterBaker.withValues(alpha: 0.2)),
+                        color: AppColors.masterBaker.withValues(alpha: 0.2)),
                   ),
-                  child: const Row(mainAxisSize: MainAxisSize.min,
-                      children: [
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('👨‍🍳', style: TextStyle(fontSize: 12)),
                     SizedBox(width: 4),
                     Text('Master Baker',
@@ -737,13 +733,14 @@ class _RecentRecords extends StatelessWidget {
 
             const Divider(height: 20, color: AppColors.border),
 
-            // ── Content ─────────────────────────────────────
+            // Content
             Expanded(
               child: ListView(
                 controller: scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                 children: [
-                  // Production Summary card
+
+                  // Production Summary
                   _PreviewCard(children: [
                     const _PreviewCardLabel('PRODUCTION SUMMARY'),
                     const SizedBox(height: 12),
@@ -757,30 +754,18 @@ class _RecentRecords extends StatelessWidget {
                       label: 'Total Sacks',
                       value: '${rec.totalSacks} sacks',
                     ),
-                    _PreviewDataRow(
-                      icon: Icons.attach_money,
-                      label: 'Batch Value',
-                      value: formatCurrency(rec.totalValue),
-                      valueColor: AppColors.masterBaker,
-                    ),
                   ]),
                   const SizedBox(height: 12),
 
-                  // Salary Breakdown card
+                  // Salary Breakdown
                   _PreviewCard(children: [
                     const _PreviewCardLabel('SALARY BREAKDOWN'),
                     const SizedBox(height: 12),
                     _PreviewDataRow(
-                      icon: Icons.people_outline,
-                      label: 'Per Worker (base)',
-                      value: formatCurrency(rec.salary - rec.bakerIncentive),
+                      icon: Icons.payments_outlined,
+                      label: 'Total Earnings',
+                      value: formatCurrency(rec.salary),
                       valueColor: AppColors.masterBaker,
-                    ),
-                    _PreviewDataRow(
-                      icon: Icons.star_outline,
-                      label: 'Baker Incentive',
-                      value: formatCurrency(rec.bakerIncentive),
-                      valueColor: const Color(0xFF1976D2),
                     ),
                     const Divider(height: 20, color: AppColors.border),
                     Row(
@@ -803,14 +788,14 @@ class _RecentRecords extends StatelessWidget {
                   ]),
                   const SizedBox(height: 12),
 
-                  // Bonus card
+                  // Bonus
                   _PreviewCard(children: [
                     const _PreviewCardLabel('BONUS (PAID SEPARATELY)'),
                     const SizedBox(height: 12),
                     _PreviewDataRow(
                       icon: Icons.card_giftcard_outlined,
                       label: 'Master Baker Bonus',
-                      value: formatCurrency(rec.bonusPerWorker),
+                      value: formatCurrency(rec.bonus),
                       valueColor: AppColors.masterBaker,
                     ),
                     const SizedBox(height: 10),
@@ -819,8 +804,7 @@ class _RecentRecords extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.amber.shade50,
                         borderRadius: BorderRadius.circular(10),
-                        border:
-                            Border.all(color: Colors.amber.shade200),
+                        border: Border.all(color: Colors.amber.shade200),
                       ),
                       child: Row(children: [
                         Icon(Icons.info_outline,
@@ -828,10 +812,9 @@ class _RecentRecords extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Bonus is paid separately and is not included in the weekly/monthly payroll total.',
+                            'Bonus is paid separately and is not included in the weekly payroll total.',
                             style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.amber.shade800),
+                                fontSize: 11, color: Colors.amber.shade800),
                           ),
                         ),
                       ]),
@@ -846,7 +829,6 @@ class _RecentRecords extends StatelessWidget {
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────
 //  PREVIEW SHEET SUB-WIDGETS
 // ─────────────────────────────────────────────────────────
