@@ -5,18 +5,18 @@ import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/admin_product_viewmodel.dart';
-import 'manage_users_screen.dart';
-import 'manage_products_screen.dart';
+// ── Use 'as' prefix so Dart knows exactly which file each class comes from ──
+import 'manage_users_screen.dart'    as users_screen;
+import 'manage_products_screen.dart' as products_screen;
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
 
   void _openPage(BuildContext context, Widget page) {
-    Navigator.pop(context); // close drawer first
+    Navigator.pop(context);
     Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-    );
+        context,
+        MaterialPageRoute(builder: (_) => page));
   }
 
   void _logout(BuildContext context) {
@@ -24,235 +24,244 @@ class AdminDrawer extends StatelessWidget {
     context.read<AuthViewModel>().logout();
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+          builder: (_) => const LoginScreen()),
       (_) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user      = context.watch<AuthViewModel>().currentUser;
-    final userVM    = context.watch<AdminUserViewModel>();
-    final productVM = context.watch<AdminProductViewModel>();
+    final user =
+        context.watch<AuthViewModel>().currentUser;
+    final userVM =
+        context.watch<AdminUserViewModel>();
+    final productVM =
+        context.watch<AdminProductViewModel>();
 
     if (user == null) return const SizedBox();
 
     return Drawer(
       backgroundColor: Colors.white,
-      child: Column(
-        children: [
-          // ── Gradient header ───────────────────────────────
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.of(context).padding.top + 20,
-              20,
-              24,
+      child: Column(children: [
+        // ── Gradient header ───────────────────────────
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            MediaQuery.of(context).padding.top + 20,
+            20,
+            24,
+          ),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFFF7A00),
+                Color(0xFFFFA03A),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          ),
+          child: Row(children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: Colors.white
+                        .withValues(alpha: 0.5),
+                    width: 2),
+              ),
+              child: Center(
+                child: Text(
+                  user.name.isNotEmpty
+                      ? user.name[0].toUpperCase()
+                      : 'A',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFF7A00)),
+                ),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // App logo row
-            
-
-                // Admin avatar + name
-                Row(children: [
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(user.name,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                  const SizedBox(height: 4),
                   Container(
-                    width: 42, height: 42,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          width: 2),
+                      color: Colors.white
+                          .withValues(alpha: 0.25),
+                      borderRadius:
+                          BorderRadius.circular(10),
                     ),
-                    child: Center(
-                      child: Text(
-                        user.name.isNotEmpty
-                            ? user.name[0].toUpperCase()
-                            : 'A',
-                        style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFFF7A00)),
-                      ),
-                    ),
+                    child: const Text('Admin (Owner)',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white,
+                            fontWeight:
+                                FontWeight.w600)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(user.name,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white)),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.white
-                                .withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text('Admin (Owner)',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ]),
-              ],
+                ],
+              ),
             ),
-          ),
+          ]),
+        ),
 
-          // ── Menu items ────────────────────────────────────
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                const _DrawerSectionLabel('MANAGEMENT'),
+        // ── Menu ─────────────────────────────────────
+        Expanded(
+          child: ListView(
+            padding:
+                const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              const _SectionLabel('MANAGEMENT'),
 
-                _DrawerItem(
-                  icon:       Icons.people_outlined,
-                  color:      AppColors.masterBaker,
-                  label:      'Manage Users',
-                  subtitle:   '${userVM.nonAdminUsers.length} staff members',
-                  badge:      '${userVM.nonAdminUsers.length}',
-                  badgeColor: AppColors.masterBaker,
-                  onTap: () => _openPage(
-                    context,
-                    const _WrappedScreen(
-                      title: 'User Management',
-                      child: ManageUsersScreen(),
-                    ),
+              _DrawerItem(
+                icon:       Icons.people_outlined,
+                color:      AppColors.masterBaker,
+                label:      'Manage Users',
+                subtitle:
+                    '${userVM.nonAdminUsers.length} staff members',
+                badge:
+                    '${userVM.nonAdminUsers.length}',
+                badgeColor: AppColors.masterBaker,
+                onTap: () => _openPage(
+                  context,
+                  _Wrapped(
+                    title: 'User Management',
+                    // ← explicit prefix, no ambiguity
+                    child:
+                        users_screen.ManageUsersScreen(),
                   ),
                 ),
+              ),
 
-                _DrawerItem(
-                  icon:       Icons.inventory_2_outlined,
-                  color:      AppColors.info,
-                  label:      'Manage Products',
-                  subtitle:   '${productVM.products.length} products',
-                  badge:      '${productVM.products.length}',
-                  badgeColor: AppColors.info,
-                  onTap: () => _openPage(
-                    context,
-                    const _WrappedScreen(
-                      title: 'Products',
-                      child: ManageProductsScreen(),
-                    ),
+              _DrawerItem(
+                icon:       Icons.inventory_2_outlined,
+                color:      AppColors.info,
+                label:      'Manage Products',
+                subtitle:
+                    '${productVM.products.length} products',
+                badge: '${productVM.products.length}',
+                badgeColor: AppColors.info,
+                onTap: () => _openPage(
+                  context,
+                  _Wrapped(
+                    title: 'Products',
+                    // ← explicit prefix
+                    child: products_screen
+                        .ManageProductsScreen(),
                   ),
                 ),
+              ),
 
-                const Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  child: Divider(height: 1),
-                ),
+              const Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                child: Divider(height: 1),
+              ),
 
-                // ── Staff roles ────────────────────────────
-                const _DrawerSectionLabel('STAFF ROLES'),
+              const _SectionLabel('STAFF ROLES'),
 
-                _DrawerRoleRow(
-                    emoji: '👨‍🍳',
-                    label: 'Master Bakers',
-                    count: userVM.masterBakers.length,
-                    color: AppColors.masterBaker),
-                _DrawerRoleRow(
-                    emoji: '🧑‍🍳',
-                    label: 'Helpers',
-                    count: userVM.helpers.length,
-                    color: AppColors.helper),
-                _DrawerRoleRow(
-                    emoji: '📦',
-                    label: 'Packers',
-                    count: userVM.nonAdminUsers
-                        .where((u) => u.isPacker)
-                        .length,
-                    color: AppColors.packer),
-                _DrawerRoleRow(
-                    emoji: '🥖',
-                    label: 'Sellers',
-                    count: userVM.nonAdminUsers
-                        .where((u) => u.isSeller)
-                        .length,
-                    color: AppColors.seller),
-              ],
-            ),
+              _RoleRow(
+                  emoji: '👨‍🍳',
+                  label: 'Master Bakers',
+                  count: userVM.masterBakers.length,
+                  color: AppColors.masterBaker),
+              _RoleRow(
+                  emoji: '🧑‍🍳',
+                  label: 'Helpers',
+                  count: userVM.helpers.length,
+                  color: AppColors.helper),
+              _RoleRow(
+                  emoji: '📦',
+                  label: 'Packers',
+                  count: userVM.nonAdminUsers
+                      .where((u) => u.isPacker)
+                      .length,
+                  color: AppColors.packer),
+              _RoleRow(
+                  emoji: '🥖',
+                  label: 'Sellers',
+                  count: userVM.nonAdminUsers
+                      .where((u) => u.isSeller)
+                      .length,
+                  color: AppColors.seller),
+            ],
           ),
+        ),
 
-          // ── Logout ────────────────────────────────────────
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1),
-          ),
-          InkWell(
-            onTap: () => _logout(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 16),
-              child: Row(children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.logout,
-                      color: AppColors.danger, size: 20),
+        // ── Logout ───────────────────────────────────
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Divider(height: 1),
+        ),
+        InkWell(
+          onTap: () => _logout(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 16),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.danger
+                      .withValues(alpha: 0.08),
+                  borderRadius:
+                      BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Log Out',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.danger)),
-                      Text('Sign out of admin panel',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textHint)),
-                    ],
-                  ),
+                child: const Icon(Icons.logout,
+                    color: AppColors.danger, size: 20),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text('Log Out',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.danger)),
+                    Text('Sign out of admin panel',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textHint)),
+                  ],
                 ),
-                const Icon(Icons.chevron_right,
-                    size: 18, color: AppColors.danger),
-              ]),
-            ),
+              ),
+              const Icon(Icons.chevron_right,
+                  size: 18, color: AppColors.danger),
+            ]),
           ),
-          SizedBox(
-              height:
-                  MediaQuery.of(context).padding.bottom + 8),
-        ],
-      ),
+        ),
+        SizedBox(
+            height:
+                MediaQuery.of(context).padding.bottom +
+                    8),
+      ]),
     );
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  WRAPPED SCREEN — gives proper AppBar to drawer pages
-// ══════════════════════════════════════════════════════════════
-class _WrappedScreen extends StatelessWidget {
+// ── Wrapped screen ────────────────────────────────────────────
+class _Wrapped extends StatelessWidget {
   final String title;
   final Widget child;
-  const _WrappedScreen(
+  const _Wrapped(
       {required this.title, required this.child});
 
   @override
@@ -276,21 +285,23 @@ class _WrappedScreen extends StatelessWidget {
             preferredSize: const Size.fromHeight(1),
             child: Container(
                 height: 1,
-                color: Colors.black.withValues(alpha: 0.04)),
+                color: Colors.black
+                    .withValues(alpha: 0.04)),
           ),
         ),
         body: child,
       );
 }
 
-// ── Shared drawer sub-widgets ─────────────────────────────────
-class _DrawerSectionLabel extends StatelessWidget {
+// ── Private sub-widgets ───────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
   final String text;
-  const _DrawerSectionLabel(this.text);
+  const _SectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding:
+            const EdgeInsets.fromLTRB(16, 12, 16, 4),
         child: Text(text,
             style: const TextStyle(
                 fontSize: 10,
@@ -303,8 +314,7 @@ class _DrawerSectionLabel extends StatelessWidget {
 class _DrawerItem extends StatelessWidget {
   final IconData     icon;
   final Color        color;
-  final String       label;
-  final String       subtitle;
+  final String       label, subtitle;
   final String?      badge;
   final Color?       badgeColor;
   final VoidCallback onTap;
@@ -325,32 +335,38 @@ class _DrawerItem extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(
               horizontal: 12, vertical: 4),
-          child: Container(
+          child: Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: 12, vertical: 12),
             child: Row(children: [
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
+                  color:
+                      color.withValues(alpha: 0.10),
+                  borderRadius:
+                      BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child:
+                    Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(label,
                         style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight:
+                                FontWeight.w700,
                             color: AppColors.text)),
                     Text(subtitle,
                         style: const TextStyle(
                             fontSize: 11,
-                            color: AppColors.textHint)),
+                            color:
+                                AppColors.textHint)),
                   ],
                 ),
               ),
@@ -361,30 +377,31 @@ class _DrawerItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: (badgeColor ?? color)
                         .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius:
+                        BorderRadius.circular(12),
                   ),
                   child: Text(badge!,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: badgeColor ?? color)),
+                          color:
+                              badgeColor ?? color)),
                 ),
               const SizedBox(width: 4),
               Icon(Icons.chevron_right,
-                  size: 16, color: AppColors.textHint),
+                  size: 16,
+                  color: AppColors.textHint),
             ]),
           ),
         ),
       );
 }
 
-class _DrawerRoleRow extends StatelessWidget {
-  final String emoji;
-  final String label;
+class _RoleRow extends StatelessWidget {
+  final String emoji, label;
   final int    count;
   final Color  color;
-
-  const _DrawerRoleRow({
+  const _RoleRow({
     required this.emoji,
     required this.label,
     required this.count,
@@ -396,7 +413,8 @@ class _DrawerRoleRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: 16, vertical: 6),
         child: Row(children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
+          Text(emoji,
+              style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(label,

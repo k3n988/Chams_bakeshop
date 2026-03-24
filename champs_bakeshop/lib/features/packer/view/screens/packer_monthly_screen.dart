@@ -14,7 +14,6 @@ class PackerMonthlyScreen extends StatefulWidget {
 }
 
 class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
-  /// Which week index is expanded (null = none)
   int? _expandedWeek;
 
   @override
@@ -49,16 +48,33 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
             ),
             const SizedBox(height: 16),
 
+            // ── Month navigator ────────────────────────────────
+            _MonthNav(
+              monthDisplay:   vm.monthDisplay,
+              isCurrentMonth: vm.isCurrentMonth,
+              onPrev: () {
+                setState(() => _expandedWeek = null);
+                vm.changeMonth(-1, uid);
+              },
+              onNext: () {
+                setState(() => _expandedWeek = null);
+                vm.changeMonth(1, uid);
+              },
+              onToday: () {
+                setState(() => _expandedWeek = null);
+                vm.goToCurrentMonth(uid);
+              },
+            ),
+            const SizedBox(height: 16),
+
             if (vm.isLoading)
               const _Loader()
             else if (vm.error != null)
               _ErrCard(vm.error!)
             else ...[
-              // ── Hero card ──────────────────────────────────
               _MonthlyHeroCard(vm: vm),
               const SizedBox(height: 14),
 
-              // ── Grid stats ─────────────────────────────────
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -101,7 +117,6 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
               ),
               const SizedBox(height: 10),
 
-              // ── 4-week expandable rows ─────────────────────
               ...vm.weeklySummaries.asMap().entries.map((e) =>
                   _ExpandableWeekRow(
                     index:      e.key,
@@ -121,13 +136,234 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  MONTH NAVIGATOR  (single pill — prev | 📅 March 2026 | next)
+// ══════════════════════════════════════════════════════════════
+class _MonthNav extends StatelessWidget {
+  final String       monthDisplay;
+  final bool         isCurrentMonth;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+
+  const _MonthNav({
+    required this.monthDisplay,
+    required this.isCurrentMonth,
+    required this.onPrev,
+    required this.onNext,
+    required this.onToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Label row ──────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.packer.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.today_rounded,
+                  size:  14,
+                  color: AppColors.packer,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Viewing Month',
+                    style: TextStyle(
+                      fontSize:   10,
+                      fontWeight: FontWeight.w700,
+                      color:      AppColors.textHint,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  // Always shows current real month
+                  Text(
+                    _currentMonthDisplay(),
+                    style: TextStyle(
+                      fontSize:   12,
+                      fontWeight: FontWeight.w800,
+                      color:      AppColors.packer,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // "This Month" jump button — only when navigated away
+              if (!isCurrentMonth)
+                GestureDetector(
+                  onTap: onToday,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.packer.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.packer.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.restart_alt_rounded,
+                            size: 13, color: AppColors.packer),
+                        const SizedBox(width: 4),
+                        Text(
+                          'This Month',
+                          style: TextStyle(
+                            fontSize:   11,
+                            fontWeight: FontWeight.w800,
+                            color:      AppColors.packer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // ── Single pill: [ < | 📅 Month Year | > ] ─────────
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.packer.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.packer.withValues(alpha: 0.25),
+              width: 1.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color:      AppColors.packer.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset:     const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // ◀ Prev
+              _PillArrow(icon: Icons.chevron_left_rounded,  onTap: onPrev),
+
+              // Divider
+              Container(
+                width: 1, height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // Centre
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.calendar_month_rounded,
+                        size:  15,
+                        color: AppColors.packer.withValues(alpha: 0.80),
+                      ),
+                      const SizedBox(width: 7),
+                      // "THIS MONTH" badge
+                      if (isCurrentMonth) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.packer
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'THIS MONTH',
+                            style: TextStyle(
+                              fontSize:   8,
+                              fontWeight: FontWeight.w800,
+                              color:      AppColors.packer,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        monthDisplay,
+                        style: const TextStyle(
+                          fontSize:   14,
+                          fontWeight: FontWeight.w700,
+                          color:      AppColors.primaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Divider
+              Container(
+                width: 1, height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // ▶ Next
+              _PillArrow(icon: Icons.chevron_right_rounded, onTap: onNext),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Always shows the real current month — never changes
+  String _currentMonthDisplay() {
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final now = DateTime.now();
+    return '${months[now.month]} ${now.year}';
+  }
+}
+
+// ── Arrow inside the pill ─────────────────────────────────────
+class _PillArrow extends StatelessWidget {
+  final IconData     icon;
+  final VoidCallback onTap;
+  const _PillArrow({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap:        onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          width:  44,
+          height: 44,
+          child: Icon(icon, size: 20, color: AppColors.packer),
+        ),
+      );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  EXPANDABLE WEEK ROW
 // ══════════════════════════════════════════════════════════════
 class _ExpandableWeekRow extends StatelessWidget {
-  final int                index;
+  final int                 index;
   final PackerWeeklySummary summary;
-  final bool               isExpanded;
-  final VoidCallback       onTap;
+  final bool                isExpanded;
+  final VoidCallback        onTap;
 
   const _ExpandableWeekRow({
     required this.index,
@@ -136,7 +372,6 @@ class _ExpandableWeekRow extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Group daily entries by product → {productName: totalBundles}
   Map<String, int> get _byProduct {
     final map = <String, int>{};
     for (final day in summary.dailyEntries) {
@@ -178,7 +413,6 @@ class _ExpandableWeekRow extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // ── Header row ─────────────────────────────────────
           InkWell(
             onTap: _hasData ? onTap : null,
             borderRadius: BorderRadius.circular(14),
@@ -186,10 +420,8 @@ class _ExpandableWeekRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 14),
               child: Row(children: [
-                // Week badge
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 38, height: 38,
                   decoration: BoxDecoration(
                     color: isExpanded
                         ? AppColors.packer
@@ -263,17 +495,14 @@ class _ExpandableWeekRow extends StatelessWidget {
             ),
           ),
 
-          // ── Expanded content ───────────────────────────────
           if (isExpanded && _hasData) ...[
-            Container(
-                height: 1,
+            Container(height: 1,
                 color: AppColors.packer.withValues(alpha: 0.12)),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Product breakdown ────────────────────
                   Row(children: [
                     const Icon(Icons.inventory_2_outlined,
                         size: 13, color: AppColors.packer),
@@ -291,8 +520,7 @@ class _ExpandableWeekRow extends StatelessWidget {
                   if (_byProduct.isEmpty)
                     const Text('No product data',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint))
+                            fontSize: 12, color: AppColors.textHint))
                   else
                     ..._byProduct.entries.map((e) => Container(
                           margin: const EdgeInsets.only(bottom: 6),
@@ -308,8 +536,7 @@ class _ExpandableWeekRow extends StatelessWidget {
                           ),
                           child: Row(children: [
                             Container(
-                                width: 8,
-                                height: 8,
+                                width: 8, height: 8,
                                 decoration: BoxDecoration(
                                     color: AppColors.packer,
                                     shape: BoxShape.circle)),
@@ -338,12 +565,10 @@ class _ExpandableWeekRow extends StatelessWidget {
                         )),
 
                   const SizedBox(height: 10),
-                  Container(
-                      height: 1,
+                  Container(height: 1,
                       color: AppColors.packer.withValues(alpha: 0.10)),
                   const SizedBox(height: 10),
 
-                  // ── Weekly total card ────────────────────
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -358,12 +583,10 @@ class _ExpandableWeekRow extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('Week Total',
                                 style: TextStyle(
@@ -374,8 +597,7 @@ class _ExpandableWeekRow extends StatelessWidget {
                             Text(
                               '${summary.bundles} bundles × ₱4.00',
                               style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70),
+                                  fontSize: 12, color: Colors.white70),
                             ),
                           ],
                         ),
@@ -392,7 +614,6 @@ class _ExpandableWeekRow extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // ── Per-day breakdown ────────────────────
                   Row(children: [
                     const Icon(Icons.calendar_today_outlined,
                         size: 13, color: AppColors.textHint),
@@ -414,18 +635,16 @@ class _ExpandableWeekRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8F4F0),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: AppColors.border),
+                          border:
+                              Border.all(color: AppColors.border),
                         ),
                         child: Row(children: [
                           Container(
-                            width: 32,
-                            height: 32,
+                            width: 32, height: 32,
                             decoration: BoxDecoration(
                               color: AppColors.packer
                                   .withValues(alpha: 0.10),
-                              borderRadius:
-                                  BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             alignment: Alignment.center,
                             child: Text(
@@ -447,12 +666,10 @@ class _ExpandableWeekRow extends StatelessWidget {
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.text)),
-                                Text(
-                                    '${day.totalBundles} bundles',
+                                Text('${day.totalBundles} bundles',
                                     style: const TextStyle(
                                         fontSize: 11,
-                                        color:
-                                            AppColors.textHint)),
+                                        color: AppColors.textHint)),
                               ],
                             ),
                           ),

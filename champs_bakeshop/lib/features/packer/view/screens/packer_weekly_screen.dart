@@ -13,7 +13,6 @@ class PackerWeeklyScreen extends StatefulWidget {
 }
 
 class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
-  /// Which date is currently expanded (null = none)
   String? _expandedDate;
 
   @override
@@ -41,8 +40,10 @@ class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
 
             // ── Week navigator ─────────────────────────────────
             _WeekNav(
-              weekStart: vm.weekStart,
-              weekEnd:   vm.weekEnd,
+              weekStartDisplay: vm.weekStartDisplay,
+              weekEndDisplay:   vm.weekEndDisplay,
+              todayDisplay:     vm.todayDisplay,
+              isCurrentWeek:    vm.isCurrentWeek,
               onPrev: () {
                 setState(() => _expandedDate = null);
                 vm.changeWeek(-1, uid);
@@ -50,6 +51,10 @@ class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
               onNext: () {
                 setState(() => _expandedDate = null);
                 vm.changeWeek(1, uid);
+              },
+              onPickDate: (picked) {
+                setState(() => _expandedDate = null);
+                vm.goToDate(picked, uid);
               },
             ),
             const SizedBox(height: 16),
@@ -59,30 +64,21 @@ class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
             else if (vm.error != null)
               _ErrCard(vm.error!)
             else ...[
-              // ── 3-stat row ─────────────────────────────────
               _WeeklyStatRow(vm: vm),
               const SizedBox(height: 14),
-
-              // ── Deductions card ────────────────────────────
               _DeductionsCard(vm: vm),
               const SizedBox(height: 14),
-
-              // ── Take-home card ─────────────────────────────
               _TakeHomeCard(vm: vm),
               const SizedBox(height: 14),
-
-              // ── Daily breakdown ────────────────────────────
               const _SectionLabel('DAILY BREAKDOWN'),
               const SizedBox(height: 4),
               Text(
                 'Tap a day to see product details',
                 style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textHint
-                        .withValues(alpha: 0.7)),
+                    color: AppColors.textHint.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 10),
-
               if (vm.dailyEntries.isEmpty)
                 _EmptyCard(
                   icon: Icons.receipt_long_outlined,
@@ -90,8 +86,8 @@ class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
                 )
               else
                 ...vm.dailyEntries.map((e) => _ExpandableDayCard(
-                      entry:        e,
-                      isExpanded:   _expandedDate == e.date,
+                      entry:      e,
+                      isExpanded: _expandedDate == e.date,
                       onTap: () => setState(() {
                         _expandedDate =
                             _expandedDate == e.date ? null : e.date;
@@ -103,6 +99,248 @@ class _PackerWeeklyScreenState extends State<PackerWeeklyScreen> {
       ),
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WEEK NAVIGATOR  (single pill — prev | 📅 date | next)
+// ══════════════════════════════════════════════════════════════
+class _WeekNav extends StatelessWidget {
+  final String              weekStartDisplay;
+  final String              weekEndDisplay;
+  final String              todayDisplay;
+  final bool                isCurrentWeek;
+  final VoidCallback        onPrev;
+  final VoidCallback        onNext;
+  final ValueChanged<DateTime>? onPickDate;
+
+  const _WeekNav({
+    required this.weekStartDisplay,
+    required this.weekEndDisplay,
+    required this.todayDisplay,
+    required this.isCurrentWeek,
+    required this.onPrev,
+    required this.onNext,
+    this.onPickDate,
+  });
+
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showDatePicker(
+      context:     context,
+      initialDate: DateTime.now(),
+      firstDate:   DateTime(2020),
+      lastDate:    DateTime(2099),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.light(
+            primary:   AppColors.packer,
+            onPrimary: Colors.white,
+            surface:   Colors.white,
+          ),
+          dialogTheme: const DialogThemeData(
+            backgroundColor: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) onPickDate?.call(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Entry Date / today label row ───────────────────
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.packer.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.today_rounded,
+                  size:  14,
+                  color: AppColors.packer,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Entry Date',
+                    style: TextStyle(
+                      fontSize:   10,
+                      fontWeight: FontWeight.w700,
+                      color:      AppColors.textHint,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  // Always shows today — never changes
+                  Text(
+                    todayDisplay,
+                    style: TextStyle(
+                      fontSize:   12,
+                      fontWeight: FontWeight.w800,
+                      color:      AppColors.packer,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // "Today" jump button — only when NOT on current week
+              if (!isCurrentWeek)
+                GestureDetector(
+                  onTap: () => onPickDate?.call(DateTime.now()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.packer.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.packer.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.restart_alt_rounded,
+                            size: 13, color: AppColors.packer),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Today',
+                          style: TextStyle(
+                            fontSize:   11,
+                            fontWeight: FontWeight.w800,
+                            color:      AppColors.packer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // ── Single pill: [ < | 📅 date range | > ] ─────────
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.packer.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.packer.withValues(alpha: 0.25),
+              width: 1.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color:      AppColors.packer.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset:     const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // ◀ Prev
+              _PillArrow(icon: Icons.chevron_left_rounded, onTap: onPrev),
+
+              // Divider
+              Container(
+                width: 1, height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // Centre — tappable to open date picker
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _openPicker(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          size:  15,
+                          color: AppColors.packer.withValues(alpha: 0.80),
+                        ),
+                        const SizedBox(width: 7),
+                        // "THIS WEEK" badge when on current week
+                        if (isCurrentWeek) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.packer
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'THIS WEEK',
+                              style: TextStyle(
+                                fontSize:   8,
+                                fontWeight: FontWeight.w800,
+                                color:      AppColors.packer,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          '$weekStartDisplay — $weekEndDisplay',
+                          style: const TextStyle(
+                            fontSize:   13,
+                            fontWeight: FontWeight.w700,
+                            color:      AppColors.primaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Divider
+              Container(
+                width: 1, height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // ▶ Next
+              _PillArrow(icon: Icons.chevron_right_rounded, onTap: onNext),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Arrow inside the pill ─────────────────────────────────────
+class _PillArrow extends StatelessWidget {
+  final IconData     icon;
+  final VoidCallback onTap;
+  const _PillArrow({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap:        onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          width:  44,
+          height: 44,
+          child: Icon(icon, size: 20, color: AppColors.packer),
+        ),
+      );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -119,7 +357,6 @@ class _ExpandableDayCard extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Group productions by product name → {name: totalBundles}
   Map<String, int> get _byProduct {
     final map = <String, int>{};
     for (final p in entry.productions) {
@@ -135,6 +372,19 @@ class _ExpandableDayCard extends StatelessWidget {
           '${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return ts.length >= 16 ? ts.substring(11, 16) : '';
+    }
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final dt = DateTime.parse(dateStr);
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return dateStr;
     }
   }
 
@@ -164,14 +414,12 @@ class _ExpandableDayCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // ── Header row (always visible, tappable) ──────────
           InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(children: [
-                // Day number badge
                 Container(
                   width: 44,
                   height: 44,
@@ -183,7 +431,7 @@ class _ExpandableDayCard extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    entry.date.substring(8), // day number
+                    entry.date.substring(8),
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
@@ -238,7 +486,6 @@ class _ExpandableDayCard extends StatelessWidget {
             ),
           ),
 
-          // ── Expanded breakdown ─────────────────────────────
           if (isExpanded) ...[
             Container(
               height: 1,
@@ -249,7 +496,6 @@ class _ExpandableDayCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Product breakdown ──────────────────────
                   Row(children: [
                     const Icon(Icons.inventory_2_outlined,
                         size: 13, color: AppColors.packer),
@@ -259,21 +505,18 @@ class _ExpandableDayCard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color:
-                              AppColors.packer.withValues(alpha: 0.8),
+                          color: AppColors.packer.withValues(alpha: 0.8),
                           letterSpacing: 0.8),
                     ),
                   ]),
                   const SizedBox(height: 10),
 
-                  // ── Per-product rows ───────────────────────
                   ..._byProduct.entries.map((e) => Container(
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.packer
-                              .withValues(alpha: 0.04),
+                          color: AppColors.packer.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                               color: AppColors.packer
@@ -281,8 +524,7 @@ class _ExpandableDayCard extends StatelessWidget {
                         ),
                         child: Row(children: [
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 8, height: 8,
                             decoration: BoxDecoration(
                                 color: AppColors.packer,
                                 shape: BoxShape.circle),
@@ -312,13 +554,10 @@ class _ExpandableDayCard extends StatelessWidget {
                       )),
 
                   const SizedBox(height: 8),
-                  Container(
-                    height: 1,
-                    color: AppColors.packer.withValues(alpha: 0.10),
-                  ),
+                  Container(height: 1,
+                      color: AppColors.packer.withValues(alpha: 0.10)),
                   const SizedBox(height: 8),
 
-                  // ── Daily total ────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -333,12 +572,10 @@ class _ExpandableDayCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('Daily Total',
                                 style: TextStyle(
@@ -349,8 +586,7 @@ class _ExpandableDayCard extends StatelessWidget {
                             Text(
                               '${entry.totalBundles} bundles × ₱4.00',
                               style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70),
+                                  fontSize: 12, color: Colors.white70),
                             ),
                           ],
                         ),
@@ -367,7 +603,6 @@ class _ExpandableDayCard extends StatelessWidget {
 
                   const SizedBox(height: 10),
 
-                  // ── Individual entry timestamps ────────────
                   Row(children: [
                     const Icon(Icons.access_time,
                         size: 13, color: AppColors.textHint),
@@ -377,28 +612,24 @@ class _ExpandableDayCard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textHint
-                              .withValues(alpha: 0.8),
+                          color: AppColors.textHint.withValues(alpha: 0.8),
                           letterSpacing: 0.8),
                     ),
                   ]),
                   const SizedBox(height: 8),
 
                   ...entry.productions.map((p) => Padding(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(children: [
                           const SizedBox(width: 4),
                           const Icon(Icons.fiber_manual_record,
-                              size: 6,
-                              color: AppColors.textHint),
+                              size: 6, color: AppColors.textHint),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(p.productName,
                                 style: const TextStyle(
                                     fontSize: 12,
-                                    color:
-                                        AppColors.textSecondary)),
+                                    color: AppColors.textSecondary)),
                           ),
                           Text('${p.bundleCount} bundles',
                               style: const TextStyle(
@@ -422,73 +653,6 @@ class _ExpandableDayCard extends StatelessWidget {
       ),
     );
   }
-
-  String _formatDate(String dateStr) {
-    try {
-      final dt = DateTime.parse(dateStr);
-      const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
-      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-    } catch (_) {
-      return dateStr;
-    }
-  }
-}
-
-// ── Week navigator ────────────────────────────────────────────
-class _WeekNav extends StatelessWidget {
-  final String       weekStart;
-  final String       weekEnd;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  const _WeekNav({
-    required this.weekStart,
-    required this.weekEnd,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.packer.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppColors.packer.withValues(alpha: 0.20)),
-        ),
-        child: Row(children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: AppColors.packer,
-            iconSize: 20,
-            onPressed: onPrev,
-          ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.date_range_outlined,
-                    size: 15,
-                    color: AppColors.packer.withValues(alpha: 0.8)),
-                const SizedBox(width: 6),
-                Text('$weekStart — $weekEnd',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppColors.primaryDark)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            color: AppColors.packer,
-            iconSize: 20,
-            onPressed: onNext,
-          ),
-        ]),
-      );
 }
 
 // ── 3-stat row ────────────────────────────────────────────────
@@ -709,8 +873,8 @@ class _TakeHomeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     _Pill(
-                      label: '-Vale',
-                      value: vm.valeDeduction > 0
+                      label:     '-Vale',
+                      value:     vm.valeDeduction > 0
                           ? formatCurrency(vm.valeDeduction)
                           : '₱0.00',
                       bgColor:   Colors.red.withValues(alpha: 0.25),
@@ -739,8 +903,7 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(8),

@@ -13,19 +13,29 @@ class PackerProfileScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
         title: const Text('Sign Out',
             style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.primaryDark)),
-        content: const Text('Are you sure you want to sign out?'),
+        content: const Text(
+            'Are you sure you want to sign out?',
+            style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger),
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               Navigator.pop(ctx);
               context.read<AuthViewModel>().logout();
@@ -36,7 +46,10 @@ class PackerProfileScreen extends StatelessWidget {
                 (_) => false,
               );
             },
-            child: const Text('Sign Out'),
+            child: const Text('Sign Out',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -49,11 +62,11 @@ class PackerProfileScreen extends StatelessWidget {
     final vm   = context.watch<PackerSalaryViewModel>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F4F0),
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Top avatar section ────────────────────────────
+            // ── Top avatar section (white) ────────────────────
             _AvatarSection(user: user),
 
             Padding(
@@ -63,11 +76,11 @@ class PackerProfileScreen extends StatelessWidget {
                 children: [
                   // ── Personal info ───────────────────────────
                   _PersonalInfoCard(user: user),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ── Earnings snapshot ───────────────────────
+                  // ── Yearly earnings snapshot ─────────────────
                   _EarningsSnapshotCard(vm: vm),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // ── Settings menu ───────────────────────────
                   _SettingsMenu(),
@@ -97,53 +110,52 @@ class _AvatarSection extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 28, 16, 28),
         child: Column(children: [
-          // ── Name at top ─────────────────────────────────────
+          // Small name at very top
           Text(user.name,
               style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.text,
-                  letterSpacing: 0.5)),
-          const SizedBox(height: 16),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.3)),
+          const SizedBox(height: 18),
 
-          // ── Avatar circle ────────────────────────────────────
+          // Avatar circle
           Stack(
             alignment: Alignment.bottomRight,
             children: [
               Container(
-                width: 90,
-                height: 90,
+                width: 92,
+                height: 92,
                 decoration: BoxDecoration(
                   color: AppColors.packer,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.packer.withValues(alpha: 0.35),
-                      blurRadius: 16,
+                      blurRadius: 18,
                       offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  user.name.isNotEmpty ? user.name[0] : 'P',
+                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'P',
                   style: const TextStyle(
-                      fontSize: 36,
+                      fontSize: 38,
                       fontWeight: FontWeight.w900,
                       color: Colors.white),
                 ),
               ),
-              // Camera icon badge
+              // Camera badge
               Container(
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppColors.border, width: 1.5),
+                  border: Border.all(color: AppColors.border, width: 1.5),
                   boxShadow: [
                     BoxShadow(
                         color: Colors.black.withValues(alpha: 0.08),
@@ -158,13 +170,13 @@ class _AvatarSection extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // ── Name with edit icon ───────────────────────────────
+          // Name + edit icon
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(user.name,
                   style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: AppColors.text)),
               const SizedBox(width: 6),
@@ -174,15 +186,15 @@ class _AvatarSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // ── Role badge ────────────────────────────────────────
+          // Role badge
           Container(
             padding: const EdgeInsets.symmetric(
-                horizontal: 20, vertical: 6),
+                horizontal: 22, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.packer.withValues(alpha: 0.10),
+              color: AppColors.packer.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: AppColors.packer.withValues(alpha: 0.25)),
+                  color: AppColors.packer.withValues(alpha: 0.22)),
             ),
             child: const Text('PACKER',
                 style: TextStyle(
@@ -222,20 +234,20 @@ class _PersonalInfoCard extends StatelessWidget {
             ),
             child: Column(children: [
               _InfoRow(
-                icon: Icons.person_outline,
-                label: 'Name',
-                value: user.name,
+                icon:    Icons.person_outline,
+                label:   'Name',
+                value:   user.name,
                 isFirst: true,
               ),
               _InfoRow(
-                icon: Icons.badge_outlined,
+                icon:  Icons.badge_outlined,
                 label: 'Role',
-                value: 'packer',
+                value: 'Packer',
               ),
               _InfoRow(
-                icon: Icons.fingerprint,
-                label: 'ID',
-                value: user.id,
+                icon:   Icons.fingerprint,
+                label:  'ID',
+                value:  user.id,
                 isLast: true,
               ),
             ]),
@@ -267,14 +279,12 @@ class _InfoRow extends StatelessWidget {
                 horizontal: 16, vertical: 14),
             child: Row(children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 36, height: 36,
                 decoration: BoxDecoration(
                   color: AppColors.packer.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon,
-                    size: 18, color: AppColors.packer),
+                child: Icon(icon, size: 18, color: AppColors.packer),
               ),
               const SizedBox(width: 14),
               SizedBox(
@@ -305,105 +315,128 @@ class _InfoRow extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  EARNINGS SNAPSHOT
+//  EARNINGS SNAPSHOT  (full-year figures)
 // ══════════════════════════════════════════════════════════════
 class _EarningsSnapshotCard extends StatelessWidget {
   final PackerSalaryViewModel vm;
   const _EarningsSnapshotCard({required this.vm});
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionLabel('EARNINGS SNAPSHOT'),
-          const SizedBox(height: 10),
+  Widget build(BuildContext context) {
+    final year = DateTime.now().year;
 
-          // ── Take-home gradient card ───────────────────────────
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section label with year badge
+        Row(children: [
+          const _SectionLabel('EARNINGS SNAPSHOT'),
+          const SizedBox(width: 8),
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.packer,
-                  AppColors.packer.withValues(alpha: 0.75),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.packer.withValues(alpha: 0.30),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                ),
-              ],
+              color: AppColors.packer.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Take-Home Pay',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatCurrency(vm.netSalary),
-                      style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.20),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Gross: ${formatCurrency(vm.grossSalary)}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
-                  ),
-                ),
-              ],
+            child: Text(
+              '$year',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.packer),
             ),
           ),
-          const SizedBox(height: 10),
+        ]),
+        const SizedBox(height: 10),
 
-          // ── Stats row ─────────────────────────────────────────
-          Row(children: [
-            Expanded(
-              child: _SnapshotStat(
-                icon:  Icons.calendar_today_outlined,
-                value: '${vm.daysWorked} days',
-                label: 'Days Worked',
-                color: AppColors.packer,
-              ),
+        // ── Take-home gradient card ───────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.packer,
+                AppColors.packer.withValues(alpha: 0.75),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _SnapshotStat(
-                icon:  Icons.inventory_2_outlined,
-                value: '${vm.totalBundles}',
-                label: 'Total Bundles',
-                color: const Color(0xFF1976D2),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.packer.withValues(alpha: 0.30),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Take-Home Pay',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 6),
+                  Text(
+                    formatCurrency(vm.yearlyGross),
+                    style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Gross: ${formatCurrency(vm.yearlyGross)}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // ── 2-stat row ────────────────────────────────────────
+        Row(children: [
+          Expanded(
+            child: _SnapshotStat(
+              icon:  Icons.calendar_today_outlined,
+              value: '${vm.yearlyDays} days',
+              label: 'Days Worked',
+              color: AppColors.packer,
             ),
-          ]),
-        ],
-      );
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _SnapshotStat(
+              icon:  Icons.inventory_2_outlined,
+              value: '${vm.yearlyBundles}',
+              label: 'Total Bundles',
+              color: const Color(0xFF1976D2),
+            ),
+          ),
+        ]),
+      ],
+    );
+  }
 }
 
 class _SnapshotStat extends StatelessWidget {
@@ -461,56 +494,65 @@ class _SnapshotStat extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════
 class _SettingsMenu extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Column(children: [
-          _MenuItem(
-            icon: Icons.person_outline,
-            color: AppColors.packer,
-            title: 'Edit Display Name',
-            subtitle: 'Change how your name appears',
-            isFirst: true,
-            onTap: () {},
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionLabel('SETTINGS'),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Column(children: [
+              _MenuItem(
+                icon:    Icons.person_outline,
+                color:   AppColors.packer,
+                title:   'Edit Display Name',
+                subtitle: 'Change how your name appears',
+                isFirst: true,
+                onTap:   () {},
+              ),
+              _MenuItem(
+                icon:    Icons.camera_alt_outlined,
+                color:   const Color(0xFF1976D2),
+                title:   'Edit Profile Photo',
+                subtitle: 'Upload or remove your photo',
+                onTap:   () {},
+              ),
+              _MenuItem(
+                icon:    Icons.lock_outline,
+                color:   const Color(0xFF388E3C),
+                title:   'Change Password',
+                subtitle: 'Update your account password',
+                onTap:   () {},
+              ),
+              _MenuItem(
+                icon:    Icons.info_outline,
+                color:   AppColors.warning,
+                title:   'About',
+                subtitle: 'App version & info',
+                isLast:  true,
+                onTap:   () => _showAbout(context),
+              ),
+            ]),
           ),
-          _MenuItem(
-            icon: Icons.camera_alt_outlined,
-            color: const Color(0xFF1976D2),
-            title: 'Edit Profile Photo',
-            subtitle: 'Upload or remove your photo',
-            onTap: () {},
-          ),
-          _MenuItem(
-            icon: Icons.lock_outline,
-            color: const Color(0xFF388E3C),
-            title: 'Change Password',
-            subtitle: 'Update your account password',
-            onTap: () {},
-          ),
-          _MenuItem(
-            icon: Icons.info_outline,
-            color: AppColors.warning,
-            title: 'About',
-            subtitle: 'App version & info',
-            isLast: true,
-            onTap: () => _showAbout(context),
-          ),
-        ]),
+        ],
       );
 
   void _showAbout(BuildContext context) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
         title: const Text("Champ's Bakeshop",
             style: TextStyle(
                 fontWeight: FontWeight.w800,
@@ -546,8 +588,6 @@ class _MenuItem extends StatelessWidget {
   final String       subtitle;
   final bool         isFirst;
   final bool         isLast;
-  final String?      trailingLabel;
-  final Color?       trailingColor;
   final VoidCallback onTap;
 
   const _MenuItem({
@@ -556,10 +596,8 @@ class _MenuItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.isFirst       = false,
-    this.isLast        = false,
-    this.trailingLabel,
-    this.trailingColor,
+    this.isFirst = false,
+    this.isLast  = false,
   });
 
   @override
@@ -578,8 +616,7 @@ class _MenuItem extends StatelessWidget {
                   horizontal: 16, vertical: 14),
               child: Row(children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 40, height: 40,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
@@ -604,25 +641,8 @@ class _MenuItem extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (trailingLabel != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (trailingColor ?? AppColors.success)
-                          .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(trailingLabel!,
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color:
-                                trailingColor ?? AppColors.success)),
-                  )
-                else
-                  Icon(Icons.chevron_right,
-                      size: 18, color: AppColors.textHint),
+                Icon(Icons.chevron_right,
+                    size: 18, color: AppColors.textHint),
               ]),
             ),
           ),
@@ -654,8 +674,8 @@ class _LogoutButton extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 15)),
           style: OutlinedButton.styleFrom(
-            side:
-                const BorderSide(color: AppColors.danger, width: 1.5),
+            side: const BorderSide(
+                color: AppColors.danger, width: 1.5),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
           ),

@@ -10,10 +10,12 @@ class PackerSalaryViewModel extends ChangeNotifier {
   bool    _isLoading = false;
   String? _error;
 
-  List<PackerProductionModel> _productions = [];
+  List<PackerProductionModel> _productions     = [];
+  List<PackerProductionModel> _yearProductions = [];
   PackerPayrollModel?         _weekPayroll;
 
-  DateTime _weekStart = DateTime.now();
+  DateTime _weekStart  = _currentMonday();
+  DateTime _monthStart = _firstDayOfMonth(DateTime.now());
 
   // ── Getters ────────────────────────────────────────────────
   bool    get isLoading   => _isLoading;
@@ -22,17 +24,35 @@ class PackerSalaryViewModel extends ChangeNotifier {
   List<PackerProductionModel> get productions => _productions;
   PackerPayrollModel?         get weekPayroll => _weekPayroll;
 
-  // ── Week range ─────────────────────────────────────────────
-  String get weekStart =>
-      _weekStart.toIso8601String().substring(0, 10);
+  // ── Week range (ISO – DB queries) ──────────────────────────
+  String get weekStart => _isoDate(_weekStart);
+  String get weekEnd   => _isoDate(_weekStart.add(const Duration(days: 6)));
 
-  String get weekEnd {
-    final end = _weekStart.add(const Duration(days: 6));
-    return end.toIso8601String().substring(0, 10);
+  // ── Week display ───────────────────────────────────────────
+  String get weekStartDisplay => _fmtDate(_weekStart);
+  String get weekEndDisplay   => _fmtDate(_weekStart.add(const Duration(days: 6)));
+  String get todayDisplay     => _fmtFull(DateTime.now());
+
+  bool get isCurrentWeek {
+    final today = _currentMonday();
+    return _weekStart.year  == today.year  &&
+           _weekStart.month == today.month &&
+           _weekStart.day   == today.day;
   }
 
+  // ── Month display ──────────────────────────────────────────
+  String get monthDisplay => _fmtMonth(_monthStart);
+
+  bool get isCurrentMonth {
+    final now = DateTime.now();
+    return _monthStart.year  == now.year &&
+           _monthStart.month == now.month;
+  }
+
+  String get _monthStartIso => _isoDate(_monthStart);
+  String get _monthEndIso   => _isoDate(_lastDayOfMonth(_monthStart));
+
   // ── Daily aggregates ───────────────────────────────────────
-  /// Group productions by date → {date: [productions]}
   Map<String, List<PackerProductionModel>> get productionsByDate {
     final map = <String, List<PackerProductionModel>>{};
     for (final p in _productions) {
@@ -41,7 +61,6 @@ class PackerSalaryViewModel extends ChangeNotifier {
     return map;
   }
 
-  /// Daily entries sorted newest first
   List<PackerDailyEntry> get dailyEntries {
     final entries = productionsByDate.entries.map((e) {
       final bundles = e.value.fold(0, (s, p) => s + p.bundleCount);
@@ -63,17 +82,24 @@ class PackerSalaryViewModel extends ChangeNotifier {
   double get netSalary     => grossSalary - valeDeduction;
   int    get daysWorked    => productionsByDate.keys.length;
 
-  // ── Monthly weekly breakdown (includes dailyEntries per week) ──
+  // ── Yearly aggregates (used by profile) ───────────────────
+  int    get yearlyBundles => _yearProductions.fold(0, (s, p) => s + p.bundleCount);
+  double get yearlyGross   => yearlyBundles * 4.0;
+  int    get yearlyDays    {
+    final dates = <String>{};
+    for (final p in _yearProductions) dates.add(p.date);
+    return dates.length;
+  }
+
+  // ── Monthly weekly breakdown ───────────────────────────────
   List<PackerWeeklySummary> get weeklySummaries {
     final summaries = <PackerWeeklySummary>[];
-
     for (int i = 3; i >= 0; i--) {
       final wStart = _weekStart.subtract(Duration(days: 7 * i));
       final wEnd   = wStart.add(const Duration(days: 6));
-      final wsStr  = wStart.toIso8601String().substring(0, 10);
-      final weStr  = wEnd.toIso8601String().substring(0, 10);
+      final wsStr  = _isoDate(wStart);
+      final weStr  = _isoDate(wEnd);
 
-      // All productions in this week
       final weekProds = _productions
           .where((p) =>
               p.date.compareTo(wsStr) >= 0 &&
@@ -82,11 +108,11 @@ class PackerSalaryViewModel extends ChangeNotifier {
 
       final bundles = weekProds.fold(0, (s, p) => s + p.bundleCount);
 
-      // Build daily entries for this week
       final dayMap = <String, List<PackerProductionModel>>{};
       for (final p in weekProds) {
         dayMap.putIfAbsent(p.date, () => []).add(p);
       }
+
       final weekDailyEntries = dayMap.entries.map((e) {
         final b = e.value.fold(0, (s, p) => s + p.bundleCount);
         return PackerDailyEntry(
@@ -111,17 +137,14 @@ class PackerSalaryViewModel extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  INIT
+  //  INIT — resets to current week
   // ─────────────────────────────────────────────────────────
   Future<void> init(String packerId) async {
-    _setWeekToCurrentMonday();
-    await _loadWeekData(packerId);
-  }
-
-  void _setWeekToCurrentMonday() {
-    final now  = DateTime.now();
-    final diff = now.weekday - DateTime.monday;
-    _weekStart = DateTime(now.year, now.month, now.day - diff);
+    _weekStart = _currentMonday();
+    await Future.wait([
+      _loadWeekData(packerId),
+      _loadYearData(packerId),
+    ]);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -154,21 +177,38 @@ class PackerSalaryViewModel extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  LOAD MONTHLY (4 weeks)
+  //  LOAD YEAR DATA (Jan 1 → Dec 31 of current year)
+  // ─────────────────────────────────────────────────────────
+  Future<void> _loadYearData(String packerId) async {
+    try {
+      final year      = DateTime.now().year;
+      final yearStart = '$year-01-01';
+      final yearEnd   = '$year-12-31';
+      _yearProductions = await _service.getProductionsByMonth(
+        packerId:   packerId,
+        monthStart: yearStart,
+        monthEnd:   yearEnd,
+      );
+    } catch (_) {
+      _yearProductions = [];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  LOAD MONTHLY
   // ─────────────────────────────────────────────────────────
   Future<void> loadMonthly(String packerId) async {
+    _monthStart = _firstDayOfMonth(DateTime.now());
+    await _loadMonthData(packerId);
+  }
+
+  Future<void> _loadMonthData(String packerId) async {
     _setLoading(true);
     try {
-      // go back 3 weeks from current week start
-      final monthStart =
-          _weekStart.subtract(const Duration(days: 21));
-      final fromDate =
-          monthStart.toIso8601String().substring(0, 10);
-
       _productions = await _service.getProductionsByMonth(
         packerId:   packerId,
-        monthStart: fromDate,
-        monthEnd:   weekEnd,
+        monthStart: _monthStartIso,
+        monthEnd:   _monthEndIso,
       );
       _error = null;
     } catch (e) {
@@ -182,9 +222,30 @@ class PackerSalaryViewModel extends ChangeNotifier {
   //  WEEK NAVIGATION
   // ─────────────────────────────────────────────────────────
   Future<void> changeWeek(int direction, String packerId) async {
-    _weekStart =
-        _weekStart.add(Duration(days: 7 * direction));
+    _weekStart = _weekStart.add(Duration(days: 7 * direction));
     await _loadWeekData(packerId);
+  }
+
+  Future<void> goToDate(DateTime date, String packerId) async {
+    final diff = date.weekday - DateTime.monday;
+    _weekStart = DateTime(date.year, date.month, date.day - diff);
+    await _loadWeekData(packerId);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  MONTH NAVIGATION
+  // ─────────────────────────────────────────────────────────
+  Future<void> changeMonth(int direction, String packerId) async {
+    final m = _monthStart.month + direction;
+    final y = _monthStart.year + (m < 1 ? -1 : m > 12 ? 1 : 0);
+    final adjustedMonth = m < 1 ? 12 : m > 12 ? 1 : m;
+    _monthStart = DateTime(y, adjustedMonth, 1);
+    await _loadMonthData(packerId);
+  }
+
+  Future<void> goToCurrentMonth(String packerId) async {
+    _monthStart = _firstDayOfMonth(DateTime.now());
+    await _loadMonthData(packerId);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -198,6 +259,40 @@ class PackerSalaryViewModel extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  static DateTime _currentMonday() {
+    final now  = DateTime.now();
+    final diff = now.weekday - DateTime.monday;
+    return DateTime(now.year, now.month, now.day - diff);
+  }
+
+  static DateTime _firstDayOfMonth(DateTime d) => DateTime(d.year, d.month, 1);
+  static DateTime _lastDayOfMonth(DateTime d)  => DateTime(d.year, d.month + 1, 0);
+  static String   _isoDate(DateTime d)         => d.toIso8601String().substring(0, 10);
+
+  static String _fmtDate(DateTime d) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month]} ${d.day}, ${d.year}';
+  }
+
+  static String _fmtMonth(DateTime d) {
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[d.month]} ${d.year}';
+  }
+
+  static String _fmtFull(DateTime d) {
+    const days = [
+      '', 'Monday', 'Tuesday', 'Wednesday',
+      'Thursday', 'Friday', 'Saturday', 'Sunday',
+    ];
+    return '${days[d.weekday]}, ${_fmtDate(d)}';
   }
 }
 
@@ -224,7 +319,7 @@ class PackerWeeklySummary {
   final int                    bundles;
   final double                 grossSalary;
   final int                    days;
-  final List<PackerDailyEntry> dailyEntries; // ← NEW
+  final List<PackerDailyEntry> dailyEntries;
 
   const PackerWeeklySummary({
     required this.weekStart,

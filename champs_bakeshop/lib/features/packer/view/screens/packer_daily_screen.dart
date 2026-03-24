@@ -30,10 +30,13 @@ class PackerDailyScreen extends StatelessWidget {
 
             // ── Week navigator ─────────────────────────────────
             _WeekNav(
-              weekStart: vm.weekStart,
-              weekEnd:   vm.weekEnd,
-              onPrev: () => vm.changeWeek(-1, uid),
-              onNext: () => vm.changeWeek(1, uid),
+              weekStartDisplay: vm.weekStartDisplay,
+              weekEndDisplay:   vm.weekEndDisplay,
+              todayDisplay:     vm.todayDisplay,
+              isCurrentWeek:    vm.isCurrentWeek,
+              onPrev:     () => vm.changeWeek(-1, uid),
+              onNext:     () => vm.changeWeek(1, uid),
+              onPickDate: (picked) => vm.goToDate(picked, uid),
             ),
             const SizedBox(height: 16),
 
@@ -42,14 +45,10 @@ class PackerDailyScreen extends StatelessWidget {
             else if (vm.error != null)
               _ErrCard(vm.error!)
             else ...[
-              // ── Summary ────────────────────────────────────
               _DailySummaryRow(vm: vm),
               const SizedBox(height: 16),
-
-              // ── Daily records ──────────────────────────────
               const _SectionLabel('DAILY RECORDS'),
               const SizedBox(height: 10),
-
               if (vm.dailyEntries.isEmpty)
                 _EmptyCard(
                   icon: Icons.receipt_long_outlined,
@@ -72,55 +71,242 @@ class PackerDailyScreen extends StatelessWidget {
 
 // ── Week navigator ────────────────────────────────────────────
 class _WeekNav extends StatelessWidget {
-  final String       weekStart;
-  final String       weekEnd;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
+  final String              weekStartDisplay;
+  final String              weekEndDisplay;
+  final String              todayDisplay;
+  final bool                isCurrentWeek;
+  final VoidCallback        onPrev;
+  final VoidCallback        onNext;
+  final ValueChanged<DateTime>? onPickDate;
+
   const _WeekNav({
-    required this.weekStart,
-    required this.weekEnd,
+    required this.weekStartDisplay,
+    required this.weekEndDisplay,
+    required this.todayDisplay,
+    required this.isCurrentWeek,
     required this.onPrev,
     required this.onNext,
+    this.onPickDate,
   });
 
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.packer.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppColors.packer.withValues(alpha: 0.20)),
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showDatePicker(
+      context:     context,
+      initialDate: DateTime.now(),
+      firstDate:   DateTime(2020),
+      lastDate:    DateTime(2099),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.light(
+            primary:   AppColors.packer,
+            onPrimary: Colors.white,
+            surface:   Colors.white,
+          ),
+          dialogTheme: const DialogThemeData(
+            backgroundColor: Colors.white,
+          ),
         ),
-        child: Row(children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: AppColors.packer,
-            iconSize: 20,
-            onPressed: onPrev,
+        child: child!,
+      ),
+    );
+    if (picked != null) onPickDate?.call(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── "Entry Date / today" label row ─────────────────
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.packer.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.today_rounded,
+                  size:  14,
+                  color: AppColors.packer,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Entry Date',
+                    style: TextStyle(
+                      fontSize:   10,
+                      fontWeight: FontWeight.w700,
+                      color:      AppColors.textHint,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  Text(
+                    todayDisplay,
+                    style: TextStyle(
+                      fontSize:   12,
+                      fontWeight: FontWeight.w800,
+                      color:      AppColors.packer,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // "Today" jump button — only when not on current week
+              if (!isCurrentWeek)
+                GestureDetector(
+                  onTap: () => onPickDate?.call(DateTime.now()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.packer.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.packer.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.restart_alt_rounded,
+                            size: 13, color: AppColors.packer),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Today',
+                          style: TextStyle(
+                            fontSize:   11,
+                            fontWeight: FontWeight.w800,
+                            color:      AppColors.packer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.date_range_outlined,
-                    size: 15,
-                    color: AppColors.packer.withValues(alpha: 0.8)),
-                const SizedBox(width: 6),
-                Text('$weekStart — $weekEnd',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppColors.primaryDark)),
-              ],
+        ),
+
+        // ── Single pill: [ < | 📅 date range | > ] ─────────
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.packer.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.packer.withValues(alpha: 0.25),
+              width: 1.4,
             ),
+            boxShadow: [
+              BoxShadow(
+                color:      AppColors.packer.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset:     const Offset(0, 2),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            color: AppColors.packer,
-            iconSize: 20,
-            onPressed: onNext,
+          child: Row(
+            children: [
+              // ◀ Prev
+              _PillArrow(icon: Icons.chevron_left_rounded, onTap: onPrev),
+
+              // Divider
+              Container(
+                width: 1,
+                height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // Centre — tappable to open date picker
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _openPicker(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          size:  15,
+                          color: AppColors.packer.withValues(alpha: 0.80),
+                        ),
+                        const SizedBox(width: 7),
+                        // "THIS WEEK" badge
+                        if (isCurrentWeek) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.packer
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'YESTERDAY',
+                              style: TextStyle(
+                                fontSize:   8,
+                                fontWeight: FontWeight.w800,
+                                color:      AppColors.packer,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          '$weekStartDisplay — $weekEndDisplay',
+                          style: const TextStyle(
+                            fontSize:   13,
+                            fontWeight: FontWeight.w700,
+                            color:      AppColors.primaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Divider
+              Container(
+                width: 1,
+                height: 24,
+                color: AppColors.packer.withValues(alpha: 0.15),
+              ),
+
+              // ▶ Next
+              _PillArrow(icon: Icons.chevron_right_rounded, onTap: onNext),
+            ],
           ),
-        ]),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Arrow button inside the pill ──────────────────────────────
+class _PillArrow extends StatelessWidget {
+  final IconData     icon;
+  final VoidCallback onTap;
+  const _PillArrow({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap:        onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          width:  44,
+          height: 44,
+          child: Icon(icon, size: 20, color: AppColors.packer),
+        ),
       );
 }
 
@@ -303,7 +489,6 @@ class _DailyEntryCard extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          // Product breakdown
           ...entry.productions.map((p) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(children: [
