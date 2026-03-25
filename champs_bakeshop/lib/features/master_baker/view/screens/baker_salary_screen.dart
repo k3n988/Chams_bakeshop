@@ -9,20 +9,6 @@ part 'baker_salary_daily_screen.dart';
 part 'baker_salary_weekly_screen.dart';
 part 'baker_salary_monthly_screen.dart';
 
-// ── Internal date helper ──────────────────────────────────────
-String _monthLabel(String dateStr) {
-  if (dateStr.isEmpty) return '—';
-  try {
-    final d = DateTime.parse(dateStr);
-    const names = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return '${names[d.month - 1]} ${d.year}';
-  } catch (_) {
-    return '—';
-  }
-}
 
 // ─────────────────────────────────────────────────────────────
 //  ROOT SCREEN
@@ -105,31 +91,6 @@ class _BakerSalaryScreenState extends State<BakerSalaryScreen>
 //  SHARED SMALL WIDGETS
 // ══════════════════════════════════════════════════════════════
 
-class _PageHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  const _PageHeader(
-      {required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.text,
-                  letterSpacing: -0.5)),
-          const SizedBox(height: 3),
-          Text(subtitle,
-              style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary)),
-        ],
-      );
-}
-
 class _WhiteCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -152,104 +113,6 @@ class _WhiteCard extends StatelessWidget {
         ),
         child: child,
       );
-}
-
-class _MonthBar extends StatelessWidget {
-  final String dateStr;
-  const _MonthBar({required this.dateStr});
-
-  @override
-  Widget build(BuildContext context) => _WhiteCard(
-        padding: const EdgeInsets.symmetric(
-            vertical: 10, horizontal: 4),
-        child: Row(children: [
-          const Icon(Icons.chevron_left,
-              color: AppColors.textHint),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.calendar_month_outlined,
-                    size: 15, color: AppColors.masterBaker),
-                const SizedBox(width: 8),
-                Text(
-                  _monthLabel(dateStr),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.primaryDark),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down,
-                    size: 18,
-                    color: AppColors.textSecondary),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right,
-              color: AppColors.textHint),
-        ]),
-      );
-}
-
-class _WeekNav extends StatelessWidget {
-  final String weekStart;
-  final String weekEnd;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  const _WeekNav({
-    required this.weekStart,
-    required this.weekEnd,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final label =
-        weekStart.isEmpty ? '—' : '$weekStart — $weekEnd';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.masterBaker.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color:
-                AppColors.masterBaker.withValues(alpha: 0.20)),
-      ),
-      child: Row(children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          color: AppColors.masterBaker,
-          iconSize: 20,
-          onPressed: onPrev,
-        ),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.date_range_outlined,
-                  size: 15,
-                  color: AppColors.masterBaker
-                      .withValues(alpha: 0.8)),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppColors.primaryDark)),
-            ],
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          color: AppColors.masterBaker,
-          iconSize: 20,
-          onPressed: onNext,
-        ),
-      ]),
-    );
-  }
 }
 
 class _SectionLabel extends StatelessWidget {

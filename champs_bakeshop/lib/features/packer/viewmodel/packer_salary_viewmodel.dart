@@ -13,9 +13,11 @@ class PackerSalaryViewModel extends ChangeNotifier {
   List<PackerProductionModel> _productions     = [];
   List<PackerProductionModel> _yearProductions = [];
   PackerPayrollModel?         _weekPayroll;
+  double                      _yearlyVale      = 0;
 
-  DateTime _weekStart  = _currentMonday();
-  DateTime _monthStart = _firstDayOfMonth(DateTime.now());
+  DateTime _weekStart   = _currentMonday();
+  DateTime _monthStart  = _firstDayOfMonth(DateTime.now());
+  DateTime _selectedDay = _today();
 
   // ── Getters ────────────────────────────────────────────────
   bool    get isLoading   => _isLoading;
@@ -23,6 +25,15 @@ class PackerSalaryViewModel extends ChangeNotifier {
 
   List<PackerProductionModel> get productions => _productions;
   PackerPayrollModel?         get weekPayroll => _weekPayroll;
+
+  // ── Selected day (daily tab) ───────────────────────────────
+  bool   get isToday          => _selectedDay == _today();
+  String get selectedDayDisplay => _fmtFullLong(_selectedDay);
+
+  List<PackerDailyEntry> get dailyEntriesForDay {
+    final dateStr = _isoDate(_selectedDay);
+    return dailyEntries.where((e) => e.date == dateStr).toList();
+  }
 
   // ── Week range (ISO – DB queries) ──────────────────────────
   String get weekStart => _isoDate(_weekStart);
@@ -85,6 +96,7 @@ class PackerSalaryViewModel extends ChangeNotifier {
   // ── Yearly aggregates (used by profile) ───────────────────
   int    get yearlyBundles => _yearProductions.fold(0, (s, p) => s + p.bundleCount);
   double get yearlyGross   => yearlyBundles * 4.0;
+  double get yearlyNet     => yearlyGross - _yearlyVale;
   int    get yearlyDays    {
     final dates = <String>{};
     for (final p in _yearProductions) dates.add(p.date);
@@ -189,8 +201,15 @@ class PackerSalaryViewModel extends ChangeNotifier {
         monthStart: yearStart,
         monthEnd:   yearEnd,
       );
+      final payrolls = await _service.getPayrollHistory(
+        packerId: packerId,
+        fromDate: yearStart,
+        toDate:   yearEnd,
+      );
+      _yearlyVale = payrolls.fold(0.0, (s, p) => s + p.valeDeduction);
     } catch (_) {
       _yearProductions = [];
+      _yearlyVale      = 0;
     }
   }
 
@@ -226,9 +245,26 @@ class PackerSalaryViewModel extends ChangeNotifier {
     await _loadWeekData(packerId);
   }
 
+  Future<void> changeDay(int direction, String packerId) async {
+    if (direction > 0 && isToday) return;
+    final next = _selectedDay.add(Duration(days: direction));
+    _selectedDay = next;
+    // reload week if day moved outside current loaded week
+    final dayMon = DateTime(next.year, next.month,
+        next.day - (next.weekday - DateTime.monday));
+    if (_isoDate(dayMon) != _isoDate(_weekStart)) {
+      _weekStart = dayMon;
+      await _loadWeekData(packerId);
+    } else {
+      notifyListeners();
+    }
+  }
+
   Future<void> goToDate(DateTime date, String packerId) async {
-    final diff = date.weekday - DateTime.monday;
-    _weekStart = DateTime(date.year, date.month, date.day - diff);
+    final d    = DateTime(date.year, date.month, date.day);
+    _selectedDay = d;
+    final diff = d.weekday - DateTime.monday;
+    _weekStart = DateTime(d.year, d.month, d.day - diff);
     await _loadWeekData(packerId);
   }
 
@@ -259,6 +295,11 @@ class PackerSalaryViewModel extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  static DateTime _today() {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day);
   }
 
   static DateTime _currentMonday() {
@@ -293,6 +334,18 @@ class PackerSalaryViewModel extends ChangeNotifier {
       'Thursday', 'Friday', 'Saturday', 'Sunday',
     ];
     return '${days[d.weekday]}, ${_fmtDate(d)}';
+  }
+
+  static String _fmtFullLong(DateTime d) {
+    const days = [
+      '', 'Monday', 'Tuesday', 'Wednesday',
+      'Thursday', 'Friday', 'Saturday', 'Sunday',
+    ];
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${days[d.weekday]}, ${months[d.month]} ${d.day}, ${d.year}';
   }
 }
 

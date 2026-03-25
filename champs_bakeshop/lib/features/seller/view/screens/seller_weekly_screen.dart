@@ -29,6 +29,7 @@ class SellerWeeklyScreen extends StatelessWidget {
           // ── Week navigator ───────────────────────────────
           _WeekNav(
             weekStart: vm.weekStart, weekEnd: vm.weekEnd,
+            isCurrentWeek: vm.isCurrentWeek,
             onPrev: () => vm.changeWeek(-1, uid),
             onNext: () => vm.changeWeek(1, uid),
           ),
@@ -69,10 +70,12 @@ class SellerWeeklyScreen extends StatelessWidget {
 class _WeekNav extends StatelessWidget {
   final String weekStart;
   final String weekEnd;
+  final bool isCurrentWeek;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   const _WeekNav({
     required this.weekStart, required this.weekEnd,
+    required this.isCurrentWeek,
     required this.onPrev, required this.onNext,
   });
 
@@ -89,18 +92,37 @@ class _WeekNav extends StatelessWidget {
             color: AppColors.seller, iconSize: 20, onPressed: onPrev,
           ),
           Expanded(
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.date_range_outlined,
-                  size: 15, color: AppColors.seller.withValues(alpha: 0.8)),
-              const SizedBox(width: 6),
-              Text('$weekStart — $weekEnd',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryDark)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (isCurrentWeek)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.seller.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('This Week',
+                      style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w700,
+                          color: AppColors.seller)),
+                ),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.date_range_outlined,
+                    size: 15, color: AppColors.seller.withValues(alpha: 0.8)),
+                const SizedBox(width: 6),
+                Text('$weekStart — $weekEnd',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryDark)),
+              ]),
             ]),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right),
-            color: AppColors.seller, iconSize: 20, onPressed: onNext,
+            icon: Icon(Icons.chevron_right,
+                color: isCurrentWeek
+                    ? AppColors.seller.withValues(alpha: 0.25)
+                    : AppColors.seller),
+            iconSize: 20,
+            onPressed: isCurrentWeek ? null : onNext,
           ),
         ]),
       );

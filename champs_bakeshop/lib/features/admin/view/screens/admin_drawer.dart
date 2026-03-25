@@ -8,6 +8,7 @@ import '../../viewmodel/admin_product_viewmodel.dart';
 // ── Use 'as' prefix so Dart knows exactly which file each class comes from ──
 import 'manage_users_screen.dart'    as users_screen;
 import 'manage_products_screen.dart' as products_screen;
+import 'admin_batch_screen.dart'     as batch_screen;
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -19,9 +20,10 @@ class AdminDrawer extends StatelessWidget {
         MaterialPageRoute(builder: (_) => page));
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
     Navigator.pop(context);
-    context.read<AuthViewModel>().logout();
+    await context.read<AuthViewModel>().logout();
+    if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -160,9 +162,22 @@ class AdminDrawer extends StatelessWidget {
                   context,
                   _Wrapped(
                     title: 'Products',
-                    // ← explicit prefix
                     child: products_screen
                         .ManageProductsScreen(),
+                  ),
+                ),
+              ),
+
+              _DrawerItem(
+                icon:       Icons.local_fire_department_outlined,
+                color:      AppColors.helper,
+                label:      'Batch Productions',
+                subtitle:   'Daily & weekly helper batches',
+                onTap: () => _openPage(
+                  context,
+                  _Wrapped(
+                    title: 'Batch Productions',
+                    child: batch_screen.AdminBatchScreen(),
                   ),
                 ),
               ),

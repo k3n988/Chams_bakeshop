@@ -4,7 +4,6 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import 'dart:math' as math;
 import '../../viewmodel/admin_user_viewmodel.dart';
-import '../../viewmodel/admin_product_viewmodel.dart';
 import '../../viewmodel/admin_production_viewmodel.dart';
 import '../../viewmodel/admin_payroll_viewmodel.dart';
 
@@ -15,7 +14,6 @@ class AdminHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userVM    = context.watch<AdminUserViewModel>();
-    final productVM = context.watch<AdminProductViewModel>();
     final prodVM    = context.watch<AdminProductionViewModel>();
     final payrollVM = context.watch<AdminPayrollViewModel>();
 
@@ -32,39 +30,50 @@ class AdminHomeScreen extends StatelessWidget {
           // ── Stats grid ────────────────────────────────────
           const _SectionLabel('QUICK OVERVIEW'),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.55,
-            children: [
-              _StatCard(
-                icon:  Icons.people_outlined,
-                label: 'Total Staff',
-                value: '${userVM.nonAdminUsers.length}',
-                color: AppColors.masterBaker,
+          SizedBox(
+            height: 110,
+            child: Row(children: [
+              Expanded(
+                child: _StatCard(
+                  icon:  Icons.layers_outlined,
+                  label: 'Total Bundles',
+                  value: '${prodVM.weekTotalBundles}',
+                  color: AppColors.primary,
+                ),
               ),
-              _StatCard(
-                icon:  Icons.inventory_2_outlined,
-                label: 'Products',
-                value: '${productVM.products.length}',
-                color: AppColors.info,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  icon:  Icons.payments_outlined,
+                  label: 'Baker/Helper Payroll',
+                  value: formatCurrency(payrollVM.totalPayroll),
+                  color: const Color(0xFF388E3C),
+                ),
               ),
-              _StatCard(
-                icon:  Icons.bar_chart_outlined,
-                label: 'Productions',
-                value: '${prodVM.productions.length}',
-                color: AppColors.primary,
+            ]),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 110,
+            child: Row(children: [
+              Expanded(
+                child: _StatCard(
+                  icon:  Icons.inventory_2_outlined,
+                  label: 'Packer Payroll',
+                  value: formatCurrency(payrollVM.totalPayrollPacker),
+                  color: AppColors.packer,
+                ),
               ),
-              _StatCard(
-                icon:  Icons.payments_outlined,
-                label: 'Total Payroll',
-                value: formatCurrency(payrollVM.totalPayroll),
-                color: const Color(0xFF388E3C),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  icon:  Icons.storefront_outlined,
+                  label: 'Seller Payroll',
+                  value: formatCurrency(payrollVM.totalPayrollSeller),
+                  color: AppColors.seller,
+                ),
               ),
-            ],
+            ]),
           ),
           const SizedBox(height: 20),
 
@@ -72,6 +81,12 @@ class AdminHomeScreen extends StatelessWidget {
           const _SectionLabel('STAFF BREAKDOWN'),
           const SizedBox(height: 12),
           _StaffBreakdownCard(userVM: userVM),
+          const SizedBox(height: 20),
+
+          // ── Packed this week ──────────────────────────────
+          const _SectionLabel('PACKED THIS WEEK — BY PRODUCT'),
+          const SizedBox(height: 12),
+          _PackedTodayCard(prodVM: prodVM),
           const SizedBox(height: 20),
 
           // ── Quick actions ─────────────────────────────────
@@ -229,7 +244,6 @@ class _StatCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(7),
@@ -573,6 +587,156 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DonutPainter old) =>
       old.progress != progress || old.total != total;
+}
+
+// ── Packed today card ─────────────────────────────────────────
+class _PackedTodayCard extends StatelessWidget {
+  final AdminProductionViewModel prodVM;
+  const _PackedTodayCard({required this.prodVM});
+
+  @override
+  Widget build(BuildContext context) {
+    final byProduct = prodVM.weekPackedByProduct;
+    final total     = prodVM.weekTotalBundles;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: prodVM.isLoading
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.primary),
+              ),
+            )
+          : byProduct.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text(
+                      'No packing recorded this week.',
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textHint),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    // ── Per-product rows ─────────────────────
+                    ...byProduct.entries.map((e) =>
+                        _ProductBundleRow(
+                          name:    e.key,
+                          bundles: e.value,
+                          total:   total,
+                        )),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    // ── Total footer ─────────────────────────
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Bundles',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Color(0xFF1A1A1A))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary
+                                .withValues(alpha: 0.08),
+                            borderRadius:
+                                BorderRadius.circular(20),
+                          ),
+                          child: Text('$total',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                  color: AppColors.primary,
+                                  letterSpacing: -0.3)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+    );
+  }
+}
+
+class _ProductBundleRow extends StatelessWidget {
+  final String name;
+  final int    bundles;
+  final int    total;
+
+  const _ProductBundleRow({
+    required this.name,
+    required this.bundles,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = total > 0 ? bundles / total : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            // Dot
+            Container(
+              width: 8, height: 8,
+              decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            // Product name
+            Expanded(
+              child: Text(name,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text)),
+            ),
+            // Bundle count
+            Text('$bundles bundle${bundles == 1 ? '' : 's'}',
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary)),
+          ]),
+          const SizedBox(height: 6),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 5,
+              backgroundColor:
+                  AppColors.primary.withValues(alpha: 0.08),
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Quick action card (2-up grid) ─────────────────────────────

@@ -50,7 +50,6 @@ class _WeeklyTabState extends State<_WeeklyTab> {
 
   void _goToCurrentWeek() {
     final vm = context.read<BakerSalaryViewModel>();
-    final uid = context.read<AuthViewModel>().currentUser!.id;
     // Navigate forward/backward until we reach current week
     final currentWeekStart = getWeekStart(DateTime.now());
     if (vm.weekStart == currentWeekStart) return;

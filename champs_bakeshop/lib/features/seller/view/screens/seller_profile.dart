@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
@@ -8,37 +10,194 @@ import '../../viewmodel/seller_remittance_viewmodel.dart';
 
 import '../../../../features/auth/view/login_screen.dart';
 
-class SellerProfileScreen extends StatelessWidget {
+class SellerProfileScreen extends StatefulWidget {
   const SellerProfileScreen({super.key});
 
-  void _confirmLogout(BuildContext context) {
+  @override
+  State<SellerProfileScreen> createState() => _SellerProfileScreenState();
+}
+
+class _SellerProfileScreenState extends State<SellerProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uid = context.read<AuthViewModel>().currentUser!.id;
+      context.read<SellerRemittanceViewModel>().loadYearlySummary(uid);
+    });
+  }
+  // ── Edit form state ───────────────────────────────────────
+  final _nameCtrl     = TextEditingController();
+  final _passCtrl     = TextEditingController();
+  final _confirmCtrl  = TextEditingController();
+  bool _obscurePass   = true;
+  bool _obscureConf   = true;
+  bool _saving        = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Pick photo ───────────────────────────────────────────
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final source = await _showSourceDialog();
+    if (source == null) return;
+
+    final xfile = await picker.pickImage(source: source, imageQuality: 80);
+    if (xfile == null) return;
+
+    if (mounted) {
+      await context.read<AuthViewModel>().setLocalPhoto(xfile.path);
+    }
+  }
+
+  Future<ImageSource?> _showSourceDialog() => showModalBottomSheet<ImageSource>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (_) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 8),
+            Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: AppColors.seller.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.camera_alt_outlined, color: AppColors.seller),
+              ),
+              title: const Text('Camera',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: AppColors.seller.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.photo_library_outlined, color: AppColors.seller),
+              ),
+              title: const Text('Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 16),
+          ]),
+        ),
+      );
+
+  // ── Open edit bottom sheet ────────────────────────────────
+  void _openEditSheet() {
+    final user = context.read<AuthViewModel>().currentUser!;
+    _nameCtrl.text    = user.name;
+    _passCtrl.text    = '';
+    _confirmCtrl.text = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => _EditSheet(
+        nameCtrl:    _nameCtrl,
+        passCtrl:    _passCtrl,
+        confirmCtrl: _confirmCtrl,
+        obscurePass: _obscurePass,
+        obscureConf: _obscureConf,
+        onTogglePass: () => setState(() => _obscurePass = !_obscurePass),
+        onToggleConf: () => setState(() => _obscureConf = !_obscureConf),
+        onSave:      () => _save(ctx),
+        saving:      _saving,
+      ),
+    );
+  }
+
+  Future<void> _save(BuildContext sheetCtx) async {
+    final name = _nameCtrl.text.trim();
+    final pass = _passCtrl.text.trim();
+    final conf = _confirmCtrl.text.trim();
+
+    if (name.isEmpty) {
+      _snack('Name cannot be empty');
+      return;
+    }
+    if (pass.isNotEmpty && pass != conf) {
+      _snack('Passwords do not match');
+      return;
+    }
+
+    setState(() => _saving = true);
+    final err = await context.read<AuthViewModel>().updateProfile(
+      name:     name,
+      password: pass.isEmpty ? context.read<AuthViewModel>().currentUser!.password : pass,
+    );
+    setState(() => _saving = false);
+
+    if (err != null) {
+      _snack('Error: $err');
+    } else {
+      if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+      _snack('Profile updated');
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _confirmLogout() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign Out',
-            style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryDark)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.logout, color: AppColors.danger, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Text('Sign Out',
+              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+        ]),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () async {
               Navigator.pop(ctx);
-              context.read<AuthViewModel>().logout();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const LoginScreen()),
-                  (_) => false,
-                );
-              }
+              await context.read<AuthViewModel>().logout();
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (_) => false,
+              );
             },
             child: const Text('Sign Out'),
           ),
@@ -49,55 +208,62 @@ class SellerProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthViewModel>().currentUser!;
+    final auth = context.watch<AuthViewModel>();
+    final user = auth.currentUser!;
     final vm   = context.watch<SellerRemittanceViewModel>();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      child: Column(
-        children: [
-          // ── Avatar & name ────────────────────────────────────
-          _ProfileCard(user: user),
-          const SizedBox(height: 16),
+      child: Column(children: [
+        // ── Profile card ─────────────────────────────────────
+        _ProfileCard(
+          user:       user,
+          photoPath:  auth.localPhotoPath,
+          onEditPhoto: _pickPhoto,
+          onEdit:     _openEditSheet,
+        ),
+        const SizedBox(height: 16),
 
-          // ── Stats card ───────────────────────────────────────
-          _StatsCard(vm: vm),
-          const SizedBox(height: 16),
+        // ── Stats card ───────────────────────────────────────
+        _StatsCard(vm: vm),
+        const SizedBox(height: 16),
 
-          // ── Info card ─────────────────────────────────────────
-          _InfoCard(),
-          const SizedBox(height: 24),
+        // ── Info card ────────────────────────────────────────
+        _InfoCard(),
+        const SizedBox(height: 24),
 
-          // ── Logout ────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.logout,
-                  color: AppColors.danger, size: 18),
-              label: const Text('Sign Out',
-                  style: TextStyle(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w700)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(
-                    color: AppColors.danger, width: 1.5),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: () => _confirmLogout(context),
+        // ── Logout ───────────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.logout, color: AppColors.danger, size: 18),
+            label: const Text('Sign Out',
+                style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.danger, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
+            onPressed: _confirmLogout,
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }
 
 // ── Profile card ──────────────────────────────────────────────
 class _ProfileCard extends StatelessWidget {
-  final dynamic user;
-  const _ProfileCard({required this.user});
+  final dynamic     user;
+  final String?     photoPath;
+  final VoidCallback onEditPhoto;
+  final VoidCallback onEdit;
+  const _ProfileCard({
+    required this.user,
+    required this.photoPath,
+    required this.onEditPhoto,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -105,72 +271,248 @@ class _ProfileCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              AppColors.seller,
-              AppColors.seller.withValues(alpha: 0.75),
-            ],
+            colors: [AppColors.seller, AppColors.seller.withValues(alpha: 0.75)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.seller.withValues(alpha: 0.28),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: [BoxShadow(
+            color: AppColors.seller.withValues(alpha: 0.28),
+            blurRadius: 16, offset: const Offset(0, 6),
+          )],
         ),
         child: Column(children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              shape: BoxShape.circle,
+          // ── Avatar with edit overlay ──────────────────────
+          Stack(alignment: Alignment.bottomRight, children: [
+            GestureDetector(
+              onTap: onEditPhoto,
+              child: CircleAvatar(
+                radius: 42,
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                backgroundImage: photoPath != null
+                    ? FileImage(File(photoPath!))
+                    : null,
+                child: photoPath == null
+                    ? Text(
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white),
+                      )
+                    : null,
+              ),
             ),
-            alignment: Alignment.center,
-            child: Text(
-              user.name.isNotEmpty ? user.name[0] : 'S',
-              style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white),
+            GestureDetector(
+              onTap: onEditPhoto,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 4)],
+                ),
+                child: const Icon(Icons.camera_alt, size: 14, color: AppColors.seller),
+              ),
             ),
-          ),
+          ]),
           const SizedBox(height: 14),
           Text(user.name,
               style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white)),
+                  fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
           const SizedBox(height: 4),
           Text(user.email,
-              style: const TextStyle(
-                  fontSize: 13, color: Colors.white70)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.20),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('🏪', style: TextStyle(fontSize: 13)),
+              style: const TextStyle(fontSize: 13, color: Colors.white70)),
+          const SizedBox(height: 14),
+          // ── Edit profile button ───────────────────────────
+          GestureDetector(
+            onTap: onEdit,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
+              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.edit_outlined, size: 14, color: Colors.white),
                 SizedBox(width: 6),
-                Text('Pandesal Seller',
+                Text('Edit Profile',
                     style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-              ],
+                        fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+              ]),
             ),
           ),
         ]),
       );
+}
+
+// ── Edit bottom sheet ─────────────────────────────────────────
+class _EditSheet extends StatefulWidget {
+  final TextEditingController nameCtrl;
+  final TextEditingController passCtrl;
+  final TextEditingController confirmCtrl;
+  final bool obscurePass;
+  final bool obscureConf;
+  final VoidCallback onTogglePass;
+  final VoidCallback onToggleConf;
+  final VoidCallback onSave;
+  final bool saving;
+
+  const _EditSheet({
+    required this.nameCtrl,
+    required this.passCtrl,
+    required this.confirmCtrl,
+    required this.obscurePass,
+    required this.obscureConf,
+    required this.onTogglePass,
+    required this.onToggleConf,
+    required this.onSave,
+    required this.saving,
+  });
+
+  @override
+  State<_EditSheet> createState() => _EditSheetState();
+}
+
+class _EditSheetState extends State<_EditSheet> {
+  late bool _obscurePass;
+  late bool _obscureConf;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscurePass = widget.obscurePass;
+    _obscureConf = widget.obscureConf;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Handle ───────────────────────────────────────────
+        Center(child: Container(
+          width: 40, height: 4,
+          decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2)),
+        )),
+        const SizedBox(height: 20),
+        const Text('Edit Profile',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900,
+                color: AppColors.primaryDark)),
+        const SizedBox(height: 4),
+        const Text('Update your name or password',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        const SizedBox(height: 20),
+
+        // ── Name ─────────────────────────────────────────────
+        _FieldLabel('Display Name'),
+        const SizedBox(height: 6),
+        TextField(
+          controller: widget.nameCtrl,
+          textCapitalization: TextCapitalization.words,
+          decoration: _inputDeco(
+            hint: 'Your name',
+            icon: Icons.person_outline,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── New password ──────────────────────────────────────
+        _FieldLabel('New Password'),
+        const SizedBox(height: 6),
+        TextField(
+          controller: widget.passCtrl,
+          obscureText: _obscurePass,
+          decoration: _inputDeco(
+            hint: 'Leave blank to keep current',
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                  _obscurePass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18, color: AppColors.textHint),
+              onPressed: () => setState(() => _obscurePass = !_obscurePass),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Confirm password ──────────────────────────────────
+        _FieldLabel('Confirm Password'),
+        const SizedBox(height: 6),
+        TextField(
+          controller: widget.confirmCtrl,
+          obscureText: _obscureConf,
+          decoration: _inputDeco(
+            hint: 'Re-enter new password',
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                  _obscureConf ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18, color: AppColors.textHint),
+              onPressed: () => setState(() => _obscureConf = !_obscureConf),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // ── Save button ───────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.seller,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: widget.saving ? null : widget.onSave,
+            child: widget.saving
+                ? const SizedBox(width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                : const Text('Save Changes',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  InputDecoration _inputDeco({required String hint, required IconData icon}) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
+        prefixIcon: Icon(icon, size: 18, color: AppColors.textHint),
+        filled: true,
+        fillColor: const Color(0xFFF5F5F5),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+                color: AppColors.seller.withValues(alpha: 0.6), width: 1.5)),
+      );
+}
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(text,
+      style: const TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary));
 }
 
 // ── Stats card ────────────────────────────────────────────────
@@ -185,41 +527,47 @@ class _StatsCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
+          boxShadow: [BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8, offset: const Offset(0, 2))],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionLabel('THIS WEEK\'S STATS'),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _StatCell(
-                    value: '${vm.totalPiecesSold}',
-                    label: 'Pieces Sold',
-                    color: AppColors.success),
-                Container(
-                    width: 1, height: 44, color: AppColors.border),
-                _StatCell(
-                    value: formatCurrency(vm.totalActualRemittance),
-                    label: 'Remitted',
-                    color: AppColors.seller),
-                Container(
-                    width: 1, height: 44, color: AppColors.border),
-                _StatCell(
-                    value: '${vm.daysRemitted}',
-                    label: 'Days',
-                    color: const Color(0xFF1976D2)),
-              ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _SectionLabel('${DateTime.now().year} ANNUAL STATS'),
+          const SizedBox(height: 14),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            _StatCell(
+                value: '${vm.yearlyPiecesSold}',
+                label: 'Pieces Sold',
+                color: AppColors.success),
+            Container(width: 1, height: 44, color: AppColors.border),
+            _StatCell(
+                value: formatCurrency(vm.yearlyRemittance),
+                label: 'Remittance',
+                color: AppColors.seller),
+            Container(width: 1, height: 44, color: AppColors.border),
+            _StatCell(
+                value: formatCurrency(vm.yearlySalary),
+                label: 'Salary',
+                color: const Color(0xFF1976D2)),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.seller.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ],
-        ),
+            child: Center(
+              child: Text(
+                '${vm.yearlyDays} days remitted in ${DateTime.now().year}',
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: AppColors.seller),
+              ),
+            ),
+          ),
+        ]),
       );
 }
 
@@ -227,26 +575,17 @@ class _StatCell extends StatelessWidget {
   final String value;
   final String label;
   final Color  color;
-  const _StatCell({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
+  const _StatCell({required this.value, required this.label, required this.color});
 
   @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Text(value,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: color)),
-          const SizedBox(height: 3),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textHint)),
-        ],
-      );
+  Widget build(BuildContext context) => Column(children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w900, color: color)),
+        const SizedBox(height: 3),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+      ]);
 }
 
 // ── Info card ─────────────────────────────────────────────────
@@ -258,40 +597,28 @@ class _InfoCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
+          boxShadow: [BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8, offset: const Offset(0, 2))],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionLabel('HOW IT WORKS'),
-            const SizedBox(height: 14),
-            _InfoRow(
-                icon: Icons.wb_sunny_outlined,
-                color: AppColors.seller,
-                title: 'Morning Session',
-                desc:
-                    'Input your plantsa count and subra before going out to sell.'),
-            const Divider(height: 20, color: AppColors.border),
-            _InfoRow(
-                icon: Icons.calculate_outlined,
-                color: const Color(0xFF1976D2),
-                title: 'Formula',
-                desc:
-                    '(Plantsa × 25 + Subra) × ₱5 = Expected remittance.'),
-            const Divider(height: 20, color: AppColors.border),
-            _InfoRow(
-                icon: Icons.payments_outlined,
-                color: AppColors.success,
-                title: 'Evening Remittance',
-                desc:
-                    'Declare returns and submit actual cash collected. Variance is tracked.'),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const _SectionLabel('HOW IT WORKS'),
+          const SizedBox(height: 14),
+          _InfoRow(
+              icon: Icons.wb_sunny_outlined, color: AppColors.seller,
+              title: 'Morning Session',
+              desc: 'Input your plantsa count and subra before going out to sell.'),
+          const Divider(height: 20, color: AppColors.border),
+          _InfoRow(
+              icon: Icons.calculate_outlined, color: const Color(0xFF1976D2),
+              title: 'Formula',
+              desc: '(Plantsa × 25 + Subra) × ₱5 = Expected remittance.'),
+          const Divider(height: 20, color: AppColors.border),
+          _InfoRow(
+              icon: Icons.payments_outlined, color: AppColors.success,
+              title: 'Evening Remittance',
+              desc: 'Declare returns and submit actual cash collected. Variance is tracked.'),
+        ]),
       );
 }
 
@@ -300,12 +627,8 @@ class _InfoRow extends StatelessWidget {
   final Color    color;
   final String   title;
   final String   desc;
-  const _InfoRow({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.desc,
-  });
+  const _InfoRow({required this.icon, required this.color,
+      required this.title, required this.desc});
 
   @override
   Widget build(BuildContext context) => Row(
@@ -320,23 +643,14 @@ class _InfoRow extends StatelessWidget {
             child: Icon(icon, size: 16, color: color),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppColors.text)),
-                const SizedBox(height: 3),
-                Text(desc,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.text)),
+            const SizedBox(height: 3),
+            Text(desc,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ])),
         ],
       );
 }
@@ -351,15 +665,12 @@ class _SectionLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.seller,
-              borderRadius: BorderRadius.circular(2)),
+              color: AppColors.seller, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
         Text(text,
             style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textHint,
-                letterSpacing: 0.8)),
+                fontSize: 11, fontWeight: FontWeight.w800,
+                color: AppColors.textHint, letterSpacing: 0.8)),
       ]);
 }

@@ -771,17 +771,6 @@ class _WeekNavigator extends StatelessWidget {
     required this.onNext,
   });
 
-  String _fmt(String dateStr) {
-    if (dateStr.isEmpty) return '—';
-    try {
-      final d = DateTime.parse(dateStr);
-      const m = [
-        'Jan','Feb','Mar','Apr','May','Jun',
-        'Jul','Aug','Sep','Oct','Nov','Dec'
-      ];
-      return '${m[d.month - 1]} ${d.day}';
-    } catch (_) { return dateStr; }
-  }
 
   String get _label {
     if (weekStart.isEmpty) return '—';

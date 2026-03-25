@@ -158,84 +158,6 @@ class _MonthNav extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Label row ──────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.packer.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.today_rounded,
-                  size:  14,
-                  color: AppColors.packer,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Viewing Month',
-                    style: TextStyle(
-                      fontSize:   10,
-                      fontWeight: FontWeight.w700,
-                      color:      AppColors.textHint,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  // Always shows current real month
-                  Text(
-                    _currentMonthDisplay(),
-                    style: TextStyle(
-                      fontSize:   12,
-                      fontWeight: FontWeight.w800,
-                      color:      AppColors.packer,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              // "This Month" jump button — only when navigated away
-              if (!isCurrentMonth)
-                GestureDetector(
-                  onTap: onToday,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.packer.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.packer.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.restart_alt_rounded,
-                            size: 13, color: AppColors.packer),
-                        const SizedBox(width: 4),
-                        Text(
-                          'This Month',
-                          style: TextStyle(
-                            fontSize:   11,
-                            fontWeight: FontWeight.w800,
-                            color:      AppColors.packer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
         // ── Single pill: [ < | 📅 Month Year | > ] ─────────
         Container(
           decoration: BoxDecoration(
@@ -304,7 +226,7 @@ class _MonthNav extends StatelessWidget {
                         style: const TextStyle(
                           fontSize:   14,
                           fontWeight: FontWeight.w700,
-                          color:      AppColors.primaryDark,
+                          color:      AppColors.packer,
                         ),
                       ),
                     ],
@@ -327,15 +249,6 @@ class _MonthNav extends StatelessWidget {
     );
   }
 
-  /// Always shows the real current month — never changes
-  String _currentMonthDisplay() {
-    const months = [
-      '', 'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    final now = DateTime.now();
-    return '${months[now.month]} ${now.year}';
-  }
 }
 
 // ── Arrow inside the pill ─────────────────────────────────────
@@ -476,7 +389,7 @@ class _ExpandableWeekRow extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: _hasData
-                              ? AppColors.primaryDark
+                              ? AppColors.packer
                               : AppColors.textHint),
                     ),
                     if (_hasData) ...[
@@ -677,7 +590,7 @@ class _ExpandableWeekRow extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryDark)),
+                                  color: AppColors.packer)),
                         ]),
                       )),
                 ],

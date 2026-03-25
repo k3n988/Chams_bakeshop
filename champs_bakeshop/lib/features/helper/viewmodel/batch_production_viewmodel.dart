@@ -15,7 +15,8 @@ class BatchProductionViewModel extends ChangeNotifier {
 
   // ── State ────────────────────────────────────────────────
 
-  DateTime selectedDate = DateTime.now();
+  DateTime selectedDate = DateTime(
+      DateTime.now().year, DateTime.now().month, DateTime.now().day);
   String? selectedBakerId;
 
   List<Map<String, String>> masterBakers = [];

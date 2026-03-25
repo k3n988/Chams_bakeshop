@@ -14,11 +14,25 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   List<SellerRemittanceModel> _remittances = [];
   List<SellerSessionModel>    _sessions    = [];
 
-  DateTime _weekStart = DateTime.now();
+  // ── Yearly snapshot (profile) ──────────────────────────────
+  int    _yearlyPiecesSold    = 0;
+  double _yearlyRemittance    = 0;
+  double _yearlySalary        = 0;
+  int    _yearlyDays          = 0;
+
+  int    get yearlyPiecesSold => _yearlyPiecesSold;
+  double get yearlyRemittance => _yearlyRemittance;
+  double get yearlySalary     => _yearlySalary;
+  int    get yearlyDays       => _yearlyDays;
+
+  DateTime _weekStart = _currentMonday();
 
   // ── Getters ────────────────────────────────────────────────
   bool    get isLoading    => _isLoading;
   String? get error        => _error;
+
+  bool get isCurrentWeek =>
+      weekStart == _currentMonday().toIso8601String().substring(0, 10);
 
   List<SellerRemittanceModel> get remittances => _remittances;
   List<SellerSessionModel>    get sessions    => _sessions;
@@ -67,10 +81,24 @@ class SellerRemittanceViewModel extends ChangeNotifier {
     await _loadRange(sellerId);
   }
 
+  Future<void> loadYearlySummary(String sellerId) async {
+    final year  = DateTime.now().year;
+    final start = '$year-01-01';
+    final end   = '$year-12-31';
+    try {
+      final remittances = await _service.getRemittancesByRange(
+        sellerId: sellerId, fromDate: start, toDate: end,
+      );
+      _yearlyPiecesSold = remittances.fold(0,   (s, r) => s + r.piecesSold);
+      _yearlyRemittance = remittances.fold(0.0, (s, r) => s + r.actualRemittance);
+      _yearlySalary     = remittances.fold(0.0, (s, r) => s + r.salary);
+      _yearlyDays       = remittances.length;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   void _setWeekToCurrentMonday() {
-    final now  = DateTime.now();
-    final diff = now.weekday - DateTime.monday;
-    _weekStart = DateTime(now.year, now.month, now.day - diff);
+    _weekStart = _currentMonday();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -137,6 +165,7 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   //  WEEK NAVIGATION
   // ─────────────────────────────────────────────────────────
   Future<void> changeWeek(int direction, String sellerId) async {
+    if (direction > 0 && isCurrentWeek) return;
     _weekStart = _weekStart.add(Duration(days: 7 * direction));
     await _loadRange(sellerId);
   }
@@ -188,6 +217,12 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   //  HELPERS
   // ─────────────────────────────────────────────────────────
+  static DateTime _currentMonday() {
+    final now  = DateTime.now();
+    final diff = now.weekday - DateTime.monday;
+    return DateTime(now.year, now.month, now.day - diff);
+  }
+
   void _setLoading(bool v) {
     _isLoading = v;
     notifyListeners();

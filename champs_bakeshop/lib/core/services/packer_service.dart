@@ -229,6 +229,43 @@ class PackerService {
     }
   }
 
+  /// Admin: fetch all packer productions for a given date (all packers)
+  Future<List<PackerProductionModel>> getAllPackerProductionsByDate(
+      String date) async {
+    try {
+      final data = await _db
+          .from(_productionTable)
+          .select()
+          .eq('date', date)
+          .order('product_name', ascending: true);
+      return (data as List)
+          .map((e) => PackerProductionModel.fromJson(e))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch packer productions: $e');
+    }
+  }
+
+  /// Admin: fetch all packer productions for a week range (all packers)
+  Future<List<PackerProductionModel>> getAllPackerProductionsByWeek({
+    required String weekStart,
+    required String weekEnd,
+  }) async {
+    try {
+      final data = await _db
+          .from(_productionTable)
+          .select()
+          .gte('date', weekStart)
+          .lte('date', weekEnd)
+          .order('product_name', ascending: true);
+      return (data as List)
+          .map((e) => PackerProductionModel.fromJson(e))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch weekly packer productions: $e');
+    }
+  }
+
   /// Admin: fetch all packer payrolls for a given week (for payroll screen)
   Future<List<PackerPayrollModel>> getAllPackerPayrollsByWeek({
     required String weekStart,

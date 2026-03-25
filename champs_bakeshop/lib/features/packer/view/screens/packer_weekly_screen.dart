@@ -151,84 +151,6 @@ class _WeekNav extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Entry Date / today label row ───────────────────
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.packer.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.today_rounded,
-                  size:  14,
-                  color: AppColors.packer,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Entry Date',
-                    style: TextStyle(
-                      fontSize:   10,
-                      fontWeight: FontWeight.w700,
-                      color:      AppColors.textHint,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  // Always shows today — never changes
-                  Text(
-                    todayDisplay,
-                    style: TextStyle(
-                      fontSize:   12,
-                      fontWeight: FontWeight.w800,
-                      color:      AppColors.packer,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              // "Today" jump button — only when NOT on current week
-              if (!isCurrentWeek)
-                GestureDetector(
-                  onTap: () => onPickDate?.call(DateTime.now()),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.packer.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.packer.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.restart_alt_rounded,
-                            size: 13, color: AppColors.packer),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Today',
-                          style: TextStyle(
-                            fontSize:   11,
-                            fontWeight: FontWeight.w800,
-                            color:      AppColors.packer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
         // ── Single pill: [ < | 📅 date range | > ] ─────────
         Container(
           decoration: BoxDecoration(
@@ -300,7 +222,7 @@ class _WeekNav extends StatelessWidget {
                           style: const TextStyle(
                             fontSize:   13,
                             fontWeight: FontWeight.w700,
-                            color:      AppColors.primaryDark,
+                            color:      AppColors.packer,
                           ),
                         ),
                       ],
@@ -375,19 +297,6 @@ class _ExpandableDayCard extends StatelessWidget {
     }
   }
 
-  String _formatDate(String dateStr) {
-    try {
-      final dt = DateTime.parse(dateStr);
-      const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
-      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-    } catch (_) {
-      return dateStr;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
@@ -442,24 +351,12 @@ class _ExpandableDayCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _formatDate(entry.date),
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.text),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${entry.productions.length} entr${entry.productions.length == 1 ? 'y' : 'ies'} · ${entry.totalBundles} bundles',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary),
-                      ),
-                    ],
+                  child: Text(
+                    '${entry.productions.length} entr${entry.productions.length == 1 ? 'y' : 'ies'} · ${entry.totalBundles} bundles',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary),
                   ),
                 ),
                 Column(

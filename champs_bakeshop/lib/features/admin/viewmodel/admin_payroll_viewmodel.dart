@@ -3,11 +3,15 @@ import '../../../../core/models/payroll_model.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/services/database_service.dart';
 import '../../../../core/services/payroll_service.dart';
+import '../../../../core/services/packer_service.dart';
+import '../../../../core/services/seller_service.dart';
 import '../../../../core/utils/helpers.dart';
 
 class AdminPayrollViewModel extends ChangeNotifier {
   final DatabaseService _db;
-  final PayrollService _payroll;
+  final PayrollService  _payroll;
+  final PackerService   _packerSvc = PackerService();
+  final SellerService   _sellerSvc = SellerService();
 
   AdminPayrollViewModel(this._db, this._payroll);
 
@@ -18,7 +22,10 @@ class AdminPayrollViewModel extends ChangeNotifier {
   String _weekEnd = '';
   bool _isLoading = false;
   bool _isPaying = false;
-  String? _error; // ✅ added
+  String? _error;
+
+  double _packerWeeklyTotal = 0.0;
+  double _sellerWeeklyTotal = 0.0;
 
   // ─── Getters ──────────────────────────────────────────────────────────────
 
@@ -31,6 +38,59 @@ class AdminPayrollViewModel extends ChangeNotifier {
 
   double get totalPayroll =>
       _entries.fold(0.0, (sum, e) => sum + e.finalSalary);
+
+  double get totalPayrollPacker => _packerWeeklyTotal;
+  double get totalPayrollSeller => _sellerWeeklyTotal;
+
+  // ─── Auto-load (called from dashboard initState) ─────────────────────────
+
+  /// Fetches products + users itself, then loads the current week's payroll
+  /// plus packer and seller weekly totals.
+  Future<void> autoLoad() async {
+    final now  = DateTime.now();
+    final mon  = now.subtract(Duration(days: now.weekday - 1));
+    final sun  = mon.add(const Duration(days: 6));
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final weekStartStr = fmt(mon);
+    final weekEndStr   = fmt(sun);
+
+    final users    = await _db.getAllUsers();
+    final products = await _db.getAllProducts();
+
+    // Baker/Helper payroll
+    final userNames = {for (final u in users) u.id: u.name};
+    final userRoles = {for (final u in users) u.id: u.role};
+    await loadWeeklyPayroll(weekStartStr, products, userNames, userRoles);
+
+    // Packer weekly total — sum net_salary from packer_payroll table
+    final packers = users.where((u) => u.role == 'packer').toList();
+    double packerTotal = 0.0;
+    for (final p in packers) {
+      final record = await _packerSvc.getPayrollByWeek(
+        packerId:  p.id,
+        weekStart: weekStartStr,
+        weekEnd:   weekEndStr,
+      );
+      if (record != null) packerTotal += record.netSalary;
+    }
+    _packerWeeklyTotal = packerTotal;
+
+    // Seller weekly total — sum salary from remittances this week
+    final sellers = users.where((u) => u.role == 'seller').toList();
+    double sellerTotal = 0.0;
+    for (final s in sellers) {
+      final remits = await _sellerSvc.getRemittancesByRange(
+        sellerId: s.id,
+        fromDate: weekStartStr,
+        toDate:   weekEndStr,
+      );
+      sellerTotal += remits.fold(0.0, (sum, r) => sum + r.salary);
+    }
+    _sellerWeeklyTotal = sellerTotal;
+
+    notifyListeners();
+  }
 
   // ─── Load ─────────────────────────────────────────────────────────────────
 

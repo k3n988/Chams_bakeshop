@@ -5,6 +5,7 @@ import '../../../../core/utils/helpers.dart';
 
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
+import 'helper_dashboard.dart' show DashColors;
 
 class HelperMonthlyScreen extends StatefulWidget {
   const HelperMonthlyScreen({super.key});
@@ -19,7 +20,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
   late DateTime _selectedMonth;
 
   static const _weekColors = [
-    AppColors.info,
+    DashColors.primary,
     AppColors.primary,
     AppColors.masterBaker,
     Color(0xFF8E44AD),
@@ -78,7 +79,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary:   AppColors.info,
+            primary:   DashColors.primary,
             onSurface: AppColors.text,
           ),
         ),
@@ -198,9 +199,9 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                   ]),
                   const SizedBox(height: 12),
                   _SheetCard(
-                    color: AppColors.primaryDark,
+                    color: DashColors.primaryDark,
                     children: [
-                      _SheetLabel('NET SALARY', AppColors.primaryDark),
+                      _SheetLabel('NET SALARY', DashColors.primaryDark),
                       const SizedBox(height: 12),
                       _SheetRow(
                           icon:       Icons.calculate_outlined,
@@ -225,7 +226,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                             style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 24,
-                                color: AppColors.primaryDark,
+                                color: DashColors.primaryDark,
                                 letterSpacing: -0.5),
                           ),
                         ],
@@ -252,7 +253,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
         .length;
 
     return RefreshIndicator(
-      color:     AppColors.info,
+      color:     DashColors.primary,
       onRefresh: () async => _load(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -293,23 +294,23 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.08),
+                        color: DashColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: AppColors.info
+                            color: DashColors.primary
                                 .withValues(alpha: 0.2)),
                       ),
                       child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.today_outlined,
-                                size: 13, color: AppColors.info),
+                                size: 13, color: DashColors.primary),
                             SizedBox(width: 5),
                             Text('This Month',
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.info)),
+                                    color: DashColors.primary)),
                           ]),
                     ),
                   ),
@@ -366,7 +367,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                   _StatTile('Avg/Week',
                       formatCurrency(vm.monthlyAvgPerWeek),
                       Icons.trending_up_outlined,
-                      AppColors.info),
+                      DashColors.primary),
                 ],
               ),
               const SizedBox(height: 20),
@@ -378,7 +379,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.10),
+                      color: DashColors.primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -386,7 +387,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
                       style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.info),
+                          color: DashColors.primary),
                     ),
                   ),
                 ],
@@ -460,7 +461,7 @@ class _MonthNavigator extends StatelessWidget {
                     Icon(Icons.calendar_month_outlined,
                         size:  15,
                         color: isCurrentMonth
-                            ? AppColors.info
+                            ? DashColors.primary
                             : AppColors.textHint),
                     const SizedBox(width: 8),
                     Text(label,
@@ -468,7 +469,7 @@ class _MonthNavigator extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                             fontSize:   14,
                             color: isCurrentMonth
-                                ? AppColors.info
+                                ? DashColors.primary
                                 : AppColors.text,
                             letterSpacing: -0.2)),
                     if (isCurrentMonth) ...[
@@ -477,7 +478,7 @@ class _MonthNavigator extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.info,
+                          color: DashColors.primary,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text('THIS MONTH',
@@ -521,7 +522,7 @@ class _MBtn extends StatelessWidget {
               horizontal: 14, vertical: 14),
           child: Icon(icon,
               size:  20,
-              color: disabled ? AppColors.border : AppColors.info),
+              color: disabled ? AppColors.border : DashColors.primary),
         ),
       );
 }
@@ -546,11 +547,11 @@ class _NoMonthRecord extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.07),
+              color: DashColors.primary.withValues(alpha: 0.07),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.calendar_month_outlined,
-                size: 36, color: AppColors.info),
+                size: 36, color: DashColors.primary),
           ),
           const SizedBox(height: 14),
           Text('No data for $monthLabel',
@@ -581,7 +582,7 @@ class _MonthPaymentBar extends StatelessWidget {
     final nonePaid = paidCount == 0;
     final color = allPaid
         ? AppColors.success
-        : nonePaid ? Colors.orange : AppColors.info;
+        : nonePaid ? Colors.orange : DashColors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -755,7 +756,7 @@ class _WeekExpansionTile extends StatelessWidget {
                           style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize:   16,
-                              color:      AppColors.primaryDark)),
+                              color:      DashColors.primaryDark)),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1210,7 +1211,7 @@ class _SectionLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.info,
+              color: DashColors.primary,
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
@@ -1310,7 +1311,7 @@ class _LoadingCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 48),
         child: Center(
           child: CircularProgressIndicator(
-              color: AppColors.info, strokeWidth: 2.5),
+              color: DashColors.primary, strokeWidth: 2.5),
         ),
       );
 }

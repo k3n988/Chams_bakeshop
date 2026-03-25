@@ -5,6 +5,7 @@ import '../../../../core/utils/helpers.dart';
 
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
+import 'helper_dashboard.dart' show DashColors;
 
 class HelperWeeklyScreen extends StatefulWidget {
   const HelperWeeklyScreen({super.key});
@@ -88,11 +89,11 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.10),
+                    color: DashColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.today_outlined,
-                      color: AppColors.info, size: 22),
+                      color: DashColors.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -128,7 +129,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                       icon:       Icons.calculate_outlined,
                       label:      'Per Worker (base)',
                       value:      formatCurrency(salary),
-                      valueColor: AppColors.info,
+                      valueColor: DashColors.primary,
                     ),
                     const Divider(height: 20, color: AppColors.border),
                     Row(
@@ -143,7 +144,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                             style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 22,
-                                color: AppColors.primaryDark,
+                                color: DashColors.primaryDark,
                                 letterSpacing: -0.5)),
                       ],
                     ),
@@ -166,7 +167,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
     final isThisWeek = _isCurrentWeek;
 
     return RefreshIndicator(
-      color:     AppColors.info,
+      color:     DashColors.primary,
       onRefresh: () async => _loadCurrentWeek(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -202,22 +203,22 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.08),
+                        color: DashColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: AppColors.info.withValues(alpha: 0.2)),
+                            color: DashColors.primary.withValues(alpha: 0.2)),
                       ),
                       child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.today_outlined,
-                                size: 13, color: AppColors.info),
+                                size: 13, color: DashColors.primary),
                             SizedBox(width: 5),
                             Text('This Week',
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.info)),
+                                    color: DashColors.primary)),
                           ]),
                     ),
                   ),
@@ -257,7 +258,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                   icon:  Icons.calendar_today_outlined,
                   label: 'Days',
                   value: '${vm.daysWorked}',
-                  color: AppColors.info,
+                  color: DashColors.primary,
                 )),
                 const SizedBox(width: 10),
                 Expanded(child: _StatTile(
@@ -282,7 +283,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.10),
+                        color: DashColors.primary.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -290,7 +291,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                         style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.info),
+                            color: DashColors.primary),
                       ),
                     ),
                   ],
@@ -324,7 +325,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                       style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 14,
-                          color: AppColors.primaryDark),
+                          color: DashColors.primaryDark),
                     ),
                   ]),
                 ),
@@ -410,7 +411,7 @@ class _WeekNavigator extends StatelessWidget {
                 Icon(Icons.date_range_outlined,
                     size: 15,
                     color: isCurrentWeek
-                        ? AppColors.info
+                        ? DashColors.primary
                         : AppColors.textHint),
                 const SizedBox(width: 8),
                 Text(label,
@@ -418,8 +419,8 @@ class _WeekNavigator extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         fontSize:   13,
                         color: isCurrentWeek
-                            ? AppColors.info
-                            : AppColors.primaryDark,
+                            ? DashColors.primary
+                            : DashColors.primaryDark,
                         letterSpacing: -0.2)),
                 if (isCurrentWeek) ...[
                   const SizedBox(width: 6),
@@ -427,7 +428,7 @@ class _WeekNavigator extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.info,
+                      color: DashColors.primary,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text('THIS WEEK',
@@ -468,7 +469,7 @@ class _WkBtn extends StatelessWidget {
               horizontal: 14, vertical: 14),
           child: Icon(icon,
               size:  20,
-              color: disabled ? AppColors.border : AppColors.info),
+              color: disabled ? AppColors.border : DashColors.primary),
         ),
       );
 }
@@ -625,7 +626,7 @@ class _DailyTransactionTile extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize:   15,
-                            color:      AppColors.primaryDark,
+                            color:      DashColors.primaryDark,
                             letterSpacing: -0.3)),
                     const SizedBox(height: 5),
                     _PaidBadge(paid: weekPaid),
@@ -638,7 +639,7 @@ class _DailyTransactionTile extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.04),
+                color: DashColors.primary.withValues(alpha: 0.04),
                 borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(16)),
                 border: Border(
@@ -650,12 +651,12 @@ class _DailyTransactionTile extends StatelessWidget {
                   Text('View breakdown',
                       style: TextStyle(
                           fontSize:   11,
-                          color: AppColors.info.withValues(alpha: 0.8),
+                          color: DashColors.primary.withValues(alpha: 0.8),
                           fontWeight: FontWeight.w600)),
                   const SizedBox(width: 3),
                   Icon(Icons.keyboard_arrow_down,
                       size:  14,
-                      color: AppColors.info.withValues(alpha: 0.7)),
+                      color: DashColors.primary.withValues(alpha: 0.7)),
                 ],
               ),
             ),
@@ -685,11 +686,11 @@ class _EmptyWeek extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.07),
+              color: DashColors.primary.withValues(alpha: 0.07),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.today_outlined,
-                size: 36, color: AppColors.info),
+                size: 36, color: DashColors.primary),
           ),
           const SizedBox(height: 14),
           const Text('No records for this week',
@@ -880,7 +881,7 @@ class _SheetLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.info,
+              color: DashColors.primary,
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
@@ -933,7 +934,7 @@ class _SectionLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.info,
+              color: DashColors.primary,
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
@@ -1050,7 +1051,7 @@ class _DeductionsCard extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize:   26,
-                            color:      AppColors.primaryDark,
+                            color:      DashColors.primaryDark,
                             letterSpacing: -0.5)),
                   ],
                 ),
@@ -1149,7 +1150,7 @@ class _LoadingCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 48),
         child: Center(
           child: CircularProgressIndicator(
-              color: AppColors.info, strokeWidth: 2.5),
+              color: DashColors.primary, strokeWidth: 2.5),
         ),
       );
 }

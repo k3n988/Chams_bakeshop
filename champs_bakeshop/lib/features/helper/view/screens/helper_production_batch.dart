@@ -124,11 +124,14 @@ class _AddProductionSheetBody extends StatelessWidget {
 
   Future<void> _pickDate(
       BuildContext context, BatchProductionViewModel vm) async {
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
     final picked = await showDatePicker(
       context: context,
       initialDate: vm.selectedDate,
+      currentDate: todayOnly,       // always highlights today
       firstDate:   DateTime(2020),
-      lastDate:    DateTime(2100),
+      lastDate:    todayOnly,       // no future dates
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
@@ -343,7 +346,7 @@ class _BakerDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           hintText:  'Select Master Baker',
           hintStyle: const TextStyle(fontSize: 13, color: DashColors.textHint),
@@ -438,7 +441,7 @@ class _BatchFormSection extends StatelessWidget {
       _SectionCard(children: [
         // Product dropdown
         DropdownButtonFormField<String>(
-          value: currentProductId,
+          initialValue: currentProductId,
           decoration: InputDecoration(
             labelText:  'Select Product',
             labelStyle: const TextStyle(fontSize: 13, color: DashColors.textHint),

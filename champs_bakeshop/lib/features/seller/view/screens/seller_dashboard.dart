@@ -70,26 +70,28 @@ class _SellerDashboardState extends State<SellerDashboard> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.seller.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.seller,
+            child: Text(
+              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'S',
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white),
             ),
-            child: const Icon(Icons.storefront_outlined,
-                color: AppColors.seller, size: 20),
           ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Seller',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.text)),
               Text(user.name,
                   style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.text)),
+              const Text('Seller',
+                  style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500)),
@@ -192,7 +194,6 @@ class _SellerHomePageState extends State<_SellerHomePage> {
   }
 
   void _goToSession(SessionType type) {
-    final uid = context.read<AuthViewModel>().currentUser!.id;
     Navigator.push(
       context,
       MaterialPageRoute(

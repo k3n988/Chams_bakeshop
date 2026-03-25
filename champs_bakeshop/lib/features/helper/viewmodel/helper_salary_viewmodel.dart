@@ -50,6 +50,50 @@ class HelperSalaryViewModel extends ChangeNotifier {
       _ovenDeduction + _gasDeduction + _valeDeduction + _wifiDeduction;
   double get finalSalary => _grossSalary - totalDeductions;
 
+  // ── Yearly (profile snapshot) ────────────────────────────────
+  double _yearlyGross = 0;
+  double _yearlyNet   = 0;
+  int    _yearlyDays  = 0;
+  int    _yearlyRecs  = 0;
+
+  double get yearlyGross    => _yearlyGross;
+  double get yearlyNet      => _yearlyNet;
+  int    get yearlyDays     => _yearlyDays;
+  int    get yearlyRecords  => _yearlyRecs;
+
+  Future<void> loadYearlySalary(String userId) async {
+    final now   = DateTime.now();
+    final start = '${now.year}-01-01';
+    final end   = '${now.year}-12-31';
+    try {
+      final productions = await _db.getProductionsByDateRange(start, end);
+      final products    = await _db.getAllProducts();
+      final deductions  = await _db.getUserDeductions(userId);
+
+      double gross = 0;
+      double ded   = 0;
+      int    days  = 0;
+      int    recs  = 0;
+
+      for (final prod in productions.where((p) => p.helperIds.contains(userId))) {
+        final calc = _payroll.computeDaily(prod, products);
+        gross += calc.salaryPerWorker;
+        days  += 1;
+        recs  += 1;
+      }
+
+      for (final d in deductions) {
+        ded += d.oven + d.gas + d.vale + d.wifi;
+      }
+
+      _yearlyGross = gross;
+      _yearlyNet   = gross - ded;
+      _yearlyDays  = days;
+      _yearlyRecs  = recs;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   // ── Monthly ──────────────────────────────────────────────────
   List<WeeklySummary> _monthlyWeeks      = [];
   double _monthlyTotalSalary             = 0;
@@ -356,7 +400,7 @@ class HelperSalaryViewModel extends ChangeNotifier {
         weekStart = weekEnd.add(const Duration(days: 1));
         weekNum++;
         if (weekStart.month != m &&
-            weekStart.isAfter(lastDay)) break;
+            weekStart.isAfter(lastDay)) { break; }
       }
 
       _monthlyWeeks           = weeks;

@@ -35,9 +35,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminUserViewModel>().loadUsers();
       context.read<AdminProductViewModel>().loadProducts();
-      context
-          .read<AdminProductionViewModel>()
-          .loadAllProductions();
+      context.read<AdminProductionViewModel>().loadAllProductions();
+      context.read<AdminPayrollViewModel>().autoLoad();
     });
   }
 

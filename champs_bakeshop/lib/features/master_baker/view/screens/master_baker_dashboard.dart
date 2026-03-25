@@ -56,10 +56,12 @@ class _MasterBakerDashboardState extends State<MasterBakerDashboard>
     final salaryVm = context.read<BakerSalaryViewModel>();
     salaryVm.loadDailyRecords(user.id);
     salaryVm.loadWeeklySalary(user.id);
+    salaryVm.loadYearlySalary(user.id);
   }
 
-  void _logout() {
-    context.read<AuthViewModel>().logout();
+  Future<void> _logout() async {
+    await context.read<AuthViewModel>().logout();
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -103,10 +105,10 @@ class _MasterBakerDashboardState extends State<MasterBakerDashboard>
         userRole: user.role,
         userId: user.id,
         accentColor: AppColors.masterBaker,
-        grossSalary: salaryVm.grossSalary,
-        netSalary: salaryVm.finalSalary,
-        daysWorked: salaryVm.daysWorked,
-        totalRecords: salaryVm.dailyRecords.length,
+        grossSalary: salaryVm.yearlyGross,
+        netSalary: salaryVm.yearlyNet,
+        daysWorked: salaryVm.yearlyDays,
+        totalRecords: salaryVm.yearlyRecords,
         onLogout: _logout,
       ),
     ];

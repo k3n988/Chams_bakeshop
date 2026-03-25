@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
@@ -72,26 +73,33 @@ class _PackerDashboardState extends State<PackerDashboard> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.packer.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.inventory_2_outlined,
-                color: AppColors.packer, size: 20),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.packer,
+            backgroundImage: context.watch<AuthViewModel>().localPhotoPath != null
+                ? FileImage(File(context.watch<AuthViewModel>().localPhotoPath!))
+                : null,
+            child: context.watch<AuthViewModel>().localPhotoPath == null
+                ? Text(
+                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'P',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white),
+                  )
+                : null,
           ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Packer',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.text)),
               Text(user.name,
                   style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.text)),
+              const Text('Packer',
+                  style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500)),

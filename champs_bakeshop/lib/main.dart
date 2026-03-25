@@ -11,6 +11,13 @@ import 'core/services/payroll_service.dart';
 import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 
+// ── Role dashboards ──
+import 'features/admin/view/screens/admin_dashboard.dart';
+import 'features/master_baker/view/screens/master_baker_dashboard.dart';
+import 'features/helper/view/screens/helper_dashboard.dart';
+import 'features/packer/view/screens/packer_dashboard.dart';
+import 'features/seller/view/screens/seller_dashboard.dart';
+
 // ── Admin ──
 import 'features/admin/viewmodel/admin_user_viewmodel.dart';
 import 'features/admin/viewmodel/admin_product_viewmodel.dart';
@@ -95,8 +102,67 @@ class ChampsBakeshopApp extends StatelessWidget {
           colorSchemeSeed: const Color(0xFFD4813A),
           fontFamily: 'Roboto',
         ),
-        home: const LoginScreen(),
+        home: const AuthWrapper(),
       ),
     );
   }
+}
+
+// ── Checks saved session then routes to correct screen ────────
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  Future<void> _check() async {
+    final auth = context.read<AuthViewModel>();
+    final restored = await auth.tryAutoLogin();
+    if (!mounted) return;
+
+    if (!restored) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+
+    final user = auth.currentUser!;
+    Widget destination;
+    if (user.isAdmin) {
+      destination = const AdminDashboard();
+    } else if (user.isMasterBaker) {
+      destination = const MasterBakerDashboard();
+    } else if (user.isPacker) {
+      destination = const PackerDashboard();
+    } else if (user.isSeller) {
+      destination = const SellerDashboard();
+    } else {
+      destination = const HelperDashboard();
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFF8C00),
+          ),
+        ),
+      );
 }

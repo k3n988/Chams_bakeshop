@@ -55,11 +55,13 @@ class _HelperDashboardState extends State<HelperDashboard>
     vm.loadDailyRecords(userId);
     vm.loadWeeklySalary(userId);
     vm.loadMonthlySummary(userId);
-    vm.loadPaidWeeks(userId); // ✅ load paid status
+    vm.loadPaidWeeks(userId);
+    vm.loadYearlySalary(userId);
   }
 
-  void _logout() {
-    context.read<AuthViewModel>().logout();
+  Future<void> _logout() async {
+    await context.read<AuthViewModel>().logout();
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -103,10 +105,10 @@ class _HelperDashboardState extends State<HelperDashboard>
         userRole:     user.role,
         userId:       user.id,
         accentColor:  DashColors.primary,
-        grossSalary:  vm.grossSalary,
-        netSalary:    vm.finalSalary,
-        daysWorked:   vm.daysWorked,
-        totalRecords: vm.dailyRecords.length,
+        grossSalary:  vm.yearlyGross,
+        netSalary:    vm.yearlyNet,
+        daysWorked:   vm.yearlyDays,
+        totalRecords: vm.yearlyRecords,
         onLogout:     _logout,
       ),
     ];
@@ -1032,9 +1034,9 @@ class _SectionLabel extends StatelessWidget {
 //  DESIGN TOKENS
 // ─────────────────────────────────────────────────────────
 class DashColors {
-  static const primary       = Color(0xFFD48135);
-  static const primaryLight  = Color(0xFFE5A663);
-  static const primaryDark   = Color(0xFFB86A1E);
+  static const primary       = Color(0xFFFF7A00);
+  static const primaryLight  = Color(0xFFFFA03A);
+  static const primaryDark   = Color(0xFFE06500);
   static const background = Color(0xFFFFFFFF); // Changed to Pure White
   static const border        = Color(0xFFEEEEEE);
   static const textPrimary   = Color(0xFF1A1A1A);

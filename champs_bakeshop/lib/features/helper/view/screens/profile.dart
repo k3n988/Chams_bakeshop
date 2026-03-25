@@ -558,11 +558,11 @@ class _ProfileScreenState extends State<ProfileScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.danger.withValues(alpha: 0.1),
+              color: _kOrange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.logout,
-                color: AppColors.danger, size: 20),
+                color: _kOrange, size: 20),
           ),
           const SizedBox(width: 12),
           const Text('Log Out',
@@ -579,7 +579,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: AppColors.danger),
+                backgroundColor: _kOrange),
             onPressed: () {
               Navigator.pop(ctx);
               widget.onLogout();
@@ -900,7 +900,7 @@ class _EarningsSnapshotCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _CardLabel('EARNINGS SNAPSHOT'),
+              _CardLabel('YEARLY EARNINGS — ${DateTime.now().year}'),
               const SizedBox(height: 14),
 
               // Orange gradient take-home box
@@ -1325,10 +1325,8 @@ class _LogoutButton extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.w700, fontSize: 15)),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.danger,
-            side: BorderSide(
-                color:
-                    AppColors.danger.withValues(alpha: 0.4)),
+            foregroundColor: _kOrange,
+            side: BorderSide(color: _kOrange.withValues(alpha: 0.5)),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
           ),

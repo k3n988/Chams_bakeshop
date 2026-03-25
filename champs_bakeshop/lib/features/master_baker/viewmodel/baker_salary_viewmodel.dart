@@ -86,6 +86,46 @@ class BakerSalaryViewModel extends ChangeNotifier {
   // ── All-time records (dashboard + history) ───────────
   List<BakerDashboardRecord> dailyRecords = [];
 
+  // ── Yearly (profile snapshot) ─────────────────────────
+  double _yearlyGross = 0;
+  double _yearlyNet   = 0;
+  int    _yearlyDays  = 0;
+  int    _yearlyRecs  = 0;
+
+  double get yearlyGross   => _yearlyGross;
+  double get yearlyNet     => _yearlyNet;
+  int    get yearlyDays    => _yearlyDays;
+  int    get yearlyRecords => _yearlyRecs;
+
+  Future<void> loadYearlySalary(String userId) async {
+    final now   = DateTime.now();
+    final start = '${now.year}-01-01';
+    final end   = '${now.year}-12-31';
+    try {
+      final productions = await _db.getProductionsByDateRange(start, end);
+      final products    = await _db.getAllProducts();
+      final myProds     = productions.where((p) => p.masterBakerId == userId);
+
+      double gross = 0;
+      int    days  = 0;
+      for (final prod in myProds) {
+        final calc = _payroll.computeDaily(prod, products);
+        gross += calc.salaryPerWorker + calc.bakerIncentive;
+        days  += 1;
+      }
+
+      final deductions = await _db.getUserDeductions(userId);
+      double ded = 0;
+      for (final d in deductions) { ded += d.gas + d.vale + d.wifi; }
+
+      _yearlyGross = gross;
+      _yearlyNet   = gross - ded;
+      _yearlyDays  = days;
+      _yearlyRecs  = days;
+      notifyListeners();
+    } catch (_) {}
+  }
+
   // ─────────────────────────────────────────────────────
   //  PUBLIC API
   // ─────────────────────────────────────────────────────

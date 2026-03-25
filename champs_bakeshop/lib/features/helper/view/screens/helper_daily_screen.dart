@@ -4,6 +4,7 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
+import 'helper_dashboard.dart' show DashColors;
 
 class HelperDailyScreen extends StatefulWidget {
   const HelperDailyScreen({super.key});
@@ -56,7 +57,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary:   AppColors.info,
+            primary:   DashColors.primary,
             onSurface: AppColors.text,
           ),
         ),
@@ -117,11 +118,11 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.10),
+                    color: DashColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.receipt_long_outlined,
-                      color: AppColors.info, size: 22),
+                      color: DashColors.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -172,7 +173,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                       icon:       Icons.attach_money,
                       label:      'Batch Value',
                       value:      formatCurrency(rec.totalValue),
-                      valueColor: AppColors.info,
+                      valueColor: DashColors.primary,
                     ),
                   ]),
                   const SizedBox(height: 12),
@@ -185,7 +186,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                       icon:       Icons.calculate_outlined,
                       label:      'Per Worker (base)',
                       value:      formatCurrency(rec.salary),
-                      valueColor: AppColors.info,
+                      valueColor: DashColors.primary,
                     ),
                     const Divider(height: 20, color: AppColors.border),
                     Row(
@@ -201,7 +202,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                           style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 22,
-                              color: AppColors.primaryDark,
+                              color: DashColors.primaryDark,
                               letterSpacing: -0.5),
                         ),
                       ],
@@ -295,7 +296,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
         records.fold(0.0, (s, r) => s + r.salary);
 
     return RefreshIndicator(
-      color:     AppColors.info,
+      color:     DashColors.primary,
       onRefresh: () async => _load(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -335,11 +336,11 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.info
+                        color: DashColors.primary
                             .withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: AppColors.info
+                            color: DashColors.primary
                                 .withValues(alpha: 0.2)),
                       ),
                       child: const Row(
@@ -347,13 +348,13 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                           children: [
                             Icon(Icons.today_outlined,
                                 size: 13,
-                                color: AppColors.info),
+                                color: DashColors.primary),
                             SizedBox(width: 5),
                             Text('Today',
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.info)),
+                                    color: DashColors.primary)),
                           ]),
                     ),
                   ),
@@ -431,7 +432,7 @@ class _DayNavigator extends StatelessWidget {
         DateTime.now().subtract(const Duration(days: 1));
     if (selectedDate.year == yesterday.year &&
         selectedDate.month == yesterday.month &&
-        selectedDate.day == yesterday.day) return 'Yesterday';
+        selectedDate.day == yesterday.day) { return 'Yesterday'; }
     const months = [
       'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'
@@ -472,7 +473,7 @@ class _DayNavigator extends StatelessWidget {
                         : Icons.calendar_today_outlined,
                     size: 15,
                     color: isToday
-                        ? AppColors.info
+                        ? DashColors.primary
                         : AppColors.textHint,
                   ),
                   const SizedBox(width: 8),
@@ -482,7 +483,7 @@ class _DayNavigator extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         fontSize:   14,
                         color: isToday
-                            ? AppColors.info
+                            ? DashColors.primary
                             : AppColors.text,
                         letterSpacing: -0.2),
                   ),
@@ -492,7 +493,7 @@ class _DayNavigator extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.info,
+                        color: DashColors.primary,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text('TODAY',
@@ -539,7 +540,7 @@ class _NavBtn extends StatelessWidget {
               size:  20,
               color: disabled
                   ? AppColors.border
-                  : AppColors.info),
+                  : DashColors.primary),
         ),
       );
 }
@@ -565,7 +566,7 @@ class _DailyStatCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: hasData
             ? const LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                colors: [DashColors.primary, DashColors.primaryLight],
                 begin:  Alignment.topLeft,
                 end:    Alignment.bottomRight,
               )
@@ -578,7 +579,7 @@ class _DailyStatCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: hasData
-                ? AppColors.info.withValues(alpha: 0.28)
+                ? DashColors.primary.withValues(alpha: 0.28)
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset:     const Offset(0, 4),
@@ -679,11 +680,11 @@ class _NoDayRecord extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.07),
+              color: DashColors.primary.withValues(alpha: 0.07),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.receipt_long_outlined,
-                size: 36, color: AppColors.info),
+                size: 36, color: DashColors.primary),
           ),
           const SizedBox(height: 14),
           Text(
@@ -758,11 +759,11 @@ class _DailyCard extends StatelessWidget {
                 Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.10),
+                    color: DashColors.primary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.receipt_outlined,
-                      color: AppColors.info, size: 20),
+                      color: DashColors.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -796,7 +797,7 @@ class _DailyCard extends StatelessWidget {
                       style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize:   15,
-                          color:      AppColors.primaryDark,
+                          color:      DashColors.primaryDark,
                           letterSpacing: -0.3),
                     ),
                     const SizedBox(height: 5),
@@ -811,7 +812,7 @@ class _DailyCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.04),
+                color: DashColors.primary.withValues(alpha: 0.04),
                 borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(16)),
                 border: Border(
@@ -823,13 +824,13 @@ class _DailyCard extends StatelessWidget {
                   Text('View breakdown',
                       style: TextStyle(
                           fontSize:  11,
-                          color: AppColors.info
+                          color: DashColors.primary
                               .withValues(alpha: 0.8),
                           fontWeight: FontWeight.w600)),
                   const SizedBox(width: 3),
                   Icon(Icons.keyboard_arrow_down,
                       size: 14,
-                      color: AppColors.info
+                      color: DashColors.primary
                           .withValues(alpha: 0.7)),
                 ],
               ),
@@ -896,7 +897,7 @@ class _SectionLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.info,
+              color: DashColors.primary,
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
@@ -945,7 +946,7 @@ class _SheetLabel extends StatelessWidget {
         Container(
           width: 3, height: 13,
           decoration: BoxDecoration(
-              color: AppColors.info,
+              color: DashColors.primary,
               borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 8),
@@ -1002,7 +1003,7 @@ class _LoadingCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 48),
         child: Center(
           child: CircularProgressIndicator(
-              color: AppColors.info, strokeWidth: 2.5),
+              color: DashColors.primary, strokeWidth: 2.5),
         ),
       );
 }

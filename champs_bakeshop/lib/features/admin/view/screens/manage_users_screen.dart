@@ -29,8 +29,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   final Map<String, String?> _displayNames = {};
   final Map<String, String?> _photoPaths   = {};
-  bool _profilesLoaded = false;
-
   @override
   void initState() {
     super.initState();
@@ -58,12 +56,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       _photoPaths
         ..clear()
         ..addAll(photos);
-      _profilesLoaded = true;
     });
   }
 
   Future<void> _reloadProfiles() async {
-    setState(() => _profilesLoaded = false);
     await _loadProfiles();
   }
 
@@ -163,7 +159,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: role,
+                initialValue: role,
                 decoration: const InputDecoration(
                     labelText: 'Role',
                     prefixIcon: Icon(Icons.badge_outlined)),
@@ -307,11 +303,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               await context
                   .read<AdminUserViewModel>()
                   .deleteUser(user.id);
               if (ctx.mounted) Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                   SnackBar(
                       content:
                           Text('${user.name} removed'),
@@ -839,7 +836,7 @@ class _DialogField extends StatefulWidget {
     required this.controller,
     required this.label,
     required this.icon,
-    this.hint    = null,
+    this.hint,
     this.obscure = false,
     this.keyboard = TextInputType.text,
     this.caps     = TextCapitalization.none,
