@@ -33,6 +33,36 @@ class AdminProductionViewModel extends ChangeNotifier {
   int get weekTotalBundles =>
       _todayPackerProductions.fold(0, (s, p) => s + p.bundleCount);
 
+  // ── Today's data (derived from weekly load) ───────────────
+  Map<String, int> get todayPackedByProduct {
+    final today = _fmtDate(DateTime.now());
+    final map = <String, int>{};
+    for (final p in _todayPackerProductions.where((p) => p.date == today)) {
+      map[p.productName] = (map[p.productName] ?? 0) + p.bundleCount;
+    }
+    return map;
+  }
+
+  int get todayTotalBundles {
+    final today = _fmtDate(DateTime.now());
+    return _todayPackerProductions
+        .where((p) => p.date == today)
+        .fold(0, (s, p) => s + p.bundleCount);
+  }
+
+  // Top packer this week: returns MapEntry(packerId, bundleCount) or null
+  MapEntry<String, int>? get topPackerEntry {
+    final map = <String, int>{};
+    for (final p in _todayPackerProductions) {
+      map[p.packerId] = (map[p.packerId] ?? 0) + p.bundleCount;
+    }
+    if (map.isEmpty) return null;
+    return map.entries.reduce((a, b) => a.value >= b.value ? a : b);
+  }
+
+  static String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   Future<void> loadAllProductions() async {
     _isLoading = true;
     notifyListeners();

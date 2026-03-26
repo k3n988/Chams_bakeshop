@@ -1034,7 +1034,7 @@ class _SectionLabel extends StatelessWidget {
 //  DESIGN TOKENS
 // ─────────────────────────────────────────────────────────
 class DashColors {
-  static const primary       = Color(0xFFFF7A00);
+  static const primary       = Color(0xFF2E86AB); // AppColors.helper blue
   static const primaryLight  = Color(0xFFFFA03A);
   static const primaryDark   = Color(0xFFE06500);
   static const background = Color(0xFFFFFFFF); // Changed to Pure White

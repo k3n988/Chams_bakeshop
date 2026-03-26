@@ -26,6 +26,9 @@ class AdminPayrollViewModel extends ChangeNotifier {
 
   double _packerWeeklyTotal = 0.0;
   double _sellerWeeklyTotal = 0.0;
+  int    _packerPaidCount    = 0;
+  int    _packerTotalCount   = 0;
+  Map<String, double> _sellerWeeklyMap = {};
 
   // ─── Getters ──────────────────────────────────────────────────────────────
 
@@ -41,6 +44,12 @@ class AdminPayrollViewModel extends ChangeNotifier {
 
   double get totalPayrollPacker => _packerWeeklyTotal;
   double get totalPayrollSeller => _sellerWeeklyTotal;
+  double get totalPayrollAll  => totalPayroll + _packerWeeklyTotal + _sellerWeeklyTotal;
+  int    get bakerPaidCount   => _entries.where((e) => e.isPaid).length;
+  int    get bakerTotalCount  => _entries.length;
+  int    get packerPaidCount  => _packerPaidCount;
+  int    get packerTotalCount => _packerTotalCount;
+  Map<String, double> get sellerWeeklyMap => Map.unmodifiable(_sellerWeeklyMap);
 
   // ─── Auto-load (called from dashboard initState) ─────────────────────────
 
@@ -66,26 +75,35 @@ class AdminPayrollViewModel extends ChangeNotifier {
     // Packer weekly total — sum net_salary from packer_payroll table
     final packers = users.where((u) => u.role == 'packer').toList();
     double packerTotal = 0.0;
+    int    packerPaid  = 0;
     for (final p in packers) {
       final record = await _packerSvc.getPayrollByWeek(
         packerId:  p.id,
         weekStart: weekStartStr,
         weekEnd:   weekEndStr,
       );
-      if (record != null) packerTotal += record.netSalary;
+      if (record != null) {
+        packerTotal += record.netSalary;
+        if (record.isPaid) packerPaid++;
+      }
     }
-    _packerWeeklyTotal = packerTotal;
+    _packerWeeklyTotal  = packerTotal;
+    _packerPaidCount    = packerPaid;
+    _packerTotalCount   = packers.length;
 
     // Seller weekly total — sum salary from remittances this week
     final sellers = users.where((u) => u.role == 'seller').toList();
     double sellerTotal = 0.0;
+    _sellerWeeklyMap   = {};
     for (final s in sellers) {
       final remits = await _sellerSvc.getRemittancesByRange(
         sellerId: s.id,
         fromDate: weekStartStr,
         toDate:   weekEndStr,
       );
-      sellerTotal += remits.fold(0.0, (sum, r) => sum + r.salary);
+      final amt = remits.fold(0.0, (sum, r) => sum + r.salary);
+      sellerTotal           += amt;
+      _sellerWeeklyMap[s.id] = amt;
     }
     _sellerWeeklyTotal = sellerTotal;
 

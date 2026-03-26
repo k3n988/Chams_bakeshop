@@ -34,7 +34,7 @@ class _PackerMonthlyScreenState extends State<PackerMonthlyScreen> {
       color: AppColors.packer,
       onRefresh: () async {
         setState(() => _expandedWeek = null);
-        await vm.loadMonthly(uid);
+        await vm.goToCurrentMonth(uid);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

@@ -8,7 +8,7 @@ import '../../viewmodel/admin_product_viewmodel.dart';
 // ── Use 'as' prefix so Dart knows exactly which file each class comes from ──
 import 'manage_users_screen.dart'    as users_screen;
 import 'manage_products_screen.dart' as products_screen;
-import 'admin_batch_screen.dart'     as batch_screen;
+import 'christmas_bonus_screen.dart' as bonus_screen;
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -169,15 +169,15 @@ class AdminDrawer extends StatelessWidget {
               ),
 
               _DrawerItem(
-                icon:       Icons.local_fire_department_outlined,
-                color:      AppColors.helper,
-                label:      'Batch Productions',
-                subtitle:   'Daily & weekly helper batches',
+                icon:       Icons.card_giftcard_outlined,
+                color:      Color(0xFFC62828),
+                label:      'Christmas Bonus',
+                subtitle:   'Track holiday bonuses per worker',
                 onTap: () => _openPage(
                   context,
                   _Wrapped(
-                    title: 'Batch Productions',
-                    child: batch_screen.AdminBatchScreen(),
+                    title: 'Christmas Bonus',
+                    child: bonus_screen.ChristmasBonusScreen(),
                   ),
                 ),
               ),

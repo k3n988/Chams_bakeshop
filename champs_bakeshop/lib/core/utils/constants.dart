@@ -115,6 +115,13 @@ class AppTheme {
 // BUSINESS CONSTANTS
 // ═══════════════════════════════════════════════════════════
 class AppConstants {
-  static const double masterBakerBonusPerSack = 100.0;
+  static const double masterBakerBonusPerSack   = 100.0;
   static const double helperOvenDeductionPerDay = 15.0;
+  static const double packerRatePerBundle       = 4.0;
+
+  // ── Seller ──────────────────────────────────────────────────
+  static const int    sellerPiecesPerPlantsa = 25;
+  static const double sellerPricePerPiece    = 5.0;
+  /// Salary = adjustedRemittance × this rate
+  static const double sellerSalaryRate       = 0.05;
 }

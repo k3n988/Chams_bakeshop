@@ -3,6 +3,7 @@ import '../../../core/models/packer_production_model.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/services/packer_service.dart';
 import '../../../core/services/database_service.dart';
+import '../../../core/utils/constants.dart';
 
 class PackerProductionViewModel extends ChangeNotifier {
   final PackerService   _service;
@@ -46,7 +47,7 @@ class PackerProductionViewModel extends ChangeNotifier {
   // ── Today aggregates ───────────────────────────────────────
   int    get todayTotalBundles =>
       _todayProductions.fold(0, (s, p) => s + p.bundleCount);
-  double get todaySalary => todayTotalBundles * 4.0;
+  double get todaySalary => todayTotalBundles * AppConstants.packerRatePerBundle;
 
   Map<String, int> get todayByProduct {
     final map = <String, int>{};
@@ -59,7 +60,7 @@ class PackerProductionViewModel extends ChangeNotifier {
   // ── Selected day aggregates ────────────────────────────────
   int    get selectedDayTotalBundles =>
       _selectedDayProductions.fold(0, (s, p) => s + p.bundleCount);
-  double get selectedDaySalary => selectedDayTotalBundles * 4.0;
+  double get selectedDaySalary => selectedDayTotalBundles * AppConstants.packerRatePerBundle;
 
   Map<String, int> get selectedDayByProduct {
     final map = <String, int>{};
@@ -71,7 +72,7 @@ class PackerProductionViewModel extends ChangeNotifier {
 
   // ── Week aggregates ────────────────────────────────────────
   int    get weekTotalBundles => _weekProductions.fold(0, (s, p) => s + p.bundleCount);
-  double get weekGrossSalary  => weekTotalBundles * 4.0;
+  double get weekGrossSalary  => weekTotalBundles * AppConstants.packerRatePerBundle;
 
   // ── Product names list (from admin) ───────────────────────
   List<String> get productNames =>
@@ -86,7 +87,7 @@ class PackerProductionViewModel extends ChangeNotifier {
       loadProducts(),
       loadTodayProductions(packerId),
       loadWeekProductions(packerId),
-    ]);
+    ]).timeout(const Duration(seconds: 15));
     // also load selected day (today)
     _selectedDayProductions = List.from(_todayProductions);
     notifyListeners();
@@ -97,10 +98,11 @@ class PackerProductionViewModel extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   Future<void> loadProducts() async {
     try {
-      _products = await _db.getAllProducts();
+      _products = await _db.getAllProducts()
+          .timeout(const Duration(seconds: 15));
       notifyListeners();
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load products. Check your connection.';
       notifyListeners();
     }
   }
@@ -115,10 +117,10 @@ class PackerProductionViewModel extends ChangeNotifier {
       _todayProductions = await _service.getProductionsByDate(
         packerId: packerId,
         date:     today,
-      );
+      ).timeout(const Duration(seconds: 15));
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load today\'s productions.';
     } finally {
       _setLoading(false);
     }
@@ -133,10 +135,10 @@ class PackerProductionViewModel extends ChangeNotifier {
       _selectedDayProductions = await _service.getProductionsByDate(
         packerId: packerId,
         date:     selectedDateStr,
-      );
+      ).timeout(const Duration(seconds: 15));
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load productions for selected date.';
     } finally {
       _setLoading(false);
     }
@@ -165,10 +167,10 @@ class PackerProductionViewModel extends ChangeNotifier {
         packerId:  packerId,
         weekStart: wStart.toIso8601String().substring(0, 10),
         weekEnd:   wEnd.toIso8601String().substring(0, 10),
-      );
+      ).timeout(const Duration(seconds: 15));
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load weekly productions.';
     }
     notifyListeners();
   }
@@ -206,13 +208,13 @@ class PackerProductionViewModel extends ChangeNotifier {
           loadTodayProductions(packerId),
           loadWeekProductions(packerId),
           loadSelectedDayProductions(packerId),
-        ]);
+        ]).timeout(const Duration(seconds: 15));
         _error = null;
         return true;
       }
       return false;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to add production. Check your connection.';
       notifyListeners();
       return false;
     } finally {
@@ -226,16 +228,17 @@ class PackerProductionViewModel extends ChangeNotifier {
   Future<bool> deleteProduction(String productionId, String packerId) async {
     _setLoading(true);
     try {
-      await _service.deleteProduction(productionId);
+      await _service.deleteProduction(productionId)
+          .timeout(const Duration(seconds: 15));
       await Future.wait([
         loadTodayProductions(packerId),
         loadWeekProductions(packerId),
         loadSelectedDayProductions(packerId),
-      ]);
+      ]).timeout(const Duration(seconds: 15));
       _error = null;
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to delete production. Check your connection.';
       notifyListeners();
       return false;
     } finally {

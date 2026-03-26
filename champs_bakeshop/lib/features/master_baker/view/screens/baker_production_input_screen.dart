@@ -34,6 +34,7 @@ class _BakerProductionInputScreenState
     extends State<BakerProductionInputScreen> {
   String _date = DateTime.now().toString().split(' ')[0];
   final Set<String> _selectedHelpers = {};
+  String? _ovenHelperId;
   final List<_ItemData> _items = [_ItemData()];
 
   @override
@@ -54,9 +55,12 @@ class _BakerProductionInputScreenState
   }
 
   void _toggleHelper(String id) => setState(() {
-        _selectedHelpers.contains(id)
-            ? _selectedHelpers.remove(id)
-            : _selectedHelpers.add(id);
+        if (_selectedHelpers.contains(id)) {
+          _selectedHelpers.remove(id);
+          if (_ovenHelperId == id) _ovenHelperId = null;
+        } else {
+          _selectedHelpers.add(id);
+        }
       });
 
   void _addItem() => setState(() => _items.add(_ItemData()));
@@ -71,11 +75,12 @@ class _BakerProductionInputScreenState
   }
 
   Future<void> _pickDate() async {
+    final today = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.parse(_date),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2030),
+      firstDate: DateTime(today.year - 2, 1, 1),
+      lastDate: today,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
@@ -143,6 +148,7 @@ class _BakerProductionInputScreenState
               masterBakerId: user.id,
               helperIds: _selectedHelpers.toList(),
               items: _validItems,
+              ovenHelperId: _ovenHelperId,
             );
 
     if (!mounted) return;
@@ -162,7 +168,10 @@ class _BakerProductionInputScreenState
       ));
       setState(() {
         _selectedHelpers.clear();
-        for (final item in _items) item.dispose();
+        _ovenHelperId = null;
+        for (final item in _items) {
+          item.dispose();
+        }
         _items
           ..clear()
           ..add(_ItemData());
@@ -368,6 +377,101 @@ class _BakerProductionInputScreenState
               ),
             ),
             const SizedBox(height: 14),
+
+            // ── Oven Helper ──────────────────────────────────────
+            if (_selectedHelpers.isNotEmpty)
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const _SectionLabel('WHO DID THE OVEN?'),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Exempt from ₱15 deduction',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.warning),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Select the helper who cooked the tinpay. They will not be charged the oven deduction for this day.',
+                      style: TextStyle(
+                          fontSize: 11, color: AppColors.textHint),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // "None" option
+                        ChoiceChip(
+                          selected: _ovenHelperId == null,
+                          label: const Text('None'),
+                          labelStyle: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: _ovenHelperId == null
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                          ),
+                          selectedColor: AppColors.textSecondary,
+                          backgroundColor: Colors.white,
+                          side: BorderSide(
+                            color: _ovenHelperId == null
+                                ? AppColors.textSecondary
+                                : AppColors.border,
+                          ),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          onSelected: (_) =>
+                              setState(() => _ovenHelperId = null),
+                        ),
+                        ...vm.helpers
+                            .where((h) => _selectedHelpers.contains(h.id))
+                            .map((h) {
+                          final sel = _ovenHelperId == h.id;
+                          return ChoiceChip(
+                            selected: sel,
+                            label: Text(h.name),
+                            labelStyle: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: sel
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                            ),
+                            selectedColor: AppColors.warning,
+                            backgroundColor: Colors.white,
+                            side: BorderSide(
+                              color: sel
+                                  ? AppColors.warning
+                                  : AppColors.border,
+                            ),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            onSelected: (_) =>
+                                setState(() => _ovenHelperId = h.id),
+                          );
+                        }),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            if (_selectedHelpers.isNotEmpty) const SizedBox(height: 14),
 
             // ── Products ─────────────────────────────────────────
             _SectionCard(

@@ -43,27 +43,31 @@ class PayrollEntry {
   final String name;
   final String role;
   final int daysWorked;
+  final int ovenExemptDays; // days this helper operated the oven
   final double grossSalary;
   final double bonusTotal;
+  final double ovenIncentive; // ₱15 × ovenExemptDays — added to salary
   final double ovenDeduction;
   final double gasDeduction;
   final double valeDeduction;
   final double wifiDeduction;
-  final bool isPaid; // ← NEW
+  final bool isPaid;
 
   PayrollEntry({
     required this.userId,
     required this.name,
     required this.role,
     required this.daysWorked,
+    this.ovenExemptDays = 0,
     required this.grossSalary,
     double masterBonus = 0,
     double bonusTotal = 0,
+    this.ovenIncentive = 0,
     this.ovenDeduction = 0,
     this.gasDeduction = 0,
     this.valeDeduction = 0,
     this.wifiDeduction = 0,
-    this.isPaid = false, // ← NEW
+    this.isPaid = false,
   }) : bonusTotal = bonusTotal != 0 ? bonusTotal : masterBonus;
 
   double get masterBonus => bonusTotal;
@@ -71,7 +75,8 @@ class PayrollEntry {
   double get totalDeductions =>
       ovenDeduction + gasDeduction + valeDeduction + wifiDeduction;
 
-  double get finalSalary => grossSalary - totalDeductions;
+  // Oven incentive is added to gross; deductions subtracted
+  double get finalSalary => grossSalary + ovenIncentive - totalDeductions;
   double get finalSalaryWithBonus => finalSalary + bonusTotal;
 
   // copyWith for toggling isPaid
@@ -80,8 +85,10 @@ class PayrollEntry {
         name: name,
         role: role,
         daysWorked: daysWorked,
+        ovenExemptDays: ovenExemptDays,
         grossSalary: grossSalary,
         bonusTotal: bonusTotal,
+        ovenIncentive: ovenIncentive,
         ovenDeduction: ovenDeduction,
         gasDeduction: gasDeduction,
         valeDeduction: valeDeduction,

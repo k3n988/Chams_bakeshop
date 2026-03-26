@@ -11,8 +11,9 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   bool    _isLoading = false;
   String? _error;
 
-  List<SellerRemittanceModel> _remittances = [];
-  List<SellerSessionModel>    _sessions    = [];
+  List<SellerRemittanceModel> _remittances       = [];
+  List<SellerSessionModel>    _sessions          = [];
+  List<SellerWeeklySummary> _cachedSummaries = [];
 
   // ── Yearly snapshot (profile) ──────────────────────────────
   int    _yearlyPiecesSold    = 0;
@@ -94,7 +95,10 @@ class SellerRemittanceViewModel extends ChangeNotifier {
       _yearlySalary     = remittances.fold(0.0, (s, r) => s + r.salary);
       _yearlyDays       = remittances.length;
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Failed to load yearly summary.';
+      notifyListeners();
+    }
   }
 
   void _setWeekToCurrentMonday() {
@@ -118,12 +122,13 @@ class SellerRemittanceViewModel extends ChangeNotifier {
           fromDate: weekStart,
           toDate:   weekEnd,
         ),
-      ]);
-      _remittances = results[0] as List<SellerRemittanceModel>;
-      _sessions    = results[1] as List<SellerSessionModel>;
+      ]).timeout(const Duration(seconds: 15));
+      _remittances     = results[0] as List<SellerRemittanceModel>;
+      _sessions        = results[1] as List<SellerSessionModel>;
+      _cachedSummaries = _buildWeeklySummaries();
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load data. Check your connection.';
     } finally {
       _setLoading(false);
     }
@@ -135,7 +140,6 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   Future<void> loadMonthly(String sellerId) async {
     _setLoading(true);
     try {
-      // Go back 3 weeks from current week start
       final monthStart = _weekStart.subtract(const Duration(days: 21));
       final fromDate   = monthStart.toIso8601String().substring(0, 10);
 
@@ -150,12 +154,13 @@ class SellerRemittanceViewModel extends ChangeNotifier {
           fromDate: fromDate,
           toDate:   weekEnd,
         ),
-      ]);
-      _remittances = results[0] as List<SellerRemittanceModel>;
-      _sessions    = results[1] as List<SellerSessionModel>;
+      ]).timeout(const Duration(seconds: 15));
+      _remittances     = results[0] as List<SellerRemittanceModel>;
+      _sessions        = results[1] as List<SellerSessionModel>;
+      _cachedSummaries = _buildWeeklySummaries();
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load monthly data. Check your connection.';
     } finally {
       _setLoading(false);
     }
@@ -190,8 +195,12 @@ class SellerRemittanceViewModel extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   //  WEEKLY BREAKDOWN  (for monthly tab)
   // ─────────────────────────────────────────────────────────
-  List<_WeeklySummary> get weeklySummaries {
-    final summaries = <_WeeklySummary>[];
+
+  /// Returns cached summaries — rebuilt only after each load.
+  List<SellerWeeklySummary> get weeklySummaries => _cachedSummaries;
+
+  List<SellerWeeklySummary> _buildWeeklySummaries() {
+    final summaries = <SellerWeeklySummary>[];
     for (int i = 3; i >= 0; i--) {
       final wStart = _weekStart.subtract(Duration(days: 7 * i));
       final wEnd   = wStart.add(const Duration(days: 6));
@@ -203,12 +212,12 @@ class SellerRemittanceViewModel extends ChangeNotifier {
                         r.date.compareTo(weStr) <= 0)
           .toList();
 
-      summaries.add(_WeeklySummary(
-        weekStart:   wsStr,
-        weekEnd:     weStr,
-        piecesSold:  weekRemittances.fold(0, (s, r) => s + r.piecesSold),
+      summaries.add(SellerWeeklySummary(
+        weekStart:       wsStr,
+        weekEnd:         weStr,
+        piecesSold:      weekRemittances.fold(0,   (s, r) => s + r.piecesSold),
         totalRemittance: weekRemittances.fold(0.0, (s, r) => s + r.actualRemittance),
-        days:        weekRemittances.length,
+        days:            weekRemittances.length,
       ));
     }
     return summaries;
@@ -235,14 +244,14 @@ class SellerRemittanceViewModel extends ChangeNotifier {
 }
 
 // ── Helper data class ─────────────────────────────────────────
-class _WeeklySummary {
+class SellerWeeklySummary {
   final String weekStart;
   final String weekEnd;
   final int    piecesSold;
   final double totalRemittance;
   final int    days;
 
-  const _WeeklySummary({
+  const SellerWeeklySummary({
     required this.weekStart,
     required this.weekEnd,
     required this.piecesSold,

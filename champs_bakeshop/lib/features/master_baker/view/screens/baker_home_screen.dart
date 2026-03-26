@@ -20,8 +20,6 @@ class _BakerHomeScreenState extends State<BakerHomeScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // 🔥 Explicitly defined the orange color from the Helper Dashboard
-  static const Color _primaryOrange = Color(0xFFD48135);
 
   @override
   void initState() {
@@ -143,28 +141,28 @@ class _BakerHomeScreenState extends State<BakerHomeScreen>
           backgroundColor: Colors.white,
           elevation: 0,
           // 🔥 Updated indicator color to Orange
-          indicatorColor: _primaryOrange.withValues(alpha: 0.10),
+          indicatorColor: AppColors.masterBaker.withValues(alpha: 0.10),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),
               // 🔥 Updated selected icon color to Orange
-              selectedIcon: Icon(Icons.dashboard, color: _primaryOrange),
+              selectedIcon: Icon(Icons.dashboard, color: AppColors.masterBaker),
               label: 'Dashboard',
             ),
             NavigationDestination(
               icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle, color: _primaryOrange),
+              selectedIcon: Icon(Icons.add_circle, color: AppColors.masterBaker),
               label: 'Production',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_outlined),
-              selectedIcon: Icon(Icons.history, color: _primaryOrange),
+              selectedIcon: Icon(Icons.history, color: AppColors.masterBaker),
               label: 'History',
             ),
             NavigationDestination(
               icon: Icon(Icons.payments_outlined),
-              selectedIcon: Icon(Icons.payments, color: _primaryOrange),
+              selectedIcon: Icon(Icons.payments, color: AppColors.masterBaker),
               label: 'Salary',
             ),
           ],

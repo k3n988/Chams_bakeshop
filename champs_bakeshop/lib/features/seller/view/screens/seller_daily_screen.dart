@@ -51,7 +51,7 @@ class _SellerDailyScreenState extends State<SellerDailyScreen> {
     final picked = await showDatePicker(
       context:     context,
       initialDate: _selectedDate,
-      firstDate:   DateTime(2024),
+      firstDate:   DateTime(DateTime.now().year - 1, 1, 1),
       lastDate:    DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(

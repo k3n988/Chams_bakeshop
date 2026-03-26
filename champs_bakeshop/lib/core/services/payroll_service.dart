@@ -1,6 +1,7 @@
 import '../models/product_model.dart';
 import '../models/production_model.dart';
 import '../models/payroll_model.dart';
+import '../utils/constants.dart';
 import 'supabase_service.dart';
 
 class PayrollService {
@@ -9,7 +10,6 @@ class PayrollService {
   PayrollService(this._db);
 
   static const double incentivePerSack = 100.0;
-  static const double helperOvenDeductionPerDay = 15.0;
 
   DailySalaryResult computeDaily(
       ProductionModel production, List<ProductModel> products) {
@@ -86,6 +86,9 @@ class PayrollService {
           w.baseSalary += calc.salaryPerWorker + calc.bakerIncentive;
         } else {
           w.baseSalary += calc.salaryPerWorker;
+          if (prod.ovenHelperId == wid) {
+            w.ovenExemptDays += 1; // this helper operated the oven — exempt
+          }
         }
       }
     }
@@ -95,26 +98,38 @@ class PayrollService {
     return workers.values.map((w) {
       final ded = dedMap[w.userId];
 
-      // ✅ Use manual oven override if set, otherwise auto-calculate for helpers
+      // Oven helper rule:
+      // - If a helper did the oven ANY day this week → fully exempt from oven
+      //   deduction for the whole week (not just the oven days)
+      // - On top of that, they earn ₱15 incentive for each day they did the oven
+      // Regular helpers (no oven days) → ₱15 deduction per day as usual
       final autoOven = w.isMaster
           ? 0.0
-          : w.daysWorked * helperOvenDeductionPerDay;
+          : (w.ovenExemptDays > 0
+              ? 0.0
+              : w.daysWorked * AppConstants.helperOvenDeductionPerDay);
       final ovenDeduction = (ded != null && ded.oven > 0)
           ? ded.oven
           : autoOven;
+      // Oven incentive: ₱15 per day the helper operated the oven (added to salary)
+      final ovenIncentive = w.isMaster
+          ? 0.0
+          : w.ovenExemptDays * AppConstants.helperOvenDeductionPerDay;
 
       return PayrollEntry(
         userId: w.userId,
         name: w.name,
         role: w.role,
         daysWorked: w.daysWorked,
+        ovenExemptDays: w.ovenExemptDays,
         grossSalary: w.baseSalary,
         bonusTotal: w.bonusTotal,
+        ovenIncentive: ovenIncentive,
         ovenDeduction: ovenDeduction,
         gasDeduction: ded?.gas ?? 0,
         valeDeduction: ded?.vale ?? 0,
         wifiDeduction: ded?.wifi ?? 0,
-        isPaid: paidUserIds.contains(w.userId), // ← NEW
+        isPaid: paidUserIds.contains(w.userId),
       );
     }).toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -128,6 +143,7 @@ class _WorkerAccum {
   double baseSalary = 0;
   double bonusTotal = 0;
   int daysWorked = 0;
+  int ovenExemptDays = 0;
   bool isMaster = false;
 
   _WorkerAccum({

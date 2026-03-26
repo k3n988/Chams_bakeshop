@@ -13,7 +13,7 @@ import 'manage_users_screen.dart'    as users_screen;
 import 'manage_products_screen.dart' as products_screen;
 import 'production_reports_screen.dart';
 import 'payroll_screen.dart';
-import 'christmas_bonus_screen.dart';
+import 'admin_batch_screen.dart' as batch_screen;
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -55,8 +55,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       setState(() => _index = 1);
     } else if (i == 4) {
       setState(() => _index = 2);
-    } else if (i == 5) {
-      setState(() => _index = 3);
     }
   }
 
@@ -112,7 +110,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       AdminHomeScreen(onNavigate: _navigateFromHome),
       const ProductionReportsScreen(),
       const AdminPayrollScreen(),
-      const ChristmasBonusScreen(),
+      batch_screen.AdminBatchScreen(),
     ];
 
     return Scaffold(
@@ -215,12 +213,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     color: AppColors.primary),
                 label: 'Payroll'),
             NavigationDestination(
-                icon:
-                    Icon(Icons.card_giftcard_outlined),
-                selectedIcon: Icon(
-                    Icons.card_giftcard,
-                    color: Color(0xFFC62828)),
-                label: 'Bonus'),
+                icon: Icon(Icons.local_fire_department_outlined),
+                selectedIcon: Icon(Icons.local_fire_department,
+                    color: AppColors.helper),
+                label: 'Batch'),
           ],
         ),
       ),

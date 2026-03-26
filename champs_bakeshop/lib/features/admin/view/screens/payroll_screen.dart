@@ -206,7 +206,11 @@ class _BakerHelperPayrollTabState
   // ── Dialogs ──────────────────────────────────────────────────
   void _showDeductionDialog(PayrollEntry entry) {
     final isHelper = entry.role != 'master_baker';
-    final autoOven = isHelper ? entry.daysWorked * 20.0 : 0.0;
+    final autoOven = isHelper
+        ? (entry.ovenExemptDays > 0
+            ? 0.0
+            : entry.daysWorked * AppConstants.helperOvenDeductionPerDay)
+        : 0.0;
     final ovenCtrl = TextEditingController(
         text: entry.ovenDeduction.toStringAsFixed(0));
     final gasCtrl  = TextEditingController(
@@ -274,7 +278,9 @@ class _BakerHelperPayrollTabState
                   Expanded(
                     child: Text(
                       isHelper
-                          ? 'Auto: ₱${autoOven.toStringAsFixed(0)} (₱20 × ${entry.daysWorked}d). Override below.'
+                          ? entry.ovenExemptDays > 0
+                              ? 'Oven helper (${entry.ovenExemptDays}d) — fully exempt from deduction. Oven pay: +₱${entry.ovenIncentive.toStringAsFixed(0)}.'
+                              : 'Auto: ₱${autoOven.toStringAsFixed(0)} (₱${AppConstants.helperOvenDeductionPerDay.toStringAsFixed(0)} × ${entry.daysWorked}d). Override below.'
                           : 'Master Baker — no oven deduction.',
                       style: TextStyle(
                           fontSize: 11,
@@ -1174,9 +1180,14 @@ class _EmployeeCard extends StatelessWidget {
                   label: 'Sack Bonus',
                   value: formatCurrency(e.bonusTotal),
                   color: AppColors.masterBaker),
+            if (e.ovenIncentive > 0)
+              BreakdownRow(
+                  label: 'Oven Pay (${e.ovenExemptDays}d)',
+                  value: '+${formatCurrency(e.ovenIncentive)}',
+                  color: AppColors.warning),
             if (e.ovenDeduction > 0)
               BreakdownRow(
-                  label: 'Oven',
+                  label: 'Oven Deduction',
                   value: '-${formatCurrency(e.ovenDeduction)}',
                   color: AppColors.danger),
             if (e.gasDeduction > 0)

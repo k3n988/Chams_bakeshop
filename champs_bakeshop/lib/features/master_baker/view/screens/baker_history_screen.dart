@@ -4,6 +4,7 @@ import '../../../../core/models/production_model.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 
+import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/baker_production_viewmodel.dart';
 
 class BakerHistoryScreen extends StatefulWidget {
@@ -14,7 +15,56 @@ class BakerHistoryScreen extends StatefulWidget {
 }
 
 class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
-  String _search = '';
+  String _search      = '';
+  int    _visibleCount = 20;
+
+  static const int _pageSize = 20;
+
+  Future<void> _deleteRecord(
+      BakerProductionViewModel vm, String productionId) async {
+    final userId =
+        context.read<AuthViewModel>().currentUser?.id ?? '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Production?',
+            style:
+                TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        content: const Text(
+            'This will permanently remove the production record and its bonus entries.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await vm.deleteProduction(productionId, userId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          Icon(ok ? Icons.check_circle : Icons.error_outline,
+              color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text(ok ? 'Record deleted.' : 'Delete failed. Try again.'),
+        ]),
+        backgroundColor: ok ? AppColors.danger : AppColors.textHint,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +74,8 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
       if (_search.isEmpty) return true;
       return p.date.contains(_search);
     }).toList();
+
+    final visible = filtered.take(_visibleCount).toList();
 
     return ColoredBox(
       color: const Color(0xFFF8F7F5),
@@ -57,7 +109,8 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: TextField(
-                    onChanged: (v) => setState(() => _search = v),
+                    onChanged: (v) =>
+                        setState(() { _search = v; _visibleCount = _pageSize; }),
                     style: const TextStyle(fontSize: 13),
                     decoration: const InputDecoration(
                       hintText: 'Search by date (e.g. 2026-03)',
@@ -84,15 +137,34 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(
                             14, 14, 14, 32),
-                        itemCount: filtered.length,
+                        itemCount: visible.length +
+                            (filtered.length > _visibleCount ? 1 : 0),
                         itemBuilder: (ctx, i) {
-                          final prod = filtered[i];
+                          if (i == visible.length) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: 8),
+                              child: TextButton(
+                                onPressed: () => setState(() =>
+                                    _visibleCount += _pageSize),
+                                child: Text(
+                                  'Load more (${filtered.length - _visibleCount} remaining)',
+                                  style: const TextStyle(
+                                      color: AppColors.masterBaker,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            );
+                          }
+                          final prod = visible[i];
                           final calc = vm.computeDaily(prod);
                           return _HistoryCard(
                             prod: prod,
                             calc: calc,
                             vm: vm,
                             index: i,
+                            onDelete: () =>
+                                _deleteRecord(vm, prod.id),
                           );
                         },
                       ),
@@ -111,12 +183,14 @@ class _HistoryCard extends StatelessWidget {
   final dynamic calc;
   final BakerProductionViewModel vm;
   final int index;
+  final VoidCallback onDelete;
 
   const _HistoryCard({
     required this.prod,
     required this.calc,
     required this.vm,
     required this.index,
+    required this.onDelete,
   });
 
   @override
@@ -193,6 +267,13 @@ class _HistoryCard extends StatelessWidget {
                     icon: Icons.edit_outlined,
                     color: AppColors.primary,
                     onTap: () => _openEditSheet(context),
+                  ),
+                  const SizedBox(width: 6),
+                  // Delete button
+                  _IconBtn(
+                    icon: Icons.delete_outline,
+                    color: AppColors.danger,
+                    onTap: onDelete,
                   ),
                 ]),
               ),

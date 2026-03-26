@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/packer_production_model.dart';
 import '../../../core/models/packer_payroll_model.dart';
 import '../../../core/services/packer_service.dart';
+import '../../../core/utils/constants.dart';
 
 class PackerSalaryViewModel extends ChangeNotifier {
   final _service = PackerService();
@@ -19,6 +20,11 @@ class PackerSalaryViewModel extends ChangeNotifier {
   DateTime _monthStart  = _firstDayOfMonth(DateTime.now());
   DateTime _selectedDay = _today();
 
+  // ── Cached computed values (rebuilt after each data load) ──
+  List<PackerDailyEntry>                          _cachedDailyEntries   = [];
+  Map<String, List<PackerProductionModel>>        _cachedProdByDate     = {};
+  List<PackerWeeklySummary>                       _cachedWeeklySummaries = [];
+
   // ── Getters ────────────────────────────────────────────────
   bool    get isLoading   => _isLoading;
   String? get error       => _error;
@@ -27,12 +33,14 @@ class PackerSalaryViewModel extends ChangeNotifier {
   PackerPayrollModel?         get weekPayroll => _weekPayroll;
 
   // ── Selected day (daily tab) ───────────────────────────────
-  bool   get isToday          => _selectedDay == _today();
+  bool   get isToday           => _selectedDay == _today();
   String get selectedDayDisplay => _fmtFullLong(_selectedDay);
 
   List<PackerDailyEntry> get dailyEntriesForDay {
     final dateStr = _isoDate(_selectedDay);
-    return dailyEntries.where((e) => e.date == dateStr).toList();
+    return _cachedDailyEntries
+        .where((e) => e.date == dateStr)
+        .toList();
   }
 
   // ── Week range (ISO – DB queries) ──────────────────────────
@@ -63,90 +71,31 @@ class PackerSalaryViewModel extends ChangeNotifier {
   String get _monthStartIso => _isoDate(_monthStart);
   String get _monthEndIso   => _isoDate(_lastDayOfMonth(_monthStart));
 
-  // ── Daily aggregates ───────────────────────────────────────
-  Map<String, List<PackerProductionModel>> get productionsByDate {
-    final map = <String, List<PackerProductionModel>>{};
-    for (final p in _productions) {
-      map.putIfAbsent(p.date, () => []).add(p);
-    }
-    return map;
-  }
+  // ── Daily aggregates (cached) ──────────────────────────────
+  Map<String, List<PackerProductionModel>> get productionsByDate =>
+      _cachedProdByDate;
 
-  List<PackerDailyEntry> get dailyEntries {
-    final entries = productionsByDate.entries.map((e) {
-      final bundles = e.value.fold(0, (s, p) => s + p.bundleCount);
-      return PackerDailyEntry(
-        date:         e.key,
-        productions:  e.value,
-        totalBundles: bundles,
-        salary:       bundles * 4.0,
-      );
-    }).toList();
-    entries.sort((a, b) => b.date.compareTo(a.date));
-    return entries;
-  }
+  List<PackerDailyEntry> get dailyEntries => _cachedDailyEntries;
 
   // ── Weekly aggregates ──────────────────────────────────────
   int    get totalBundles  => _productions.fold(0, (s, p) => s + p.bundleCount);
-  double get grossSalary   => totalBundles * 4.0;
+  double get grossSalary   => totalBundles * AppConstants.packerRatePerBundle;
   double get valeDeduction => _weekPayroll?.valeDeduction ?? 0.0;
   double get netSalary     => grossSalary - valeDeduction;
-  int    get daysWorked    => productionsByDate.keys.length;
+  int    get daysWorked    => _cachedProdByDate.keys.length;
 
   // ── Yearly aggregates (used by profile) ───────────────────
   int    get yearlyBundles => _yearProductions.fold(0, (s, p) => s + p.bundleCount);
-  double get yearlyGross   => yearlyBundles * 4.0;
+  double get yearlyGross   => yearlyBundles * AppConstants.packerRatePerBundle;
   double get yearlyNet     => yearlyGross - _yearlyVale;
   int    get yearlyDays    {
     final dates = <String>{};
-    for (final p in _yearProductions) dates.add(p.date);
+    for (final p in _yearProductions) { dates.add(p.date); }
     return dates.length;
   }
 
-  // ── Monthly weekly breakdown ───────────────────────────────
-  List<PackerWeeklySummary> get weeklySummaries {
-    final summaries = <PackerWeeklySummary>[];
-    for (int i = 3; i >= 0; i--) {
-      final wStart = _weekStart.subtract(Duration(days: 7 * i));
-      final wEnd   = wStart.add(const Duration(days: 6));
-      final wsStr  = _isoDate(wStart);
-      final weStr  = _isoDate(wEnd);
-
-      final weekProds = _productions
-          .where((p) =>
-              p.date.compareTo(wsStr) >= 0 &&
-              p.date.compareTo(weStr) <= 0)
-          .toList();
-
-      final bundles = weekProds.fold(0, (s, p) => s + p.bundleCount);
-
-      final dayMap = <String, List<PackerProductionModel>>{};
-      for (final p in weekProds) {
-        dayMap.putIfAbsent(p.date, () => []).add(p);
-      }
-
-      final weekDailyEntries = dayMap.entries.map((e) {
-        final b = e.value.fold(0, (s, p) => s + p.bundleCount);
-        return PackerDailyEntry(
-          date:         e.key,
-          productions:  e.value,
-          totalBundles: b,
-          salary:       b * 4.0,
-        );
-      }).toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
-
-      summaries.add(PackerWeeklySummary(
-        weekStart:    wsStr,
-        weekEnd:      weStr,
-        bundles:      bundles,
-        grossSalary:  bundles * 4.0,
-        days:         dayMap.keys.length,
-        dailyEntries: weekDailyEntries,
-      ));
-    }
-    return summaries;
-  }
+  // ── Monthly weekly breakdown (cached) ─────────────────────
+  List<PackerWeeklySummary> get weeklySummaries => _cachedWeeklySummaries;
 
   // ─────────────────────────────────────────────────────────
   //  INIT — resets to current week
@@ -156,7 +105,7 @@ class PackerSalaryViewModel extends ChangeNotifier {
     await Future.wait([
       _loadWeekData(packerId),
       _loadYearData(packerId),
-    ]);
+    ]).timeout(const Duration(seconds: 15));
   }
 
   // ─────────────────────────────────────────────────────────
@@ -176,13 +125,14 @@ class PackerSalaryViewModel extends ChangeNotifier {
           weekStart: weekStart,
           weekEnd:   weekEnd,
         ),
-      ]);
+      ]).timeout(const Duration(seconds: 15));
 
       _productions = results[0] as List<PackerProductionModel>;
       _weekPayroll = results[1] as PackerPayrollModel?;
+      _rebuildCache();
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load weekly data. Check your connection.';
     } finally {
       _setLoading(false);
     }
@@ -196,42 +146,55 @@ class PackerSalaryViewModel extends ChangeNotifier {
       final year      = DateTime.now().year;
       final yearStart = '$year-01-01';
       final yearEnd   = '$year-12-31';
-      _yearProductions = await _service.getProductionsByMonth(
-        packerId:   packerId,
-        monthStart: yearStart,
-        monthEnd:   yearEnd,
-      );
-      final payrolls = await _service.getPayrollHistory(
-        packerId: packerId,
-        fromDate: yearStart,
-        toDate:   yearEnd,
-      );
-      _yearlyVale = payrolls.fold(0.0, (s, p) => s + p.valeDeduction);
-    } catch (_) {
+
+      final results = await Future.wait([
+        _service.getProductionsByMonth(
+          packerId:   packerId,
+          monthStart: yearStart,
+          monthEnd:   yearEnd,
+        ),
+        _service.getPayrollHistory(
+          packerId: packerId,
+          fromDate: yearStart,
+          toDate:   yearEnd,
+        ),
+      ]).timeout(const Duration(seconds: 15));
+
+      _yearProductions = results[0] as List<PackerProductionModel>;
+      final payrolls   = results[1] as List<PackerPayrollModel>;
+      _yearlyVale      = payrolls.fold(0.0, (s, p) => s + p.valeDeduction);
+      notifyListeners();
+    } catch (e) {
       _yearProductions = [];
       _yearlyVale      = 0;
+      notifyListeners();
     }
   }
+
+  /// Reload only year data — called after add/delete production
+  Future<void> reloadYear(String packerId) => _loadYearData(packerId);
 
   // ─────────────────────────────────────────────────────────
   //  LOAD MONTHLY
   // ─────────────────────────────────────────────────────────
-  Future<void> loadMonthly(String packerId) async {
-    _monthStart = _firstDayOfMonth(DateTime.now());
-    await _loadMonthData(packerId);
-  }
+
+  /// Loads data for the currently selected month (preserves navigation state)
+  Future<void> loadMonthly(String packerId) => _loadMonthData(packerId);
 
   Future<void> _loadMonthData(String packerId) async {
     _setLoading(true);
     try {
-      _productions = await _service.getProductionsByMonth(
-        packerId:   packerId,
-        monthStart: _monthStartIso,
-        monthEnd:   _monthEndIso,
-      );
+      _productions = await _service
+          .getProductionsByMonth(
+            packerId:   packerId,
+            monthStart: _monthStartIso,
+            monthEnd:   _monthEndIso,
+          )
+          .timeout(const Duration(seconds: 15));
+      _rebuildCache();
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load monthly data. Check your connection.';
     } finally {
       _setLoading(false);
     }
@@ -249,7 +212,6 @@ class PackerSalaryViewModel extends ChangeNotifier {
     if (direction > 0 && isToday) return;
     final next = _selectedDay.add(Duration(days: direction));
     _selectedDay = next;
-    // reload week if day moved outside current loaded week
     final dayMon = DateTime(next.year, next.month,
         next.day - (next.weekday - DateTime.monday));
     if (_isoDate(dayMon) != _isoDate(_weekStart)) {
@@ -282,6 +244,74 @@ class PackerSalaryViewModel extends ChangeNotifier {
   Future<void> goToCurrentMonth(String packerId) async {
     _monthStart = _firstDayOfMonth(DateTime.now());
     await _loadMonthData(packerId);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  CACHE REBUILD — called after every data load
+  // ─────────────────────────────────────────────────────────
+  void _rebuildCache() {
+    // productionsByDate map
+    final map = <String, List<PackerProductionModel>>{};
+    for (final p in _productions) {
+      map.putIfAbsent(p.date, () => []).add(p);
+    }
+    _cachedProdByDate = map;
+
+    // dailyEntries list (sorted newest first)
+    final entries = map.entries.map((e) {
+      final bundles = e.value.fold(0, (s, p) => s + p.bundleCount);
+      return PackerDailyEntry(
+        date:         e.key,
+        productions:  e.value,
+        totalBundles: bundles,
+        salary:       bundles * AppConstants.packerRatePerBundle,
+      );
+    }).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    _cachedDailyEntries = entries;
+
+    // weeklySummaries anchored on _monthStart (for monthly tab)
+    final summaries = <PackerWeeklySummary>[];
+    for (int i = 0; i < 4; i++) {
+      final wStart = _monthStart.add(Duration(days: 7 * i));
+      final wEnd   = wStart.add(const Duration(days: 6));
+      final wsStr  = _isoDate(wStart);
+      final weStr  = _isoDate(wEnd);
+
+      final weekProds = _productions
+          .where((p) =>
+              p.date.compareTo(wsStr) >= 0 &&
+              p.date.compareTo(weStr)  <= 0)
+          .toList();
+
+      final bundles = weekProds.fold(0, (s, p) => s + p.bundleCount);
+
+      final dayMap = <String, List<PackerProductionModel>>{};
+      for (final p in weekProds) {
+        dayMap.putIfAbsent(p.date, () => []).add(p);
+      }
+
+      final weekDailyEntries = dayMap.entries.map((e) {
+        final b = e.value.fold(0, (s, p) => s + p.bundleCount);
+        return PackerDailyEntry(
+          date:         e.key,
+          productions:  e.value,
+          totalBundles: b,
+          salary:       b * AppConstants.packerRatePerBundle,
+        );
+      }).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
+      summaries.add(PackerWeeklySummary(
+        weekStart:    wsStr,
+        weekEnd:      weStr,
+        bundles:      bundles,
+        grossSalary:  bundles * AppConstants.packerRatePerBundle,
+        days:         dayMap.keys.length,
+        dailyEntries: weekDailyEntries,
+      ));
+    }
+    _cachedWeeklySummaries = summaries;
   }
 
   // ─────────────────────────────────────────────────────────

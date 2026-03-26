@@ -27,20 +27,35 @@ class BakerProductionViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.wait([
-      _db.getProductionsByMasterBaker(masterBakerId)
-          .then((v) => _productions = v)
-          .catchError((_) => _productions = []),
-      _db.getAllProducts()
-          .then((v) => _products = v)
-          .catchError((_) => _products = []),
-      _db.getUsersByRole('helper')
-          .then((v) => _helpers = v)
-          .catchError((_) => _helpers = []),
-    ]);
+    try {
+      await Future.wait([
+        _db.getProductionsByMasterBaker(masterBakerId)
+            .then((v) => _productions = v)
+            .catchError((_) => _productions = []),
+        _db.getAllProducts()
+            .then((v) => _products = v)
+            .catchError((_) => _products = []),
+        _db.getUsersByRole('helper')
+            .then((v) => _helpers = v)
+            .catchError((_) => _helpers = []),
+      ]).timeout(const Duration(seconds: 15));
+    } catch (_) {}
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<bool> deleteProduction(String productionId, String masterBakerId) async {
+    try {
+      await _db.deleteChristmasBonusesByProduction(productionId);
+      await _db.deleteProduction(productionId);
+      _productions.removeWhere((p) => p.id == productionId);
+      notifyListeners();
+      await loadData(masterBakerId);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   DailySalaryResult computeDaily(ProductionModel production) =>
@@ -91,6 +106,7 @@ class BakerProductionViewModel extends ChangeNotifier {
     required String               masterBakerId,
     required List<String>         helperIds,
     required List<ProductionItem> items,
+    String?                       ovenHelperId,
   }) async {
     try {
       final exists =
@@ -106,6 +122,7 @@ class BakerProductionViewModel extends ChangeNotifier {
         masterBakerId:   masterBakerId,
         helperIds:       helperIds,
         items:           items,
+        ovenHelperId:    ovenHelperId,
         totalValue:      computed.totalValue,
         totalSacks:      computed.totalSacks,
         totalExtraKg:    computed.totalExtraKg,

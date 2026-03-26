@@ -1,3 +1,5 @@
+import '../utils/constants.dart';
+
 class PackerProductionModel {
   final String id;
   final String packerId;
@@ -18,8 +20,7 @@ class PackerProductionModel {
   });
 
   // ── Derived ────────────────────────────────────────────────
-  /// ₱4 per bundle
-  double get salaryEarned => bundleCount * 4.0;
+  double get salaryEarned => bundleCount * AppConstants.packerRatePerBundle;
 
   // ── Serialization ──────────────────────────────────────────
   factory PackerProductionModel.fromJson(Map<String, dynamic> json) {

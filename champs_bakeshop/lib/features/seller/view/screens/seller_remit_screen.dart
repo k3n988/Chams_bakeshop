@@ -39,7 +39,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
       if (existing != null) {
         _returnCtrl.text   = existing.returnPieces.toString();
         _remittedCtrl.text =
-            existing.actualRemittance.toStringAsFixed(0);
+            existing.actualRemittance.toStringAsFixed(2);
       }
     });
   }
@@ -61,9 +61,17 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
     final uid       = context.read<AuthViewModel>().currentUser!.id;
     final messenger = ScaffoldMessenger.of(context);
 
-    if (_remittedCtrl.text.trim().isEmpty) {
+    if (_remittedCtrl.text.trim().isEmpty || _actualRemittance <= 0) {
       messenger.showSnackBar(const SnackBar(
-        content: Text('Please enter the amount remitted'),
+        content: Text('Please enter a valid amount remitted'),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
+
+    if (_returnPieces < 0) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Return pieces cannot be negative'),
         backgroundColor: AppColors.danger,
       ));
       return;
@@ -90,7 +98,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
       ok = await vm.updateRemittance(
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
-        salary:           _adjusted(totalTaken) * 0.05,
+        salary:           _adjusted(totalTaken) * AppConstants.sellerSalaryRate,
         remitType:        widget.remitType,
       );
     } else {
@@ -98,7 +106,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
         sellerId:         uid,
         returnPieces:     _returnPieces,
         actualRemittance: _actualRemittance,
-        salary:           _adjusted(totalTaken) * 0.05,
+        salary:           _adjusted(totalTaken) * AppConstants.sellerSalaryRate,
         remitType:        widget.remitType,
       );
     }
@@ -133,7 +141,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
         : vm.hasAfternoonRemittance;
 
     final primaryColor = _isMorning
-        ? const Color(0xFF1976D2)
+        ? AppColors.seller
         : AppColors.success;
     final sessionLabel = _isMorning ? 'Morning' : 'Afternoon';
 

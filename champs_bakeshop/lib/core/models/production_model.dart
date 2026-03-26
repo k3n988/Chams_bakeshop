@@ -43,6 +43,7 @@ class ProductionModel {
   final String masterBakerId;
   final List<String> helperIds;
   final List<ProductionItem> items;
+  final String? ovenHelperId; // helper exempt from oven deduction that day
 
   // All computed fields saved to DB
   final double totalValue;
@@ -59,6 +60,7 @@ class ProductionModel {
     required this.masterBakerId,
     required this.helperIds,
     required this.items,
+    this.ovenHelperId,
     this.totalValue = 0.0,
     this.totalSacks = 0,
     this.totalExtraKg = 0,
@@ -77,6 +79,7 @@ class ProductionModel {
     String? masterBakerId,
     List<String>? helperIds,
     List<ProductionItem>? items,
+    String? ovenHelperId,
     double? totalValue,
     int? totalSacks,
     int? totalExtraKg,
@@ -91,6 +94,7 @@ class ProductionModel {
         masterBakerId: masterBakerId ?? this.masterBakerId,
         helperIds: helperIds ?? this.helperIds,
         items: items ?? this.items,
+        ovenHelperId: ovenHelperId ?? this.ovenHelperId,
         totalValue: totalValue ?? this.totalValue,
         totalSacks: totalSacks ?? this.totalSacks,
         totalExtraKg: totalExtraKg ?? this.totalExtraKg,
@@ -106,6 +110,7 @@ class ProductionModel {
         'master_baker_id': masterBakerId,
         'helper_ids': helperIds,
         'items': items.map((i) => i.toMap()).toList(),
+        'oven_helper_id': ovenHelperId,
         'total_value': totalValue,
         'total_sacks': totalSacks,
         'total_extra_kg': totalExtraKg,
@@ -144,6 +149,7 @@ class ProductionModel {
       masterBakerId: map['master_baker_id'],
       helperIds: parsedHelpers,
       items: parsedItems,
+      ovenHelperId: map['oven_helper_id'] as String?,
       totalValue: (map['total_value'] ?? 0).toDouble(),
       totalSacks: map['total_sacks'] ?? 0,
       totalExtraKg: map['total_extra_kg'] ?? 0,

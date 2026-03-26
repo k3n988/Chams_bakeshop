@@ -26,13 +26,15 @@ class _SellerSessionInputScreenState
   final _plantsaCtrl = TextEditingController();
   final _subraCtrl   = TextEditingController();
 
-  static const int    _piecesPerPlantsa = 25;
-  static const double _pricePerPiece    = 5.0;
+  static const int    _piecesPerPlantsa = AppConstants.sellerPiecesPerPlantsa;
+  static const double _pricePerPiece    = AppConstants.sellerPricePerPiece;
 
   int    get _plantsa            => int.tryParse(_plantsaCtrl.text) ?? 0;
   int    get _subra              => int.tryParse(_subraCtrl.text)   ?? 0;
   int    get _totalPieces        => (_plantsa * _piecesPerPlantsa) + _subra;
   double get _expectedRemittance => _totalPieces * _pricePerPiece;
+  double get _estimatedSalary    =>
+      _expectedRemittance * AppConstants.sellerSalaryRate;
 
   bool   get _isMorning => widget.sessionType == SessionType.morning;
 
@@ -79,11 +81,15 @@ class _SellerSessionInputScreenState
         backgroundColor: AppColors.success,
       ));
       Navigator.pop(context);
-    } else if (mounted && vm.error != null) {
+    } else if (mounted) {
       messenger.showSnackBar(SnackBar(
-        content: Text(vm.error!),
+        content: Text(vm.error ?? 'Failed to start session. Try again.'),
         backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
       ));
+      vm.clearError();
     }
   }
 
@@ -179,7 +185,7 @@ class _SellerSessionInputScreenState
                     hint:   'e.g. 5',
                     icon:   Icons.add_circle_outline,
                     suffix: 'pieces',
-                    color:  const Color(0xFF1976D2),
+                    color:  primaryColor,
                     onChanged: (_) => setState(() {}),
                   ),
                 ],
@@ -191,6 +197,7 @@ class _SellerSessionInputScreenState
             _PreviewCard(
               totalPieces:        _totalPieces,
               expectedRemittance: _expectedRemittance,
+              estimatedSalary:    _estimatedSalary,
               plantsa:            _plantsa,
               subra:              _subra,
               piecesPerPlantsa:   _piecesPerPlantsa,
@@ -235,6 +242,7 @@ class _SellerSessionInputScreenState
 class _PreviewCard extends StatelessWidget {
   final int    totalPieces;
   final double expectedRemittance;
+  final double estimatedSalary;
   final int    plantsa;
   final int    subra;
   final int    piecesPerPlantsa;
@@ -244,6 +252,7 @@ class _PreviewCard extends StatelessWidget {
   const _PreviewCard({
     required this.totalPieces,
     required this.expectedRemittance,
+    required this.estimatedSalary,
     required this.plantsa,
     required this.subra,
     required this.piecesPerPlantsa,
@@ -305,10 +314,14 @@ class _PreviewCard extends StatelessWidget {
                 _CalcRow(label: 'Subra', value: '$subra pieces'),
                 const Divider(height: 14, color: Colors.white30),
                 _CalcRow(
-                  label:
-                      'Total × ₱${pricePerPiece.toStringAsFixed(0)}',
-                  value:
-                      '$totalPieces pcs = ${formatCurrency(expectedRemittance)}',
+                  label: 'Total × ₱${pricePerPiece.toStringAsFixed(0)}',
+                  value: '$totalPieces pcs = ${formatCurrency(expectedRemittance)}',
+                  isBold: true,
+                ),
+                const SizedBox(height: 4),
+                _CalcRow(
+                  label: 'Est. Salary (5%)',
+                  value: formatCurrency(estimatedSalary),
                   isBold: true,
                 ),
               ]),

@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import '../../viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/admin_production_viewmodel.dart';
 import '../../viewmodel/admin_payroll_viewmodel.dart';
+import '../../viewmodel/admin_product_viewmodel.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final void Function(int) onNavigate;
@@ -17,130 +18,562 @@ class AdminHomeScreen extends StatelessWidget {
     final prodVM    = context.watch<AdminProductionViewModel>();
     final payrollVM = context.watch<AdminPayrollViewModel>();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    Future<void> refresh() => Future.wait([
+          context.read<AdminUserViewModel>().loadUsers(),
+          context.read<AdminProductViewModel>().loadProducts(),
+          context.read<AdminProductionViewModel>().loadAllProductions(),
+          context.read<AdminPayrollViewModel>().autoLoad(),
+        ]);
 
-          // ── Hero banner ───────────────────────────────────
-          _HeroBanner(),
-          const SizedBox(height: 20),
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: refresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-          // ── Stats grid ────────────────────────────────────
-          const _SectionLabel('QUICK OVERVIEW'),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 110,
-            child: Row(children: [
-              Expanded(
-                child: _StatCard(
+            // ── Hero banner ─────────────────────────────────
+            _HeroBanner(),
+            const SizedBox(height: 20),
+
+            // ── Quick overview ──────────────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const _SectionLabel('QUICK OVERVIEW'),
+                const SizedBox(width: 10),
+                _WeekChip(),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              height: 110,
+              child: Row(children: [
+                Expanded(child: _StatCard(
                   icon:  Icons.layers_outlined,
                   label: 'Total Bundles',
                   value: '${prodVM.weekTotalBundles}',
                   color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: _StatCard(
                   icon:  Icons.payments_outlined,
                   label: 'Baker/Helper Payroll',
                   value: formatCurrency(payrollVM.totalPayroll),
                   color: const Color(0xFF388E3C),
-                ),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 110,
-            child: Row(children: [
-              Expanded(
-                child: _StatCard(
+                )),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 110,
+              child: Row(children: [
+                Expanded(child: _StatCard(
                   icon:  Icons.inventory_2_outlined,
                   label: 'Packer Payroll',
                   value: formatCurrency(payrollVM.totalPayrollPacker),
                   color: AppColors.packer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: _StatCard(
                   icon:  Icons.storefront_outlined,
                   label: 'Seller Payroll',
                   value: formatCurrency(payrollVM.totalPayrollSeller),
                   color: AppColors.seller,
-                ),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 20),
-
-          // ── Staff breakdown ───────────────────────────────
-          const _SectionLabel('STAFF BREAKDOWN'),
-          const SizedBox(height: 12),
-          _StaffBreakdownCard(userVM: userVM),
-          const SizedBox(height: 20),
-
-          // ── Packed this week ──────────────────────────────
-          const _SectionLabel('PACKED THIS WEEK — BY PRODUCT'),
-          const SizedBox(height: 12),
-          _PackedTodayCard(prodVM: prodVM),
-          const SizedBox(height: 20),
-
-          // ── Quick actions ─────────────────────────────────
-          const _SectionLabel('QUICK ACTIONS'),
-          const SizedBox(height: 12),
-
-          // Row 1: Users + Products (open via drawer)
-          Row(children: [
-            Expanded(
-              child: _QuickActionCard(
-                icon:    Icons.people_outlined,
-                label:   'Manage Users',
-                color:   AppColors.masterBaker,
-                onTap:   () => onNavigate(1),
-              ),
+                )),
+              ]),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _QuickActionCard(
-                icon:    Icons.inventory_2_outlined,
-                label:   'Products',
-                color:   AppColors.info,
-                onTap:   () => onNavigate(2),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          _ActionTile(
-            icon:     Icons.bar_chart_outlined,
-            label:    'Production Reports',
-            subtitle: 'View daily production history',
-            color:    AppColors.primary,
-            onTap:    () => onNavigate(3),
+            // ── Combined total wage banner ──────────────────
+            _TotalWagesBanner(total: payrollVM.totalPayrollAll),
+            const SizedBox(height: 20),
+
+            // ── Payroll status ──────────────────────────────
+            const _SectionLabel('PAYROLL STATUS'),
+            const SizedBox(height: 12),
+            _PayrollStatusCard(payrollVM: payrollVM),
+            const SizedBox(height: 20),
+
+            // ── Today's production ──────────────────────────
+            const _SectionLabel("TODAY'S PRODUCTION"),
+            const SizedBox(height: 12),
+            _TodayProductionCard(prodVM: prodVM),
+            const SizedBox(height: 20),
+
+            // ── Top performers ──────────────────────────────
+            const _SectionLabel('TOP PERFORMERS THIS WEEK'),
+            const SizedBox(height: 12),
+            _TopPerformersCard(
+              prodVM:    prodVM,
+              payrollVM: payrollVM,
+              userVM:    userVM,
+            ),
+            const SizedBox(height: 20),
+
+            // ── Staff breakdown ─────────────────────────────
+            const _SectionLabel('STAFF BREAKDOWN'),
+            const SizedBox(height: 12),
+            _StaffBreakdownCard(userVM: userVM),
+            const SizedBox(height: 20),
+
+            // ── Packed this week ────────────────────────────
+            const _SectionLabel('PACKED THIS WEEK — BY PRODUCT'),
+            const SizedBox(height: 12),
+            _PackedTodayCard(prodVM: prodVM),
+            const SizedBox(height: 20),
+
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Week chip ─────────────────────────────────────────────────
+class _WeekChip extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final mon = now.subtract(Duration(days: now.weekday - 1));
+    final sun = mon.add(const Duration(days: 6));
+    const m = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final label =
+        '${m[mon.month]} ${mon.day} – ${m[sun.month]} ${sun.day}, ${sun.year}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize:   10,
+          fontWeight: FontWeight.w700,
+          color:      AppColors.primary,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Total wages banner ────────────────────────────────────────
+class _TotalWagesBanner extends StatelessWidget {
+  final double total;
+  const _TotalWagesBanner({required this.total});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          _ActionTile(
-            icon:     Icons.payments_outlined,
-            label:    'Weekly Payroll',
-            subtitle: 'Generate & manage payroll',
-            color:    const Color(0xFF388E3C),
-            onTap:    () => onNavigate(4),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF7A00).withValues(alpha: 0.20),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('TOTAL WEEKLY WAGES',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white70,
+                        letterSpacing: 0.8)),
+                SizedBox(height: 2),
+                Text('All roles combined',
+                    style: TextStyle(fontSize: 11, color: Colors.white60)),
+              ],
+            ),
+            Text(
+              formatCurrency(total),
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white),
+            ),
+          ],
+        ),
+      );
+}
+
+// ── Payroll status card ───────────────────────────────────────
+class _PayrollStatusCard extends StatelessWidget {
+  final AdminPayrollViewModel payrollVM;
+  const _PayrollStatusCard({required this.payrollVM});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-          _ActionTile(
-            icon:     Icons.card_giftcard_outlined,
-            label:    'Christmas Bonus',
-            subtitle: 'Track holiday bonuses per worker',
-            color:    const Color(0xFFC62828),
-            onTap:    () => onNavigate(5),
-            isLast:   true,
+        ],
+      ),
+      child: Column(
+        children: [
+          _PayrollRow(
+            label:     '👨‍🍳 Baker / Helper',
+            paid:      payrollVM.bakerPaidCount,
+            total:     payrollVM.bakerTotalCount,
+            color:     const Color(0xFF388E3C),
+          ),
+          const SizedBox(height: 14),
+          _PayrollRow(
+            label:     '📦 Packer',
+            paid:      payrollVM.packerPaidCount,
+            total:     payrollVM.packerTotalCount,
+            color:     AppColors.packer,
           ),
         ],
       ),
     );
   }
+}
+
+class _PayrollRow extends StatelessWidget {
+  final String label;
+  final int    paid;
+  final int    total;
+  final Color  color;
+  const _PayrollRow({
+    required this.label,
+    required this.paid,
+    required this.total,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = total > 0 ? paid / total : 0.0;
+    final allPaid = total > 0 && paid == total;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text)),
+            Row(children: [
+              if (allPaid)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: const Text('ALL PAID',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.success,
+                          letterSpacing: 0.4)),
+                ),
+              Text(
+                total == 0 ? 'No data' : '$paid / $total paid',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: allPaid ? AppColors.success : color),
+              ),
+            ]),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value:           frac,
+            minHeight:       6,
+            backgroundColor: color.withValues(alpha: 0.10),
+            color:           allPaid ? AppColors.success : color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Today's production card ───────────────────────────────────
+class _TodayProductionCard extends StatelessWidget {
+  final AdminProductionViewModel prodVM;
+  const _TodayProductionCard({required this.prodVM});
+
+  @override
+  Widget build(BuildContext context) {
+    final byProduct = prodVM.todayPackedByProduct;
+    final total     = prodVM.todayTotalBundles;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: prodVM.isLoading
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.packer),
+              ),
+            )
+          : byProduct.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.packer.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.inventory_2_outlined,
+                          size: 18, color: AppColors.packer),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('No packing recorded today.',
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.textHint)),
+                  ]),
+                )
+              : Column(
+                  children: [
+                    ...byProduct.entries.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(children: [
+                            Container(
+                              width: 8, height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.packer,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(e.key,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.text)),
+                            ),
+                            Text('${e.value} bundles',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.packer)),
+                          ]),
+                        )),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Today',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.text)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.packer.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text('$total bundles',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: AppColors.packer)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+    );
+  }
+}
+
+// ── Top performers card ───────────────────────────────────────
+class _TopPerformersCard extends StatelessWidget {
+  final AdminProductionViewModel prodVM;
+  final AdminPayrollViewModel    payrollVM;
+  final AdminUserViewModel       userVM;
+
+  const _TopPerformersCard({
+    required this.prodVM,
+    required this.payrollVM,
+    required this.userVM,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Top packer
+    final topPacker  = prodVM.topPackerEntry;
+    final packerName = topPacker != null
+        ? userVM.getUserName(topPacker.key)
+        : null;
+
+    // Top seller
+    final sellerMap = payrollVM.sellerWeeklyMap;
+    MapEntry<String, double>? topSellerEntry;
+    if (sellerMap.isNotEmpty) {
+      topSellerEntry = sellerMap.entries
+          .reduce((a, b) => a.value >= b.value ? a : b);
+    }
+    final sellerName = topSellerEntry != null
+        ? userVM.getUserName(topSellerEntry.key)
+        : null;
+
+    final hasData = packerName != null || sellerName != null;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: !hasData
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text('No production data this week.',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textHint)),
+            )
+          : Column(
+              children: [
+                if (packerName != null) ...[
+                  _PerformerRow(
+                    emoji:    '📦',
+                    role:     'Top Packer',
+                    name:     packerName,
+                    detail:   '${topPacker!.value} bundles',
+                    color:    AppColors.packer,
+                  ),
+                  if (sellerName != null) const SizedBox(height: 12),
+                ],
+                if (sellerName != null)
+                  _PerformerRow(
+                    emoji:    '🥖',
+                    role:     'Top Seller',
+                    name:     sellerName,
+                    detail:   formatCurrency(topSellerEntry!.value),
+                    color:    AppColors.seller,
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _PerformerRow extends StatelessWidget {
+  final String emoji;
+  final String role;
+  final String name;
+  final String detail;
+  final Color  color;
+
+  const _PerformerRow({
+    required this.emoji,
+    required this.role,
+    required this.name,
+    required this.detail,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Text(emoji, style: const TextStyle(fontSize: 20)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(role,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textHint,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(name,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.text)),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(detail,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: color)),
+        ),
+      ]);
 }
 
 // ── Hero banner ───────────────────────────────────────────────
@@ -737,144 +1170,6 @@ class _ProductBundleRow extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Quick action card (2-up grid) ─────────────────────────────
-class _QuickActionCard extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final Color        color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: color.withValues(alpha: 0.20)),
-            ),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: color)),
-              ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 12, color: color.withValues(alpha: 0.6)),
-            ]),
-          ),
-        ),
-      );
-}
-
-// ── Action tile ───────────────────────────────────────────────
-class _ActionTile extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final String       subtitle;
-  final Color        color;
-  final VoidCallback onTap;
-  final bool         isLast;
-
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-    this.isLast = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
-        child: Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(label,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: Color(0xFF1A1A1A))),
-                      const SizedBox(height: 2),
-                      Text(subtitle,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textHint)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.chevron_right,
-                      color: color, size: 16),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      );
 }
 
 // ── Section label ─────────────────────────────────────────────

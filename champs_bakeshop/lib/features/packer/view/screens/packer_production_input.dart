@@ -5,6 +5,7 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/packer_production_viewmodel.dart';
+import '../../viewmodel/packer_salary_viewmodel.dart';
 
 class PackerProductionInputScreen extends StatefulWidget {
   const PackerProductionInputScreen({super.key});
@@ -18,26 +19,36 @@ class _PackerProductionInputScreenState
     extends State<PackerProductionInputScreen> {
   final _bundleCtrl = TextEditingController();
 
-  String?   _selectedProduct;
-  DateTime  _entryDate = DateTime.now();
+  String?  _selectedProduct;
+  DateTime _entryDate = DateTime.now();
 
-  int    get _bundles        => int.tryParse(_bundleCtrl.text) ?? 0;
-  double get _previewSalary  => _bundles * 4.0;
+  int    get _bundles       => int.tryParse(_bundleCtrl.text) ?? 0;
+  double get _previewSalary => _bundles * AppConstants.packerRatePerBundle;
+
+  // ── Listen for late-loading products ──────────────────────
+  void _onVmChange() {
+    if (!mounted) return;
+    final vm = context.read<PackerProductionViewModel>();
+    if (_selectedProduct == null && vm.productNames.isNotEmpty) {
+      setState(() => _selectedProduct = vm.productNames.first);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vm = context.read<PackerProductionViewModel>();
-      // Set first product as default when products load
       if (vm.productNames.isNotEmpty && _selectedProduct == null) {
         setState(() => _selectedProduct = vm.productNames.first);
       }
+      vm.addListener(_onVmChange);
     });
   }
 
   @override
   void dispose() {
+    context.read<PackerProductionViewModel>().removeListener(_onVmChange);
     _bundleCtrl.dispose();
     super.dispose();
   }
@@ -47,7 +58,7 @@ class _PackerProductionInputScreenState
     final picked = await showDatePicker(
       context: context,
       initialDate: _entryDate,
-      firstDate: DateTime(DateTime.now().year - 1),
+      firstDate: DateTime(DateTime.now().year - 1, 1, 1),
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
@@ -60,15 +71,13 @@ class _PackerProductionInputScreenState
         child: child!,
       ),
     );
-    if (picked != null) {
-      setState(() => _entryDate = picked);
-    }
+    if (picked != null) setState(() => _entryDate = picked);
   }
 
   String get _dateLabel {
     const months = [
       'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jul','Aug','Sep','Oct','Nov','Dec',
     ];
     return '${months[_entryDate.month - 1]} ${_entryDate.day}, ${_entryDate.year}';
   }
@@ -80,26 +89,35 @@ class _PackerProductionInputScreenState
            _entryDate.day   == now.day;
   }
 
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor:
+            isError ? AppColors.danger : AppColors.success,
+        behavior:        SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (_selectedProduct == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please select a product'),
-        backgroundColor: AppColors.danger,
-      ));
+      _showSnack('Please select a product', isError: true);
       return;
     }
-
     if (_bundles <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please enter at least 1 bundle'),
-        backgroundColor: AppColors.danger,
-      ));
+      _showSnack('Please enter at least 1 bundle', isError: true);
       return;
     }
 
     final vm        = context.read<PackerProductionViewModel>();
+    final salaryVm  = context.read<PackerSalaryViewModel>();
     final uid       = context.read<AuthViewModel>().currentUser!.id;
-    final messenger = ScaffoldMessenger.of(context);
+
+    vm.clearError();
 
     final ok = await vm.addProduction(
       packerId:    uid,
@@ -108,17 +126,63 @@ class _PackerProductionInputScreenState
       entryDate:   _entryDate,
     );
 
-    if (ok && mounted) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Production added! ✅'),
-        backgroundColor: AppColors.success,
-      ));
+    if (!mounted) return;
+
+    if (ok) {
+      _showSnack('Production added!');
       _bundleCtrl.clear();
       setState(() {});
-    } else if (mounted && vm.error != null) {
-      messenger.showSnackBar(SnackBar(
-          content: Text(vm.error!),
-          backgroundColor: AppColors.danger));
+      // Refresh yearly totals in profile
+      salaryVm.reloadYear(uid);
+    } else if (vm.error != null) {
+      _showSnack(vm.error!, isError: true);
+      vm.clearError();
+    }
+  }
+
+  // ── Delete with confirmation ───────────────────────────────
+  Future<void> _confirmDelete(dynamic prod, String packerId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Entry',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+          'Remove ${prod.bundleCount} bundles of '
+          '"${prod.productName}"?\nThis cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+                foregroundColor: AppColors.danger),
+            child: const Text('Delete',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final vm       = context.read<PackerProductionViewModel>();
+    final salaryVm = context.read<PackerSalaryViewModel>();
+
+    final ok = await vm.deleteProduction(prod.id, packerId);
+    if (!mounted) return;
+
+    if (ok) {
+      _showSnack('Entry deleted');
+      salaryVm.reloadYear(packerId);
+    } else if (vm.error != null) {
+      _showSnack(vm.error!, isError: true);
+      vm.clearError();
     }
   }
 
@@ -127,11 +191,6 @@ class _PackerProductionInputScreenState
     final vm  = context.watch<PackerProductionViewModel>();
     final uid = context.read<AuthViewModel>().currentUser!.id;
 
-    // Auto-select first product if not yet selected
-    if (_selectedProduct == null && vm.productNames.isNotEmpty) {
-      _selectedProduct = vm.productNames.first;
-    }
-
     // Productions for selected date
     final selectedProds = vm.selectedDayProductions.isNotEmpty
         ? vm.selectedDayProductions
@@ -139,7 +198,8 @@ class _PackerProductionInputScreenState
 
     final totalBundles =
         selectedProds.fold<int>(0, (s, p) => s + (p.bundleCount as int));
-    final totalSalary = totalBundles * 4.0;
+    final totalSalary =
+        totalBundles * AppConstants.packerRatePerBundle;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
@@ -170,9 +230,10 @@ class _PackerProductionInputScreenState
             ),
             const SizedBox(height: 16),
 
-            // ── Info card ──────────────────────────────────────
+            // ── Info banner ────────────────────────────────────
             _InfoBanner(
-              text: 'Each bundle earns ₱4.00. '
+              text: 'Each bundle earns '
+                  '${formatCurrency(AppConstants.packerRatePerBundle)}. '
                   'You can add multiple entries per day.',
             ),
             const SizedBox(height: 16),
@@ -206,24 +267,29 @@ class _PackerProductionInputScreenState
                         color: AppColors.warning.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color:
-                                AppColors.warning.withValues(alpha: 0.25)),
+                            color: AppColors.warning
+                                .withValues(alpha: 0.25)),
                       ),
                       child: const Row(children: [
                         Icon(Icons.warning_amber_outlined,
                             size: 16, color: AppColors.warning),
                         SizedBox(width: 8),
-                        Text('No products found. Ask admin to add products.',
+                        Expanded(
+                          child: Text(
+                            'No products found. Ask admin to add products.',
                             style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.warning)),
+                                color: AppColors.warning),
+                          ),
+                        ),
                       ]),
                     )
                   else
                     _ProductChips(
                       products:  vm.productNames,
                       selected:  _selectedProduct ?? '',
-                      onChanged: (v) => setState(() => _selectedProduct = v),
+                      onChanged: (v) =>
+                          setState(() => _selectedProduct = v),
                     ),
 
                   const SizedBox(height: 16),
@@ -233,7 +299,7 @@ class _PackerProductionInputScreenState
                     controller: _bundleCtrl,
                     keyboardType: TextInputType.number,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly
+                      FilteringTextInputFormatter.digitsOnly,
                     ],
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
@@ -285,8 +351,7 @@ class _PackerProductionInputScreenState
               child: ElevatedButton.icon(
                 icon: vm.isLoading
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 20, height: 20,
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2.5))
                     : const Icon(Icons.add, color: Colors.white),
@@ -312,11 +377,14 @@ class _PackerProductionInputScreenState
             // ── Entries for selected date ──────────────────────
             if (selectedProds.isNotEmpty) ...[
               _CardLabel(
-                  _isToday
-                      ? "TODAY'S ENTRIES"
-                      : 'ENTRIES FOR $_dateLabel'),
+                _isToday ? "TODAY'S ENTRIES" : 'ENTRIES FOR $_dateLabel',
+              ),
               const SizedBox(height: 10),
-              ...selectedProds.map((p) => _EntryRow(prod: p, packerId: uid, vm: vm)),
+              ...selectedProds.map((p) => _EntryRow(
+                    prod:     p,
+                    packerId: uid,
+                    onDelete: () => _confirmDelete(p, uid),
+                  )),
               const Divider(height: 20, color: AppColors.border),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -422,8 +490,8 @@ class _DateSelectorCard extends StatelessWidget {
 
 // ── Dynamic product chips ─────────────────────────────────────
 class _ProductChips extends StatelessWidget {
-  final List<String>           products;
-  final String                 selected;
+  final List<String>          products;
+  final String                selected;
   final void Function(String) onChanged;
   const _ProductChips({
     required this.products,
@@ -534,9 +602,12 @@ class _PreviewCard extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: Colors.white)),
-                  Text('$bundles bundles × ₱4.00',
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.white70)),
+                  Text(
+                    '$bundles bundles × '
+                    '${formatCurrency(AppConstants.packerRatePerBundle)}',
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.white70),
+                  ),
                 ],
               ),
             ),
@@ -547,13 +618,13 @@ class _PreviewCard extends StatelessWidget {
 
 // ── Entry row with delete ─────────────────────────────────────
 class _EntryRow extends StatelessWidget {
-  final dynamic                  prod;
-  final String                   packerId;
-  final PackerProductionViewModel vm;
+  final dynamic      prod;
+  final String       packerId;
+  final VoidCallback onDelete;
   const _EntryRow({
     required this.prod,
     required this.packerId,
-    required this.vm,
+    required this.onDelete,
   });
 
   String _formatTime(String ts) {
@@ -584,7 +655,8 @@ class _EntryRow extends StatelessWidget {
           Expanded(
             child: Text(prod.productName,
                 style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    color: AppColors.textSecondary)),
           ),
           Text('${prod.bundleCount} bundles',
               style: const TextStyle(
@@ -597,10 +669,10 @@ class _EntryRow extends StatelessWidget {
                   fontSize: 11, color: AppColors.textHint)),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: () => vm.deleteProduction(prod.id, packerId),
+            onTap: onDelete,
             child: Icon(Icons.delete_outline,
                 size: 16,
-                color: AppColors.danger.withValues(alpha: 0.6)),
+                color: AppColors.danger.withValues(alpha: 0.7)),
           ),
         ]),
       );

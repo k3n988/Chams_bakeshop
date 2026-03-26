@@ -87,6 +87,44 @@ class SellerService {
     }
   }
 
+  /// Check if a session already exists for seller/date/type
+  Future<bool> sessionExistsForDate({
+    required String sellerId,
+    required String date,
+    required String sessionType,
+  }) async {
+    try {
+      final data = await _db
+          .from(_sessionTable)
+          .select('id')
+          .eq('seller_id', sellerId)
+          .eq('date', date)
+          .eq('session_type', sessionType)
+          .maybeSingle();
+      return data != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete a session by id
+  Future<void> deleteSession(String sessionId) async {
+    try {
+      await _db.from(_sessionTable).delete().eq('id', sessionId);
+    } catch (e) {
+      throw Exception('Failed to delete session: $e');
+    }
+  }
+
+  /// Delete a remittance by id
+  Future<void> deleteRemittance(String remittanceId) async {
+    try {
+      await _db.from(_remittanceTable).delete().eq('id', remittanceId);
+    } catch (e) {
+      throw Exception('Failed to delete remittance: $e');
+    }
+  }
+
   /// Update a session
   Future<SellerSessionModel?> updateSession({
     required String sessionId,

@@ -184,9 +184,11 @@ class BakerSalaryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final productions =
-          await _db.getProductionsByDateRange(date, date);
-      final products = await _db.getAllProducts();
+      final productions = await _db
+          .getProductionsByDateRange(date, date)
+          .timeout(const Duration(seconds: 15));
+      final products = await _db.getAllProducts()
+          .timeout(const Duration(seconds: 15));
 
       final myProds = productions
           .where((p) => p.masterBakerId == userId)
@@ -228,9 +230,11 @@ class BakerSalaryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final productions =
-          await _db.getProductionsByDateRange(monthStart, monthEnd);
-      final products = await _db.getAllProducts();
+      final productions = await _db
+          .getProductionsByDateRange(monthStart, monthEnd)
+          .timeout(const Duration(seconds: 15));
+      final products = await _db.getAllProducts()
+          .timeout(const Duration(seconds: 15));
 
       final myProds = productions
           .where((p) => p.masterBakerId == userId)
@@ -288,9 +292,11 @@ class BakerSalaryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final productions = await _db.getProductionsByDateRange(
-          _weekStart, _weekEnd);
-      final products = await _db.getAllProducts();
+      final productions = await _db
+          .getProductionsByDateRange(_weekStart, _weekEnd)
+          .timeout(const Duration(seconds: 15));
+      final products = await _db.getAllProducts()
+          .timeout(const Duration(seconds: 15));
 
       final myProds = productions
           .where((p) => p.masterBakerId == userId)

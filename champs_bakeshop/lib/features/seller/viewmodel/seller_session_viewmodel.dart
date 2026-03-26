@@ -29,6 +29,7 @@ class SellerSessionViewModel extends ChangeNotifier {
   String? get error     => _error;
 
   // ── Morning ────────────────────────────────────────────────
+  /// Kept for backward compatibility — prefer morningSession
   SellerSessionModel?    get todaySession      => _morningSession;
   SellerSessionModel?    get morningSession    => _morningSession;
   SellerRemittanceModel? get morningRemittance => _morningRemittance;
@@ -129,16 +130,14 @@ class SellerSessionViewModel extends ChangeNotifier {
   Future<void> loadDateRecord(String sellerId, String date) async {
     _setLoading(true);
     try {
-      final sessions = await _service.getSessionsByRange(
-        sellerId: sellerId,
-        fromDate: date,
-        toDate:   date,
-      );
-      final remittances = await _service.getRemittancesByRange(
-        sellerId: sellerId,
-        fromDate: date,
-        toDate:   date,
-      );
+      final results = await Future.wait([
+        _service.getSessionsByRange(
+          sellerId: sellerId, fromDate: date, toDate: date),
+        _service.getRemittancesByRange(
+          sellerId: sellerId, fromDate: date, toDate: date),
+      ]).timeout(const Duration(seconds: 15));
+      final sessions    = results[0] as List<SellerSessionModel>;
+      final remittances = results[1] as List<SellerRemittanceModel>;
 
       _morningSession      = sessions.where((s) => s.sessionType == 'morning').firstOrNull;
       _afternoonSession    = sessions.where((s) => s.sessionType == 'afternoon').firstOrNull;
@@ -174,19 +173,17 @@ class SellerSessionViewModel extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────
   Future<void> loadWeeklyRemittances(String sellerId) async {
     try {
-      _remittances = await _service.getRemittancesByRange(
-        sellerId: sellerId,
-        fromDate: weekStart,
-        toDate:   weekEnd,
-      );
-      _sessions = await _service.getSessionsByRange(
-        sellerId: sellerId,
-        fromDate: weekStart,
-        toDate:   weekEnd,
-      );
+      final results = await Future.wait([
+        _service.getRemittancesByRange(
+          sellerId: sellerId, fromDate: weekStart, toDate: weekEnd),
+        _service.getSessionsByRange(
+          sellerId: sellerId, fromDate: weekStart, toDate: weekEnd),
+      ]).timeout(const Duration(seconds: 15));
+      _remittances = results[0] as List<SellerRemittanceModel>;
+      _sessions    = results[1] as List<SellerSessionModel>;
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load data. Check your connection.';
     }
     notifyListeners();
   }
@@ -212,6 +209,19 @@ class SellerSessionViewModel extends ChangeNotifier {
       final dateStr = date ?? now.toIso8601String().substring(0, 10);
       final tsStr   = now.toIso8601String();
       final typeStr = sessionType == SessionType.morning ? 'morning' : 'afternoon';
+
+      // ── Duplicate guard ──────────────────────────────────────
+      final exists = await _service.sessionExistsForDate(
+        sellerId:    sellerId,
+        date:        dateStr,
+        sessionType: typeStr,
+      );
+      if (exists) {
+        _error = 'A $typeStr session for $dateStr already exists.';
+        notifyListeners();
+        _setLoading(false);
+        return false;
+      }
 
       final session = await _service.createSession(
         sellerId:     sellerId,
@@ -334,6 +344,79 @@ class SellerSessionViewModel extends ChangeNotifier {
       return false;
     } catch (e) {
       _error = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  DELETE
+  // ─────────────────────────────────────────────────────────
+
+  /// Deletes a session (and its remittance if present) for the
+  /// current loaded date, then reloads the date record.
+  Future<bool> deleteSession({
+    required String      sellerId,
+    required SessionType sessionType,
+    required String      date,
+  }) async {
+    final session = sessionType == SessionType.morning
+        ? _morningSession
+        : _afternoonSession;
+    if (session == null) return false;
+
+    _setLoading(true);
+    try {
+      // Delete remittance first (FK dependency)
+      final remittance = sessionType == SessionType.morning
+          ? _morningRemittance
+          : _afternoonRemittance;
+      if (remittance != null) {
+        await _service.deleteRemittance(remittance.id);
+      }
+      await _service.deleteSession(session.id);
+
+      if (sessionType == SessionType.morning) {
+        _morningSession    = null;
+        _morningRemittance = null;
+      } else {
+        _afternoonSession    = null;
+        _afternoonRemittance = null;
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete session.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Deletes only the remittance record for the given session type.
+  Future<bool> deleteRemittance({required RemitType remitType}) async {
+    final remittance = remitType == RemitType.morning
+        ? _morningRemittance
+        : _afternoonRemittance;
+    if (remittance == null) return false;
+
+    _setLoading(true);
+    try {
+      await _service.deleteRemittance(remittance.id);
+      if (remitType == RemitType.morning) {
+        _morningRemittance = null;
+      } else {
+        _afternoonRemittance = null;
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete remittance.';
       notifyListeners();
       return false;
     } finally {
