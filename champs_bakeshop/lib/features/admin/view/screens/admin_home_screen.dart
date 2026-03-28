@@ -93,6 +93,12 @@ class AdminHomeScreen extends StatelessWidget {
             _TotalWagesBanner(total: payrollVM.totalPayrollAll),
             const SizedBox(height: 20),
 
+            // ── Staff breakdown ─────────────────────────────
+            const _SectionLabel('STAFF BREAKDOWN'),
+            const SizedBox(height: 12),
+            _StaffBreakdownCard(userVM: userVM),
+            const SizedBox(height: 20),
+
             // ── Payroll status ──────────────────────────────
             const _SectionLabel('PAYROLL STATUS'),
             const SizedBox(height: 12),
@@ -113,12 +119,6 @@ class AdminHomeScreen extends StatelessWidget {
               payrollVM: payrollVM,
               userVM:    userVM,
             ),
-            const SizedBox(height: 20),
-
-            // ── Staff breakdown ─────────────────────────────
-            const _SectionLabel('STAFF BREAKDOWN'),
-            const SizedBox(height: 12),
-            _StaffBreakdownCard(userVM: userVM),
             const SizedBox(height: 20),
 
             // ── Packed this week ────────────────────────────

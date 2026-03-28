@@ -18,10 +18,15 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
 
-  // Logo: scale + fade in
+  // Logo: zoom + fade in
   late final AnimationController _logoCtrl;
   late final Animation<double>   _logoScale;
   late final Animation<double>   _logoFade;
+
+  // Glow pulse ring after logo lands
+  late final AnimationController _glowCtrl;
+  late final Animation<double>   _glowScale;
+  late final Animation<double>   _glowOpacity;
 
   // Text: slide up + fade
   late final AnimationController _textCtrl;
@@ -40,17 +45,33 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // ── Logo (0 → 700 ms) ─────────────────────────────────
+    // ── Logo zoom (0 → 900 ms): 0 → 1.18 → 0.93 → 1.0 ──────
     _logoCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 900),
     );
-    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _logoCtrl, curve: Curves.elasticOut),
-    );
+    _logoScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 65,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.18, end: 0.93)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 20,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.93, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 15,
+      ),
+    ]).animate(_logoCtrl);
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoCtrl,
-          curve: const Interval(0.0, 0.5, curve: Curves.easeIn)),
+      CurvedAnimation(
+        parent: _logoCtrl,
+        curve: const Interval(0.0, 0.35, curve: Curves.easeIn),
+      ),
     );
 
     // ── Text (starts 400 ms after logo) ───────────────────
@@ -77,6 +98,18 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _lineCtrl, curve: Curves.easeOut),
     );
 
+    // ── Glow pulse ring (fires once after logo lands) ─────
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _glowScale = Tween<double>(begin: 1.0, end: 2.2).animate(
+      CurvedAnimation(parent: _glowCtrl, curve: Curves.easeOut),
+    );
+    _glowOpacity = Tween<double>(begin: 0.35, end: 0.0).animate(
+      CurvedAnimation(parent: _glowCtrl, curve: Curves.easeIn),
+    );
+
     // ── Loader dots (starts 950 ms after logo) ────────────
     _loaderCtrl = AnimationController(
       vsync: this,
@@ -92,6 +125,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _runSequence() async {
     await _logoCtrl.forward();
+    _glowCtrl.forward(); // fire glow ring as logo finishes landing
     await Future<void>.delayed(const Duration(milliseconds: 50));
     await _textCtrl.forward();
     _lineCtrl.forward();
@@ -144,6 +178,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _logoCtrl.dispose();
+    _glowCtrl.dispose();
     _textCtrl.dispose();
     _lineCtrl.dispose();
     _loaderCtrl.dispose();
@@ -166,16 +201,47 @@ class _SplashScreenState extends State<SplashScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
 
-                    // ── Logo ──────────────────────────────────
-                    ScaleTransition(
-                      scale: _logoScale,
-                      child: FadeTransition(
-                        opacity: _logoFade,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          width: 150,
-                          height: 150,
-                        ),
+                    // ── Logo + glow ring ──────────────────────
+                    SizedBox(
+                      width: 160,
+                      height: 160,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Expanding glow ring
+                          AnimatedBuilder(
+                            animation: _glowCtrl,
+                            builder: (_, __) => Transform.scale(
+                              scale: _glowScale.value,
+                              child: Opacity(
+                                opacity: _glowOpacity.value,
+                                child: Container(
+                                  width: 150,
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFFFF7A00),
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Logo
+                          ScaleTransition(
+                            scale: _logoScale,
+                            child: FadeTransition(
+                              opacity: _logoFade,
+                              child: Image.asset(
+                                'assets/logo.png',
+                                width: 150,
+                                height: 150,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 28),
