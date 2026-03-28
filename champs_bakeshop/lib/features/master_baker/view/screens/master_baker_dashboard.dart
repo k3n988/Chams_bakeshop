@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 
@@ -119,6 +121,7 @@ class _MasterBakerDashboardState extends State<MasterBakerDashboard>
           ? null
           : _BakerAppBar(
               userName: user.name,
+              userId: user.id,
               onAddProduction: _goToProduce,
             ),
       body: FadeTransition(
@@ -136,14 +139,53 @@ class _MasterBakerDashboardState extends State<MasterBakerDashboard>
 // ─────────────────────────────────────────────────────────
 //  APP BAR
 // ─────────────────────────────────────────────────────────
-class _BakerAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _BakerAppBar extends StatefulWidget implements PreferredSizeWidget {
   final String userName;
+  final String userId;
   final VoidCallback onAddProduction;
-  const _BakerAppBar(
-      {required this.userName, required this.onAddProduction});
+  const _BakerAppBar({
+    required this.userName,
+    required this.userId,
+    required this.onAddProduction,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 1);
+
+  @override
+  State<_BakerAppBar> createState() => _BakerAppBarState();
+}
+
+class _BakerAppBarState extends State<_BakerAppBar> {
+  String? _photoPath;
+  late String _displayName;
+
+  static const _photoKey = 'profile_photo_path';
+  static const _nameKey  = 'profile_display_name';
+
+  @override
+  void initState() {
+    super.initState();
+    _displayName = widget.userName;
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final photo = prefs.getString('${_photoKey}_${widget.userId}');
+    final name  = prefs.getString('${_nameKey}_${widget.userId}');
+    if (!mounted) return;
+    setState(() {
+      _photoPath   = photo;
+      if (name != null && name.isNotEmpty) _displayName = name;
+    });
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,24 +195,43 @@ class _BakerAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       titleSpacing: 16,
       title: Row(children: [
+        // Profile avatar
         Container(
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: Colors.white,
+            shape: BoxShape.circle,
+            color: AppColors.masterBaker.withValues(alpha: 0.85),
+            border: Border.all(
+              color: AppColors.masterBaker.withValues(alpha: 0.25),
+              width: 2,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: AppColors.masterBaker.withValues(alpha: 0.18),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
             ],
-            border: Border.all(color: AppColors.border),
+            image: _photoPath != null
+                ? DecorationImage(
+                    image: FileImage(File(_photoPath!)),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
-          child: const Center(
-            child: Text('👨‍🍳', style: TextStyle(fontSize: 18)),
-          ),
+          child: _photoPath == null
+              ? Center(
+                  child: Text(
+                    _initials(_displayName),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                )
+              : null,
         ),
         const SizedBox(width: 10),
         Column(
@@ -178,7 +239,7 @@ class _BakerAppBar extends StatelessWidget implements PreferredSizeWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Hi, $userName 👋',
+              'Hi, $_displayName 👋',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -912,6 +973,213 @@ class _PreviewDataRow extends StatelessWidget {
                   color: valueColor ?? AppColors.text)),
         ]),
       );
+}
+
+// ─────────────────────────────────────────────────────────
+//  PROFILE HEADER CARD
+// ─────────────────────────────────────────────────────────
+class _ProfileHeaderCard extends StatefulWidget {
+  final String userName;
+  final String userRole;
+  final String userId;
+
+  const _ProfileHeaderCard({
+    required this.userName,
+    required this.userRole,
+    required this.userId,
+  });
+
+  @override
+  State<_ProfileHeaderCard> createState() => _ProfileHeaderCardState();
+}
+
+class _ProfileHeaderCardState extends State<_ProfileHeaderCard>
+    with SingleTickerProviderStateMixin {
+  String? _photoPath;
+  late String _displayName;
+  late AnimationController _scaleCtrl;
+  late Animation<double> _scaleAnim;
+
+  static const _photoKey = 'profile_photo_path';
+  static const _nameKey  = 'profile_display_name';
+
+  @override
+  void initState() {
+    super.initState();
+    _displayName = widget.userName;
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnim = CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut);
+    _scaleCtrl.forward();
+    _loadPrefs();
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final photo = prefs.getString('${_photoKey}_${widget.userId}');
+    final name  = prefs.getString('${_nameKey}_${widget.userId}');
+    if (!mounted) return;
+    setState(() {
+      _photoPath   = photo;
+      if (name != null && name.isNotEmpty) _displayName = name;
+    });
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          ScaleTransition(
+            scale: _scaleAnim,
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.masterBaker.withValues(alpha: 0.85),
+                border: Border.all(
+                  color: AppColors.masterBaker.withValues(alpha: 0.20),
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.masterBaker.withValues(alpha: 0.20),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+                image: _photoPath != null
+                    ? DecorationImage(
+                        image: FileImage(File(_photoPath!)),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: _photoPath == null
+                  ? Center(
+                      child: Text(
+                        _initials(_displayName),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Name + role
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _displayName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.text,
+                    letterSpacing: -0.4,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.masterBaker.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.masterBaker.withValues(alpha: 0.20),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('👨‍🍳', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 5),
+                      Text(
+                        widget.userRole,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.masterBaker,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Active indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF388E3C).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF388E3C),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'Active',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF388E3C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────

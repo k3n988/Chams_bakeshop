@@ -7,6 +7,7 @@ import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/packer_salary_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
+import 'packer_all_report_screen.dart';
 
 class PackerProfileScreen extends StatefulWidget {
   const PackerProfileScreen({super.key});
@@ -202,7 +203,31 @@ class _PackerProfileScreenState extends State<PackerProfileScreen> {
 
         // ── How it works ─────────────────────────────────────
         const _HowItWorksCard(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // ── All packers report ────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.bar_chart_rounded, size: 18),
+            label: const Text('View All Packers Report',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.packer,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const PackerAllReportScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
 
         // ── Logout ───────────────────────────────────────────
         SizedBox(
