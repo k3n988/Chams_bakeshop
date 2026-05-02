@@ -7,6 +7,30 @@ import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/baker_production_viewmodel.dart';
 
+// ─────────────────────────────────────────────────────────
+//  WEEK HELPERS
+// ─────────────────────────────────────────────────────────
+
+/// Returns the Monday of the week that contains [date].
+DateTime _weekStart(DateTime date) {
+  final d = DateTime(date.year, date.month, date.day);
+  return d.subtract(Duration(days: d.weekday - 1)); // weekday: 1=Mon
+}
+
+/// Returns the Sunday of the week that contains [date].
+DateTime _weekEnd(DateTime date) => _weekStart(date).add(const Duration(days: 6));
+
+/// Formats a date range like "Mar 23 – Mar 29".
+String _formatRange(DateTime start, DateTime end) {
+  const months = [
+    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  final s = '${months[start.month]} ${start.day}';
+  final e = '${months[end.month]} ${end.day}';
+  return '$s – $e';
+}
+
 class BakerHistoryScreen extends StatefulWidget {
   const BakerHistoryScreen({super.key});
 
@@ -15,10 +39,45 @@ class BakerHistoryScreen extends StatefulWidget {
 }
 
 class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
-  String _search      = '';
-  int    _visibleCount = 20;
-
+  late DateTime _weekAnchor; // Monday of the displayed week
+  int _visibleCount = 20;
   static const int _pageSize = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _weekAnchor = _weekStart(DateTime.now());
+  }
+
+  bool get _isCurrentWeek =>
+      _weekAnchor == _weekStart(DateTime.now());
+
+  void _prevWeek() => setState(() {
+        _weekAnchor = _weekAnchor.subtract(const Duration(days: 7));
+        _visibleCount = _pageSize;
+      });
+
+  void _nextWeek() {
+    final next = _weekAnchor.add(const Duration(days: 7));
+    // Don't go beyond the current week
+    if (next.isAfter(_weekStart(DateTime.now()))) return;
+    setState(() {
+      _weekAnchor = next;
+      _visibleCount = _pageSize;
+    });
+  }
+
+  bool _inSelectedWeek(String dateStr) {
+    // prod.date expected format: "YYYY-MM-DD"
+    try {
+      final d = DateTime.parse(dateStr);
+      final day = DateTime(d.year, d.month, d.day);
+      final end = _weekAnchor.add(const Duration(days: 6));
+      return !day.isBefore(_weekAnchor) && !day.isAfter(end);
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<void> _deleteRecord(
       BakerProductionViewModel vm, String productionId) async {
@@ -70,12 +129,15 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
   Widget build(BuildContext context) {
     final vm = context.watch<BakerProductionViewModel>();
 
-    final filtered = vm.productions.where((p) {
-      if (_search.isEmpty) return true;
-      return p.date.contains(_search);
-    }).toList();
+    final filtered = vm.productions
+        .where((p) => _inSelectedWeek(p.date))
+        .toList();
 
     final visible = filtered.take(_visibleCount).toList();
+    final weekEnd = _weekEnd(_weekAnchor);
+    final nextIsCurrentOrFuture =
+        _weekAnchor.add(const Duration(days: 7))
+            .isAfter(_weekStart(DateTime.now()));
 
     return ColoredBox(
       color: const Color(0xFFF8F7F5),
@@ -84,7 +146,7 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
           // ── Top bar ──────────────────────────────────────────────
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -100,28 +162,59 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textHint),
                 ),
-                const SizedBox(height: 12),
-                // Search bar
+                const SizedBox(height: 14),
+
+                // ── Week navigator ────────────────────────────────
                 Container(
-                  height: 42,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF3F0EC),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: TextField(
-                    onChanged: (v) =>
-                        setState(() { _search = v; _visibleCount = _pageSize; }),
-                    style: const TextStyle(fontSize: 13),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by date (e.g. 2026-03)',
-                      hintStyle: TextStyle(
-                          fontSize: 13, color: AppColors.textHint),
-                      prefixIcon: Icon(Icons.search,
-                          size: 18, color: AppColors.textHint),
-                      border: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 12),
-                    ),
+                  child: Row(
+                    children: [
+                      // Prev arrow
+                      _NavArrow(
+                        icon: Icons.chevron_left_rounded,
+                        onTap: _prevWeek,
+                        enabled: true,
+                      ),
+
+                      // Week label
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.calendar_month_outlined,
+                              size: 15,
+                              color: AppColors.textHint,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatRange(_weekAnchor, weekEnd),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.text,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (_isCurrentWeek) ...[
+                              const SizedBox(width: 8),
+                              _ThisWeekBadge(),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // Next arrow
+                      _NavArrow(
+                        icon: Icons.chevron_right_rounded,
+                        onTap: nextIsCurrentOrFuture ? null : _nextWeek,
+                        enabled: !nextIsCurrentOrFuture,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -133,7 +226,8 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
             child: vm.productions.isEmpty
                 ? _EmptyHistory()
                 : filtered.isEmpty
-                    ? _NoResults(query: _search)
+                    ? _NoResultsWeek(
+                        label: _formatRange(_weekAnchor, weekEnd))
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(
                             14, 14, 14, 32),
@@ -173,6 +267,64 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────
+//  WEEK NAVIGATOR WIDGETS
+// ─────────────────────────────────────────────────────────
+
+class _NavArrow extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  const _NavArrow({
+    required this.icon,
+    required this.onTap,
+    required this.enabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: enabled
+              ? AppColors.text
+              : AppColors.textHint.withValues(alpha: 0.35),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThisWeekBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          'THIS WEEK',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            color: AppColors.success,
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -228,7 +380,6 @@ class _HistoryCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
                 child: Row(children: [
-                  // Date icon block
                   Container(
                     width: 46,
                     height: 46,
@@ -262,14 +413,12 @@ class _HistoryCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Edit button
                   _IconBtn(
                     icon: Icons.edit_outlined,
                     color: AppColors.primary,
                     onTap: () => _openEditSheet(context),
                   ),
                   const SizedBox(width: 6),
-                  // Delete button
                   _IconBtn(
                     icon: Icons.delete_outline,
                     color: AppColors.danger,
@@ -278,7 +427,6 @@ class _HistoryCard extends StatelessWidget {
                 ]),
               ),
 
-              // ── Divider ─────────────────────────────────────
               const Divider(height: 1, color: Color(0xFFF0EDE8)),
 
               // ── Stats row ───────────────────────────────────
@@ -298,7 +446,6 @@ class _HistoryCard extends StatelessWidget {
                     color: const Color(0xFF1976D2),
                   ),
                   const Spacer(),
-                  // Earnings highlight
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -409,7 +556,6 @@ class _HistoryCard extends StatelessWidget {
                 BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(children: [
-            // Handle
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 40, height: 4,
@@ -417,8 +563,6 @@ class _HistoryCard extends StatelessWidget {
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2)),
             ),
-
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(children: [
@@ -450,7 +594,6 @@ class _HistoryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Edit shortcut
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
@@ -486,14 +629,11 @@ class _HistoryCard extends StatelessWidget {
 
             const Divider(height: 20, color: AppColors.border),
 
-            // Scrollable content
             Expanded(
               child: ListView(
                 controller: scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                 children: [
-
-                  // Production Summary
                   _SheetCard(children: [
                     const _SheetLabel('PRODUCTION SUMMARY'),
                     const SizedBox(height: 12),
@@ -518,7 +658,6 @@ class _HistoryCard extends StatelessWidget {
                   ]),
                   const SizedBox(height: 12),
 
-                  // Salary Breakdown
                   _SheetCard(children: [
                     const _SheetLabel('SALARY BREAKDOWN'),
                     const SizedBox(height: 12),
@@ -560,7 +699,6 @@ class _HistoryCard extends StatelessWidget {
                   ]),
                   const SizedBox(height: 12),
 
-                  // Helpers
                   if (prod.helperIds.isNotEmpty) ...[
                     _SheetCard(children: [
                       const _SheetLabel('HELPERS ASSIGNED'),
@@ -607,7 +745,6 @@ class _HistoryCard extends StatelessWidget {
                     const SizedBox(height: 12),
                   ],
 
-                  // Products breakdown
                   _SheetCard(children: [
                     const _SheetLabel('PRODUCTS PRODUCED'),
                     const SizedBox(height: 12),
@@ -873,25 +1010,32 @@ class _EmptyHistory extends StatelessWidget {
       );
 }
 
-class _NoResults extends StatelessWidget {
-  final String query;
-  const _NoResults({required this.query});
+class _NoResultsWeek extends StatelessWidget {
+  final String label;
+  const _NoResultsWeek({required this.label});
 
   @override
   Widget build(BuildContext context) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_outlined,
-                size: 44, color: AppColors.textHint),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.textHint.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.event_busy_outlined,
+                  size: 40, color: AppColors.textHint),
+            ),
             const SizedBox(height: 14),
-            Text('No results for "$query"',
+            Text('No records for $label',
                 style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                     color: AppColors.text)),
             const SizedBox(height: 6),
-            const Text('Try a different date format',
+            const Text('Try navigating to a different week',
                 style: TextStyle(
                     fontSize: 13, color: AppColors.textHint)),
           ],
@@ -1305,7 +1449,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
       padding:
           EdgeInsets.fromLTRB(20, 0, 20, 16 + bottomInset),
       child: Column(children: [
-        // Handle
         Center(
           child: Container(
             width: 40, height: 4,
@@ -1316,7 +1459,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
           ),
         ),
 
-        // Title
         Row(children: [
           const Icon(Icons.edit_calendar_outlined,
               size: 20, color: AppColors.primary),
@@ -1327,7 +1469,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
         ]),
         const SizedBox(height: 12),
 
-        // Tab bar
         Container(
           decoration: BoxDecoration(
               color: Colors.grey.shade100,
@@ -1386,7 +1527,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
           ),
         ),
 
-        // Live preview bar
         Container(
           margin: const EdgeInsets.symmetric(vertical: 10),
           padding: const EdgeInsets.all(12),
@@ -1418,7 +1558,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
               ]),
         ),
 
-        // Action buttons
         Row(children: [
           Expanded(
             child: OutlinedButton(

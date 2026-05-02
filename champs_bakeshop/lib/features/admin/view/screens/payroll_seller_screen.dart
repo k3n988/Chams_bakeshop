@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/models/user_model.dart';
@@ -81,7 +82,14 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         );
       }));
 
-      _paidSellerIds.clear(); // reset paid state on date change
+      // Load persisted paid state for this date
+      final prefs = await SharedPreferences.getInstance();
+      _paidSellerIds.clear();
+      for (final s in sellers) {
+        if (prefs.getBool('seller_paid_${s.id}_$_dateStr') == true) {
+          _paidSellerIds.add(s.id);
+        }
+      }
 
       setState(() {
         _sessions    = newSessions;
@@ -428,18 +436,20 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: const Text('Confirm Paid'),
             style: FilledButton.styleFrom(backgroundColor: AppColors.success),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              // Persist to SharedPreferences so it survives refreshes
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('seller_paid_${seller.id}_$_dateStr', true);
+              if (!mounted) return;
               setState(() => _paidSellerIds.add(seller.id));
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('${seller.name} marked as paid! ✅'),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  margin: const EdgeInsets.all(12),
-                ));
-              }
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('${seller.name} marked as paid! ✅'),
+                backgroundColor: AppColors.success,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                margin: const EdgeInsets.all(12),
+              ));
             },
           ),
         ],

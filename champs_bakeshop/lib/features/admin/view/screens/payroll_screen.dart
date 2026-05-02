@@ -94,7 +94,6 @@ class _BakerHelperPayrollTab extends StatefulWidget {
 
 class _BakerHelperPayrollTabState
     extends State<_BakerHelperPayrollTab> {
-  // ── Default: current month ───────────────────────────────────
   late DateTime _selectedMonth;
 
   @override
@@ -106,7 +105,6 @@ class _BakerHelperPayrollTabState
         .addPostFrameCallback((_) => _loadCurrentWeek());
   }
 
-  // ── Current week helpers ─────────────────────────────────────
   String get _currentWeekStart => getWeekStart(DateTime.now());
 
   bool get _isCurrentWeek {
@@ -128,7 +126,6 @@ class _BakerHelperPayrollTabState
     return '${names[_selectedMonth.month - 1]} ${_selectedMonth.year}';
   }
 
-  // ── Loaders ──────────────────────────────────────────────────
   void _loadCurrentWeek() {
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
@@ -155,7 +152,6 @@ class _BakerHelperPayrollTabState
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
-    // Block going forward past current week
     if (dir > 0 && _isCurrentWeek) return;
     payVM.changeWeek(
         dir, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
@@ -203,7 +199,6 @@ class _BakerHelperPayrollTabState
     }
   }
 
-  // ── Dialogs ──────────────────────────────────────────────────
   void _showDeductionDialog(PayrollEntry entry) {
     final isHelper = entry.role != 'master_baker';
     final autoOven = isHelper
@@ -521,11 +516,10 @@ class _BakerHelperPayrollTabState
   Widget build(BuildContext context) {
     final payVM = context.watch<AdminPayrollViewModel>();
 
-    // ── Sort: unpaid first, paid last ────────────────────────
     final sortedEntries = [...payVM.entries]
       ..sort((a, b) {
         if (a.isPaid == b.isPaid) return 0;
-        return a.isPaid ? 1 : -1; // unpaid floats to top
+        return a.isPaid ? 1 : -1;
       });
 
     final unpaidEntries =
@@ -541,8 +535,6 @@ class _BakerHelperPayrollTabState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          // ── Page header ──────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -551,7 +543,6 @@ class _BakerHelperPayrollTabState
                 subtitle: 'Automated salary computation',
                 icon:     Icons.payments_outlined,
               ),
-              // This week shortcut
               if (!isThisWeek)
                 GestureDetector(
                   onTap: _loadCurrentWeek,
@@ -585,7 +576,6 @@ class _BakerHelperPayrollTabState
           ),
           const SizedBox(height: 16),
 
-          // ── Month navigator ──────────────────────────────
           _MonthNavigator(
             label:          _monthLabel,
             isCurrentMonth: _isCurrentMonth,
@@ -597,7 +587,6 @@ class _BakerHelperPayrollTabState
           ),
           const SizedBox(height: 10),
 
-          // ── Week navigator ───────────────────────────────
           _WeekNavigator(
             weekStart:     payVM.weekStart,
             weekEnd:       payVM.weekEnd,
@@ -607,7 +596,6 @@ class _BakerHelperPayrollTabState
           ),
           const SizedBox(height: 16),
 
-          // ── Content ──────────────────────────────────────
           if (payVM.isLoading)
             const Center(
                 child: CircularProgressIndicator(
@@ -626,7 +614,6 @@ class _BakerHelperPayrollTabState
             ),
             const SizedBox(height: 16),
 
-            // ── Unpaid section label ─────────────────────
             if (unpaidEntries.isNotEmpty) ...[
               _SectionDivider(
                 label: 'UNPAID  ·  ${unpaidEntries.length}',
@@ -642,7 +629,6 @@ class _BakerHelperPayrollTabState
               const SizedBox(height: 8),
             ],
 
-            // ── Paid section label ───────────────────────
             if (paidCount > 0) ...[
               _SectionDivider(
                 label: 'PAID  ·  $paidCount',
@@ -777,7 +763,6 @@ class _WeekNavigator extends StatelessWidget {
     required this.onNext,
   });
 
-
   String get _label {
     if (weekStart.isEmpty) return '—';
     final s = DateTime.tryParse(weekStart);
@@ -889,7 +874,7 @@ class _PayNavBtn extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  SECTION DIVIDER (Unpaid / Paid labels)
+//  SECTION DIVIDER
 // ─────────────────────────────────────────────────────────────
 class _SectionDivider extends StatelessWidget {
   final String label;
@@ -1175,11 +1160,7 @@ class _EmployeeCard extends StatelessWidget {
                 label: 'Gross Salary',
                 value: formatCurrency(e.grossSalary),
                 color: AppColors.success),
-            if (e.bonusTotal > 0)
-              BreakdownRow(
-                  label: 'Sack Bonus',
-                  value: formatCurrency(e.bonusTotal),
-                  color: AppColors.masterBaker),
+            // ── Sack Bonus hidden (admin-only) ──────────────────
             if (e.ovenIncentive > 0)
               BreakdownRow(
                   label: 'Oven Pay (${e.ovenExemptDays}d)',
@@ -1229,7 +1210,6 @@ class _EmployeeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // ── PAID = red badge  |  UNPAID = green button ──
               e.isPaid
                   ? Container(
                       padding: const EdgeInsets.symmetric(

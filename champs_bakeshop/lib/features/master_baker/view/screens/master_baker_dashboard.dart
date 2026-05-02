@@ -195,7 +195,6 @@ class _BakerAppBarState extends State<_BakerAppBar> {
       surfaceTintColor: Colors.transparent,
       titleSpacing: 16,
       title: Row(children: [
-        // Profile avatar
         Container(
           width: 38,
           height: 38,
@@ -357,6 +356,7 @@ class _DashboardHome extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth >= 600;
+    final isAdmin = (user.role as String).toLowerCase() == 'admin';
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isWide ? 24 : 16),
@@ -397,7 +397,7 @@ class _DashboardHome extends StatelessWidget {
           SizedBox(height: isWide ? 24 : 20),
           const _SectionLabel('RECENT DAILY RECORDS'),
           const SizedBox(height: 10),
-          _RecentRecords(records: vm.dailyRecords),
+          _RecentRecords(records: vm.dailyRecords, isAdmin: isAdmin),
           const SizedBox(height: 16),
         ],
       ),
@@ -507,8 +507,8 @@ class _TodayProductionCard extends StatelessWidget {
     int totalSacks = 0;
     double totalEarnings = 0;
     for (final r in todayRecords) {
-      totalSacks += r.totalSacks ;
-      totalEarnings += r.salary ;
+      totalSacks += r.totalSacks;
+      totalEarnings += r.salary;
     }
 
     return Container(
@@ -607,11 +607,12 @@ class _TodayStat extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────
-//  RECENT RECORDS LIST  (with tappable preview)
+//  RECENT RECORDS LIST
 // ─────────────────────────────────────────────────────────
 class _RecentRecords extends StatelessWidget {
   final List<BakerDashboardRecord> records;
-  const _RecentRecords({required this.records});
+  final bool isAdmin;
+  const _RecentRecords({required this.records, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
@@ -718,14 +719,19 @@ class _RecentRecords extends StatelessWidget {
   }
 
   void _showPreviewSheet(BuildContext context, BakerDashboardRecord rec) {
+    final prodVm = context.read<BakerProductionViewModel>();
+    final dayProds = prodVm.productions
+        .where((p) => p.date == rec.date)
+        .toList();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.55,
+        initialChildSize: 0.65,
         minChildSize: 0.4,
-        maxChildSize: 0.85,
+        maxChildSize: 0.92,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -735,8 +741,7 @@ class _RecentRecords extends StatelessWidget {
             // Handle
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2)),
@@ -798,93 +803,299 @@ class _RecentRecords extends StatelessWidget {
 
             // Content
             Expanded(
-              child: ListView(
-                controller: scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                children: [
+              child: dayProds.isEmpty
 
-                  // Production Summary
-                  _PreviewCard(children: [
-                    const _PreviewCardLabel('PRODUCTION SUMMARY'),
-                    const SizedBox(height: 12),
-                    _PreviewDataRow(
-                      icon: Icons.groups_outlined,
-                      label: 'Total Workers',
-                      value: '${rec.totalWorkers}',
-                    ),
-                    _PreviewDataRow(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Total Sacks',
-                      value: '${rec.totalSacks} sacks',
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
-
-                  // Salary Breakdown
-                  _PreviewCard(children: [
-                    const _PreviewCardLabel('SALARY BREAKDOWN'),
-                    const SizedBox(height: 12),
-                    _PreviewDataRow(
-                      icon: Icons.payments_outlined,
-                      label: 'Total Earnings',
-                      value: formatCurrency(rec.salary),
-                      valueColor: AppColors.masterBaker,
-                    ),
-                    const Divider(height: 20, color: AppColors.border),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // ── Fallback: productions not loaded yet ──
+                  ? ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                       children: [
-                        const Text('Your Earnings',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: AppColors.text)),
-                        Text(
-                          formatCurrency(rec.salary),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 20,
-                              color: AppColors.primaryDark),
-                        ),
+                        _PreviewCard(children: [
+                          const _PreviewCardLabel('PRODUCTION SUMMARY'),
+                          const SizedBox(height: 12),
+                          _PreviewDataRow(
+                            icon: Icons.groups_outlined,
+                            label: 'Total Workers',
+                            value: '${rec.totalWorkers}',
+                          ),
+                          _PreviewDataRow(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Total Sacks',
+                            value: '${rec.totalSacks} sacks',
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                        _PreviewCard(children: [
+                          const _PreviewCardLabel('SALARY BREAKDOWN'),
+                          const SizedBox(height: 12),
+                          _PreviewDataRow(
+                            icon: Icons.payments_outlined,
+                            label: 'Your Earnings',
+                            value: formatCurrency(rec.salary),
+                            valueColor: AppColors.primaryDark,
+                          ),
+                        ]),
+                      ],
+                    )
+
+                  // ── Full detail from ProductionModel ──
+                  : ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      children: [
+                        for (final prod in dayProds) ...[
+                          // Batch label when multiple batches on same day
+                          if (dayProds.length > 1) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(children: [
+                                Container(
+                                  width: 3, height: 13,
+                                  decoration: BoxDecoration(
+                                      color: AppColors.masterBaker,
+                                      borderRadius: BorderRadius.circular(2)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'BATCH ${dayProds.indexOf(prod) + 1} OF ${dayProds.length}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textHint,
+                                      letterSpacing: 0.8),
+                                ),
+                              ]),
+                            ),
+                          ],
+
+                          // Production Summary
+                          _PreviewCard(children: [
+                            const _PreviewCardLabel('PRODUCTION SUMMARY'),
+                            const SizedBox(height: 12),
+                            _PreviewDataRow(
+                              icon: Icons.groups_outlined,
+                              label: 'Total Workers',
+                              value: '${prod.totalWorkers}',
+                            ),
+                            _PreviewDataRow(
+                              icon: Icons.inventory_2_outlined,
+                              label: 'Total Sacks',
+                              value: prod.totalExtraKg > 0
+                                  ? '${prod.totalSacks} sacks + ${prod.totalExtraKg} kg'
+                                  : '${prod.totalSacks} sacks',
+                            ),
+                            _PreviewDataRow(
+                              icon: Icons.attach_money,
+                              label: 'Batch Value',
+                              value: formatCurrency(
+                                  prodVm.computeDaily(prod).totalValue
+                                      as double),
+                              valueColor: AppColors.masterBaker,
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // Salary Breakdown
+                          _PreviewCard(children: [
+                            const _PreviewCardLabel('SALARY BREAKDOWN'),
+                            const SizedBox(height: 12),
+                            _PreviewDataRow(
+                              icon: Icons.people_outline,
+                              label: 'Per Worker (base)',
+                              value: formatCurrency(
+                                  prodVm.computeDaily(prod).salaryPerWorker
+                                      as double),
+                            ),
+                            if ((prodVm.computeDaily(prod).bakerIncentive
+                                    as double) >
+                                0)
+                              _PreviewDataRow(
+                                icon: Icons.star_outline,
+                                label: 'Baker Incentive',
+                                value: formatCurrency(
+                                    prodVm.computeDaily(prod).bakerIncentive
+                                        as double),
+                                valueColor: const Color(0xFF1976D2),
+                              ),
+                            const Divider(
+                                height: 20, color: AppColors.border),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Your Earnings',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: AppColors.text)),
+                                Text(
+                                  formatCurrency(
+                                    (prodVm.computeDaily(prod).salaryPerWorker
+                                            as double) +
+                                        (prodVm
+                                                .computeDaily(prod)
+                                                .bakerIncentive
+                                            as double),
+                                  ),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 22,
+                                      color: AppColors.primaryDark,
+                                      letterSpacing: -0.5),
+                                ),
+                              ],
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // Helpers
+                          if (prod.helperIds.isNotEmpty) ...[
+                            _PreviewCard(children: [
+                              const _PreviewCardLabel('HELPERS ASSIGNED'),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: prod.helperIds.map((hId) {
+                                  final h = prodVm.helpers
+                                      .where((u) => u.id == hId)
+                                      .firstOrNull;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.07),
+                                      borderRadius:
+                                          BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: AppColors.primary
+                                              .withValues(alpha: 0.15)),
+                                    ),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.person_outline,
+                                              size: 13,
+                                              color: AppColors.primary),
+                                          const SizedBox(width: 5),
+                                          Text(h?.name ?? 'Helper',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: AppColors.primary)),
+                                        ]),
+                                  );
+                                }).toList(),
+                              ),
+                            ]),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // Products Produced
+                          _PreviewCard(children: [
+                            const _PreviewCardLabel('PRODUCTS PRODUCED'),
+                            const SizedBox(height: 12),
+                            ...prod.items.map((item) {
+                              final p = prodVm.products
+                                  .where((x) => x.id == item.productId)
+                                  .firstOrNull;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.masterBaker
+                                          .withValues(alpha: 0.07),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                        Icons.bakery_dining_outlined,
+                                        size: 14,
+                                        color: AppColors.masterBaker),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      p?.name ?? 'Unknown Product',
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textSecondary),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.masterBaker
+                                          .withValues(alpha: 0.08),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      item.extraKg > 0
+                                          ? '${item.sacks} sacks + ${item.extraKg} kg'
+                                          : '${item.sacks} sacks',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.masterBaker),
+                                    ),
+                                  ),
+                                ]),
+                              );
+                            }),
+                          ]),
+
+                          // Admin bonus
+                          if (isAdmin) ...[
+                            const SizedBox(height: 12),
+                            _PreviewCard(children: [
+                              const _PreviewCardLabel(
+                                  'BONUS (PAID SEPARATELY)'),
+                              const SizedBox(height: 12),
+                              _PreviewDataRow(
+                                icon: Icons.card_giftcard_outlined,
+                                label: 'Master Baker Bonus',
+                                value: formatCurrency(rec.bonus),
+                                valueColor: AppColors.masterBaker,
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: Colors.amber.shade200),
+                                ),
+                                child: Row(children: [
+                                  Icon(Icons.info_outline,
+                                      size: 14,
+                                      color: Colors.amber.shade700),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Bonus is paid separately and is not included in the weekly payroll total.',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.amber.shade800),
+                                    ),
+                                  ),
+                                ]),
+                              ),
+                            ]),
+                          ],
+
+                          // Spacer between batches
+                          if (dayProds.indexOf(prod) < dayProds.length - 1)
+                            const SizedBox(height: 20),
+                        ],
                       ],
                     ),
-                  ]),
-                  const SizedBox(height: 12),
-
-                  // Bonus
-                  _PreviewCard(children: [
-                    const _PreviewCardLabel('BONUS (PAID SEPARATELY)'),
-                    const SizedBox(height: 12),
-                    _PreviewDataRow(
-                      icon: Icons.card_giftcard_outlined,
-                      label: 'Master Baker Bonus',
-                      value: formatCurrency(rec.bonus),
-                      valueColor: AppColors.masterBaker,
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: Row(children: [
-                        Icon(Icons.info_outline,
-                            size: 14, color: Colors.amber.shade700),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Bonus is paid separately and is not included in the weekly payroll total.',
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.amber.shade800),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ]),
-                ],
-              ),
             ),
           ]),
         ),
@@ -892,6 +1103,7 @@ class _RecentRecords extends StatelessWidget {
     );
   }
 }
+
 // ─────────────────────────────────────────────────────────
 //  PREVIEW SHEET SUB-WIDGETS
 // ─────────────────────────────────────────────────────────
@@ -973,213 +1185,6 @@ class _PreviewDataRow extends StatelessWidget {
                   color: valueColor ?? AppColors.text)),
         ]),
       );
-}
-
-// ─────────────────────────────────────────────────────────
-//  PROFILE HEADER CARD
-// ─────────────────────────────────────────────────────────
-class _ProfileHeaderCard extends StatefulWidget {
-  final String userName;
-  final String userRole;
-  final String userId;
-
-  const _ProfileHeaderCard({
-    required this.userName,
-    required this.userRole,
-    required this.userId,
-  });
-
-  @override
-  State<_ProfileHeaderCard> createState() => _ProfileHeaderCardState();
-}
-
-class _ProfileHeaderCardState extends State<_ProfileHeaderCard>
-    with SingleTickerProviderStateMixin {
-  String? _photoPath;
-  late String _displayName;
-  late AnimationController _scaleCtrl;
-  late Animation<double> _scaleAnim;
-
-  static const _photoKey = 'profile_photo_path';
-  static const _nameKey  = 'profile_display_name';
-
-  @override
-  void initState() {
-    super.initState();
-    _displayName = widget.userName;
-    _scaleCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _scaleAnim = CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut);
-    _scaleCtrl.forward();
-    _loadPrefs();
-  }
-
-  @override
-  void dispose() {
-    _scaleCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final photo = prefs.getString('${_photoKey}_${widget.userId}');
-    final name  = prefs.getString('${_nameKey}_${widget.userId}');
-    if (!mounted) return;
-    setState(() {
-      _photoPath   = photo;
-      if (name != null && name.isNotEmpty) _displayName = name;
-    });
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Avatar
-          ScaleTransition(
-            scale: _scaleAnim,
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.masterBaker.withValues(alpha: 0.85),
-                border: Border.all(
-                  color: AppColors.masterBaker.withValues(alpha: 0.20),
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.masterBaker.withValues(alpha: 0.20),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-                image: _photoPath != null
-                    ? DecorationImage(
-                        image: FileImage(File(_photoPath!)),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: _photoPath == null
-                  ? Center(
-                      child: Text(
-                        _initials(_displayName),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Name + role
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.text,
-                    letterSpacing: -0.4,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.masterBaker.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.masterBaker.withValues(alpha: 0.20),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('👨‍🍳', style: TextStyle(fontSize: 12)),
-                      const SizedBox(width: 5),
-                      Text(
-                        widget.userRole,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.masterBaker,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Active indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF388E3C).withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF388E3C),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                const Text(
-                  'Active',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF388E3C),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────

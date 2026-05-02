@@ -4,6 +4,7 @@ import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
+import '../../../master_baker/viewmodel/baker_production_viewmodel.dart';
 import 'helper_dashboard.dart' show DashColors;
 
 class HelperDailyScreen extends StatefulWidget {
@@ -40,7 +41,6 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
   }
 
   void _goDay(int dir) {
-    // Block future dates
     final next = _selectedDate.add(Duration(days: dir));
     if (next.isAfter(DateTime.now())) return;
     setState(() => _selectedDate = next);
@@ -86,23 +86,31 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
   bool _isPaid(String date, Set<String> paidWeeks) =>
       paidWeeks.contains(_weekStartOf(date));
 
+  // ─────────────────────────────────────────────────────────
+  //  FULL PRODUCTION DETAIL SHEET  (Mirrors Baker but NO incentive)
+  // ─────────────────────────────────────────────────────────
   void _showPreview(HelperDailyRecord rec, bool paid) {
+    final userId  = _userId;
+    final prodVm  = context.read<BakerProductionViewModel>();
+    final dayProds = prodVm.productions
+        .where((p) => p.date == rec.date && p.helperIds.contains(userId))
+        .toList();
+
     showModalBottomSheet(
-      context:         context,
+      context:            context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor:    Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.60,
+        initialChildSize: 0.65,
         minChildSize:     0.4,
-        maxChildSize:     0.88,
+        maxChildSize:     0.92,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
             color:        Colors.white,
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(24)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(children: [
-            // Handle
+            // ── Handle ────────────────────────────────────────
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 40, height: 4,
@@ -111,14 +119,14 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                   borderRadius: BorderRadius.circular(2)),
             ),
 
-            // Header
+            // ── Header ────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: DashColors.primary.withValues(alpha: 0.10),
+                    color: DashColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.receipt_long_outlined,
@@ -131,158 +139,373 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                     children: [
                       Text(rec.date,
                           style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.text,
+                              fontSize:     17,
+                              fontWeight:   FontWeight.w800,
+                              color:        AppColors.text,
                               letterSpacing: -0.3)),
                       const Text('Production Detail',
                           style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textHint)),
+                              color:    AppColors.textHint)),
                     ],
                   ),
                 ),
-                // Paid/Unpaid badge
                 _PaidBadge(paid: paid, large: true),
               ]),
             ),
 
             const Divider(height: 20, color: AppColors.border),
 
-            // Content
+            // ── Content ───────────────────────────────────────
             Expanded(
-              child: ListView(
-                controller: scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                children: [
-                  // Production summary
-                  _SheetCard(children: [
-                    const _SheetLabel('PRODUCTION SUMMARY'),
-                    const SizedBox(height: 12),
-                    _SheetRow(
-                      icon:  Icons.groups_outlined,
-                      label: 'Total Workers',
-                      value: '${rec.totalWorkers}',
-                    ),
-                    _SheetRow(
-                      icon:  Icons.inventory_2_outlined,
-                      label: 'Total Sacks',
-                      value: '${rec.totalSacks} sacks',
-                    ),
-                    _SheetRow(
-                      icon:       Icons.attach_money,
-                      label:      'Batch Value',
-                      value:      formatCurrency(rec.totalValue),
-                      valueColor: DashColors.primary,
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
+              child: dayProds.isEmpty
 
-                  // Salary breakdown
-                  _SheetCard(children: [
-                    const _SheetLabel('SALARY BREAKDOWN'),
-                    const SizedBox(height: 12),
-                    _SheetRow(
-                      icon:       Icons.calculate_outlined,
-                      label:      'Per Worker (base)',
-                      value:      formatCurrency(rec.salary),
-                      valueColor: DashColors.primary,
-                    ),
-                    const Divider(height: 20, color: AppColors.border),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // ── Fallback: summary only (no production model loaded) ──
+                  ? ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                       children: [
-                        const Text('Your Earnings',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: AppColors.text)),
-                        Text(
-                          formatCurrency(rec.salary),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 22,
-                              color: DashColors.primaryDark,
-                              letterSpacing: -0.5),
-                        ),
+                        _SheetCard(children: [
+                          const _SheetLabel('PRODUCTION SUMMARY'),
+                          const SizedBox(height: 12),
+                          _SheetRow(
+                            icon:  Icons.groups_outlined,
+                            label: 'Total Workers',
+                            value: '${rec.totalWorkers}',
+                          ),
+                          _SheetRow(
+                            icon:  Icons.inventory_2_outlined,
+                            label: 'Total Sacks',
+                            value: '${rec.totalSacks} sacks',
+                          ),
+                          _SheetRow(
+                            icon:       Icons.attach_money,
+                            label:      'Batch Value',
+                            value:      formatCurrency(rec.totalValue),
+                            valueColor: DashColors.primary,
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                        _SheetCard(children: [
+                          const _SheetLabel('SALARY BREAKDOWN'),
+                          const SizedBox(height: 12),
+                          _SheetRow(
+                            icon:  Icons.people_outline,
+                            label: 'Per Worker (base)',
+                            value: formatCurrency(rec.salary),
+                          ),
+                          const Divider(height: 20, color: AppColors.border),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Your Earnings',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize:   15,
+                                      color:      AppColors.text)),
+                              Text(
+                                formatCurrency(rec.salary),
+                                style: const TextStyle(
+                                    fontWeight:   FontWeight.w900,
+                                    fontSize:     22,
+                                    color:        DashColors.primaryDark,
+                                    letterSpacing: -0.5),
+                              ),
+                            ],
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                        _buildPaymentStatus(paid),
                       ],
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
+                    )
 
-                  // Payment status
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: paid
-                          ? AppColors.success.withValues(alpha: 0.05)
-                          : Colors.orange.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: paid
-                            ? AppColors.success.withValues(alpha: 0.2)
-                            : Colors.orange.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: paid
-                              ? AppColors.success.withValues(alpha: 0.10)
-                              : Colors.orange.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          paid
-                              ? Icons.check_circle_outline
-                              : Icons.schedule_outlined,
-                          color: paid
-                              ? AppColors.success
-                              : Colors.orange,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              paid ? 'Salary Paid' : 'Pending Payment',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                  color: paid
-                                      ? AppColors.success
-                                      : Colors.orange),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              paid
-                                  ? 'Your salary for this week has been released.'
-                                  : 'Pending admin approval for this week.',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: paid
-                                      ? AppColors.success
-                                          .withValues(alpha: 0.8)
-                                      : Colors.orange
-                                          .withValues(alpha: 0.8)),
+                  // ── Full detail from ProductionModel ──────────
+                  : ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      children: [
+                        for (final prod in dayProds) ...[
+
+                          // Batch label (only when multiple batches)
+                          if (dayProds.length > 1) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(children: [
+                                Container(
+                                  width: 3, height: 13,
+                                  decoration: BoxDecoration(
+                                      color: DashColors.primary,
+                                      borderRadius: BorderRadius.circular(2)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'BATCH ${dayProds.indexOf(prod) + 1}'
+                                  ' OF ${dayProds.length}',
+                                  style: const TextStyle(
+                                      fontSize:     11,
+                                      fontWeight:   FontWeight.w800,
+                                      color:        AppColors.textHint,
+                                      letterSpacing: 0.8),
+                                ),
+                              ]),
                             ),
                           ],
-                        ),
-                      ),
-                    ]),
-                  ),
-                ],
-              ),
+
+                          // ── PRODUCTION SUMMARY ──────────────────
+                          _SheetCard(children: [
+                            const _SheetLabel('PRODUCTION SUMMARY'),
+                            const SizedBox(height: 12),
+                            _SheetRow(
+                              icon:  Icons.groups_outlined,
+                              label: 'Total Workers',
+                              value: '${prod.totalWorkers}',
+                            ),
+                            _SheetRow(
+                              icon:  Icons.inventory_2_outlined,
+                              label: 'Total Sacks',
+                              value: prod.totalExtraKg > 0
+                                  ? '${prod.totalSacks} sacks + ${prod.totalExtraKg} kg'
+                                  : '${prod.totalSacks} sacks',
+                            ),
+                            _SheetRow(
+                              icon:       Icons.attach_money,
+                              label:      'Batch Value',
+                              value:      formatCurrency(
+                                  prodVm.computeDaily(prod).totalValue as double),
+                              valueColor: DashColors.primary,
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // ── SALARY BREAKDOWN (NO baker incentive) ──
+                          _SheetCard(children: [
+                            const _SheetLabel('SALARY BREAKDOWN'),
+                            const SizedBox(height: 12),
+                            _SheetRow(
+                              icon:  Icons.people_outline,
+                              label: 'Per Worker (base)',
+                              value: formatCurrency(
+                                  prodVm.computeDaily(prod).salaryPerWorker as double),
+                            ),
+                            const Divider(height: 20, color: AppColors.border),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Your Earnings',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize:   15,
+                                        color:      AppColors.text)),
+                                Text(
+                                  formatCurrency(
+                                      prodVm.computeDaily(prod).salaryPerWorker
+                                          as double),
+                                  style: const TextStyle(
+                                      fontWeight:   FontWeight.w900,
+                                      fontSize:     22,
+                                      color:        DashColors.primaryDark,
+                                      letterSpacing: -0.5),
+                                ),
+                              ],
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // ── HELPERS ASSIGNED ────────────────────
+                          if (prod.helperIds.isNotEmpty) ...[
+                            _SheetCard(children: [
+                              const _SheetLabel('HELPERS ASSIGNED'),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing:    8,
+                                runSpacing: 8,
+                                children: prod.helperIds.map((hId) {
+                                  final h = prodVm.helpers
+                                      .where((u) => u.id == hId)
+                                      .firstOrNull;
+                                  final isMe = hId == userId;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: DashColors.primary
+                                          .withValues(alpha: 0.07),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: DashColors.primary
+                                              .withValues(alpha: 0.15)),
+                                    ),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isMe
+                                                ? Icons.person
+                                                : Icons.person_outline,
+                                            size:  13,
+                                            color: DashColors.primary,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            h?.name ?? 'Helper',
+                                            style: const TextStyle(
+                                                fontSize:   12,
+                                                fontWeight: FontWeight.w600,
+                                                color:      DashColors.primary),
+                                          ),
+                                          if (isMe) ...[
+                                            const SizedBox(width: 5),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 5, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: DashColors.primary,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text('You',
+                                                  style: TextStyle(
+                                                      fontSize:   8,
+                                                      color:      Colors.white,
+                                                      fontWeight: FontWeight.w800)),
+                                            ),
+                                          ],
+                                        ]),
+                                  );
+                                }).toList(),
+                              ),
+                            ]),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // ── PRODUCTS PRODUCED ───────────────────
+                          _SheetCard(children: [
+                            const _SheetLabel('PRODUCTS PRODUCED'),
+                            const SizedBox(height: 12),
+                            ...prod.items.map((item) {
+                              final p = prodVm.products
+                                  .where((x) => x.id == item.productId)
+                                  .firstOrNull;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: DashColors.primary
+                                          .withValues(alpha: 0.07),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.bakery_dining_outlined,
+                                        size:  14,
+                                        color: DashColors.primary),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      p?.name ?? 'Unknown Product',
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          color:    AppColors.textSecondary),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: DashColors.primary
+                                          .withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      item.extraKg > 0
+                                          ? '${item.sacks} sacks + ${item.extraKg} kg'
+                                          : '${item.sacks} sacks',
+                                      style: const TextStyle(
+                                          fontSize:   11,
+                                          fontWeight: FontWeight.w700,
+                                          color:      DashColors.primary),
+                                    ),
+                                  ),
+                                ]),
+                              );
+                            }),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // ── PAYMENT STATUS ──────────────────────
+                          _buildPaymentStatus(paid),
+
+                          if (dayProds.indexOf(prod) < dayProds.length - 1)
+                            const SizedBox(height: 20),
+                        ],
+                      ],
+                    ),
             ),
           ]),
         ),
       ),
     );
   }
+
+  Widget _buildPaymentStatus(bool paid) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: paid
+              ? AppColors.success.withValues(alpha: 0.04)
+              : Colors.orange.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: paid
+                ? AppColors.success.withValues(alpha: 0.15)
+                : Colors.orange.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: paid
+                  ? AppColors.success.withValues(alpha: 0.10)
+                  : Colors.orange.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              paid
+                  ? Icons.check_circle_outline
+                  : Icons.schedule_outlined,
+              color: paid ? AppColors.success : Colors.orange,
+              size:  22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  paid ? 'Salary Paid' : 'Pending Payment',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize:   14,
+                      color: paid ? AppColors.success : Colors.orange),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  paid
+                      ? 'Your salary for this week has been released by admin.'
+                      : 'Your salary for this week is pending admin approval.',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: paid
+                          ? AppColors.success.withValues(alpha: 0.8)
+                          : Colors.orange.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
+          ),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -314,30 +537,28 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                   children: [
                     Text('Daily Salary',
                         style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.text,
+                            fontSize:     20,
+                            fontWeight:   FontWeight.w900,
+                            color:        AppColors.text,
                             letterSpacing: -0.5)),
                     SizedBox(height: 2),
                     Text('Earnings per production day',
                         style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textHint)),
+                            color:    AppColors.textHint)),
                   ],
                 ),
                 if (!_isToday)
                   GestureDetector(
                     onTap: () {
-                      setState(
-                          () => _selectedDate = DateTime.now());
+                      setState(() => _selectedDate = DateTime.now());
                       _load();
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: DashColors.primary
-                            .withValues(alpha: 0.08),
+                        color: DashColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                             color: DashColors.primary
@@ -347,14 +568,14 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.today_outlined,
-                                size: 13,
+                                size:  13,
                                 color: DashColors.primary),
                             SizedBox(width: 5),
                             Text('Today',
                                 style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize:   12,
                                     fontWeight: FontWeight.w700,
-                                    color: DashColors.primary)),
+                                    color:      DashColors.primary)),
                           ]),
                     ),
                   ),
@@ -412,11 +633,11 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
 //  DAY NAVIGATOR
 // ─────────────────────────────────────────────────────────────
 class _DayNavigator extends StatelessWidget {
-  final DateTime     selectedDate;
-  final bool         isToday;
-  final VoidCallback onPrev;
+  final DateTime      selectedDate;
+  final bool          isToday;
+  final VoidCallback  onPrev;
   final VoidCallback? onNext;
-  final VoidCallback onTap;
+  final VoidCallback  onTap;
 
   const _DayNavigator({
     required this.selectedDate,
@@ -428,11 +649,10 @@ class _DayNavigator extends StatelessWidget {
 
   String get _label {
     if (isToday) return 'Today';
-    final yesterday =
-        DateTime.now().subtract(const Duration(days: 1));
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
     if (selectedDate.year == yesterday.year &&
         selectedDate.month == yesterday.month &&
-        selectedDate.day == yesterday.day) { return 'Yesterday'; }
+        selectedDate.day == yesterday.day) return 'Yesterday';
     const months = [
       'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'
@@ -450,9 +670,9 @@ class _DayNavigator extends StatelessWidget {
         border:       Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color:  Colors.black.withValues(alpha: 0.03),
+            color:     Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset:    const Offset(0, 2),
           ),
         ],
       ),
@@ -462,8 +682,7 @@ class _DayNavigator extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -471,20 +690,16 @@ class _DayNavigator extends StatelessWidget {
                     isToday
                         ? Icons.today
                         : Icons.calendar_today_outlined,
-                    size: 15,
-                    color: isToday
-                        ? DashColors.primary
-                        : AppColors.textHint,
+                    size:  15,
+                    color: isToday ? DashColors.primary : AppColors.textHint,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _label,
                     style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize:   14,
-                        color: isToday
-                            ? DashColors.primary
-                            : AppColors.text,
+                        fontWeight:   FontWeight.w800,
+                        fontSize:     14,
+                        color: isToday ? DashColors.primary : AppColors.text,
                         letterSpacing: -0.2),
                   ),
                   if (isToday) ...[
@@ -498,9 +713,9 @@ class _DayNavigator extends StatelessWidget {
                       ),
                       child: const Text('TODAY',
                           style: TextStyle(
-                              fontSize:   9,
-                              fontWeight: FontWeight.w800,
-                              color:      Colors.white,
+                              fontSize:     9,
+                              fontWeight:   FontWeight.w800,
+                              color:        Colors.white,
                               letterSpacing: 0.5)),
                     ),
                   ],
@@ -534,13 +749,10 @@ class _NavBtn extends StatelessWidget {
         onTap:        disabled ? null : onTap,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Icon(icon,
               size:  20,
-              color: disabled
-                  ? AppColors.border
-                  : DashColors.primary),
+              color: disabled ? AppColors.border : DashColors.primary),
         ),
       );
 }
@@ -571,11 +783,9 @@ class _DailyStatCard extends StatelessWidget {
                 end:    Alignment.bottomRight,
               )
             : null,
-        color: hasData ? null : Colors.white,
+        color:        hasData ? null : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border:       hasData
-            ? null
-            : Border.all(color: AppColors.border),
+        border:       hasData ? null : Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: hasData
@@ -595,16 +805,15 @@ class _DailyStatCard extends StatelessWidget {
                     Text('Earned Today',
                         style: TextStyle(
                             fontSize:   12,
-                            color: Colors.white
-                                .withValues(alpha: 0.85),
+                            color:      Colors.white.withValues(alpha: 0.85),
                             fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     Text(
                       formatCurrency(totalEarned),
                       style: const TextStyle(
-                          fontSize:   26,
-                          fontWeight: FontWeight.w900,
-                          color:      Colors.white,
+                          fontSize:     26,
+                          fontWeight:   FontWeight.w900,
+                          color:        Colors.white,
                           letterSpacing: -0.8),
                     ),
                     const SizedBox(height: 4),
@@ -612,8 +821,7 @@ class _DailyStatCard extends StatelessWidget {
                       '$recordsCount batch${recordsCount > 1 ? 'es' : ''} recorded',
                       style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white
-                              .withValues(alpha: 0.85)),
+                          color:    Colors.white.withValues(alpha: 0.85)),
                     ),
                   ],
                 ),
@@ -632,8 +840,7 @@ class _DailyStatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.border
-                      .withValues(alpha: 0.5),
+                  color: AppColors.border.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.payments_outlined,
@@ -773,9 +980,9 @@ class _DailyCard extends StatelessWidget {
                       Text(
                         'Batch ${index + 1}',
                         style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize:   14,
-                            color:      AppColors.text,
+                            fontWeight:   FontWeight.w800,
+                            fontSize:     14,
+                            color:        AppColors.text,
                             letterSpacing: -0.3),
                       ),
                       const SizedBox(height: 3),
@@ -795,9 +1002,9 @@ class _DailyCard extends StatelessWidget {
                     Text(
                       formatCurrency(record.salary),
                       style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize:   15,
-                          color:      DashColors.primaryDark,
+                          fontWeight:   FontWeight.w900,
+                          fontSize:     15,
+                          color:        DashColors.primaryDark,
                           letterSpacing: -0.3),
                     ),
                     const SizedBox(height: 5),
@@ -823,15 +1030,13 @@ class _DailyCard extends StatelessWidget {
                 children: [
                   Text('View breakdown',
                       style: TextStyle(
-                          fontSize:  11,
-                          color: DashColors.primary
-                              .withValues(alpha: 0.8),
+                          fontSize:   11,
+                          color: DashColors.primary.withValues(alpha: 0.8),
                           fontWeight: FontWeight.w600)),
                   const SizedBox(width: 3),
                   Icon(Icons.keyboard_arrow_down,
-                      size: 14,
-                      color: DashColors.primary
-                          .withValues(alpha: 0.7)),
+                      size:  14,
+                      color: DashColors.primary.withValues(alpha: 0.7)),
                 ],
               ),
             ),
@@ -878,8 +1083,7 @@ class _PaidBadge extends StatelessWidget {
             style: TextStyle(
                 fontSize:   large ? 12 : 10,
                 fontWeight: FontWeight.w700,
-                color:
-                    paid ? AppColors.success : Colors.orange),
+                color:      paid ? AppColors.success : Colors.orange),
           ),
         ]),
       );
@@ -903,9 +1107,9 @@ class _SectionLabel extends StatelessWidget {
         const SizedBox(width: 8),
         Text(text,
             style: const TextStyle(
-                fontSize:   11,
-                fontWeight: FontWeight.w800,
-                color:      AppColors.textHint,
+                fontSize:     11,
+                fontWeight:   FontWeight.w800,
+                color:        AppColors.textHint,
                 letterSpacing: 0.8)),
       ]);
 }
@@ -952,9 +1156,9 @@ class _SheetLabel extends StatelessWidget {
         const SizedBox(width: 8),
         Text(text,
             style: const TextStyle(
-                fontSize:   11,
-                fontWeight: FontWeight.w800,
-                color:      AppColors.textHint,
+                fontSize:     11,
+                fontWeight:   FontWeight.w800,
+                color:        AppColors.textHint,
                 letterSpacing: 0.8)),
       ]);
 }
@@ -987,7 +1191,7 @@ class _SheetRow extends StatelessWidget {
               style: TextStyle(
                   fontSize:   13,
                   fontWeight: FontWeight.w700,
-                  color: valueColor ?? AppColors.text)),
+                  color:      valueColor ?? AppColors.text)),
         ]),
       );
 }
