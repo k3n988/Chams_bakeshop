@@ -58,6 +58,7 @@ class _HelperDashboardState extends State<HelperDashboard>
     vm.loadMonthlySummary(userId);
     vm.loadPaidWeeks(userId);
     vm.loadYearlySalary(userId);
+    context.read<BakerProductionViewModel>().loadDataForHelper(userId);
   }
 
   Future<void> _logout() async {

@@ -45,6 +45,31 @@ class BakerProductionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Loads all productions that include [helperId], plus products & helpers.
+  /// Used by the helper dashboard so the detail sheet has live production data.
+  Future<void> loadDataForHelper(String helperId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await Future.wait([
+        _db.getAllProductions()
+            .then((v) => _productions =
+                v.where((p) => p.helperIds.contains(helperId)).toList())
+            .catchError((_) => _productions = []),
+        _db.getAllProducts()
+            .then((v) => _products = v)
+            .catchError((_) => _products = []),
+        _db.getUsersByRole('helper')
+            .then((v) => _helpers = v)
+            .catchError((_) => _helpers = []),
+      ]).timeout(const Duration(seconds: 15));
+    } catch (_) {}
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<bool> deleteProduction(String productionId, String masterBakerId) async {
     try {
       await _db.deleteChristmasBonusesByProduction(productionId);

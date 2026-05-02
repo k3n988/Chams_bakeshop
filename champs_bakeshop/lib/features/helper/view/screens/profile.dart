@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/services/database_service.dart';
+import '../../../../core/models/product_model.dart';
+import '../../../auth/viewmodel/auth_viewmodel.dart';
 
 // ─────────────────────────────────────────────────────────
 //  CONSTANTS
@@ -221,6 +223,21 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── Price Rates ───────────────────────────────────────
+  void _showPriceRates() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MultiProvider(
+        providers: [
+          Provider.value(value: context.read<DatabaseService>()),
+        ],
+        child: _PriceRatesSheet(isMasterBaker: widget.userRole == 'master_baker'),
+      ),
+    );
+  }
+
   // ── Bonus ─────────────────────────────────────────────
   void _handleBonusButton() {
     if (_bonusUnlocked) {
@@ -406,9 +423,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     bool obscureCurrent = true;
     bool obscureNew     = true;
     bool obscureConfirm = true;
+    bool saving         = false;
+    String? errorMsg;
+
+    final authVm = context.read<AuthViewModel>();
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) => AlertDialog(
           shape: RoundedRectangleBorder(
@@ -432,6 +454,28 @@ class _ProfileScreenState extends State<ProfileScreen>
           content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+            if (errorMsg != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: AppColors.danger.withValues(alpha: 0.2)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.error_outline,
+                      color: AppColors.danger, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(errorMsg!,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.danger)),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+            ],
             _PasswordField(
               controller: currentCtrl,
               label:      'Current Password',
@@ -458,27 +502,71 @@ class _ProfileScreenState extends State<ProfileScreen>
           ]),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: saving ? null : () => Navigator.pop(ctx),
                 child: const Text('Cancel')),
             FilledButton(
               style: FilledButton.styleFrom(
                   backgroundColor: _kOrange),
-              onPressed: () {
-                if (newCtrl.text.length < 6) {
-                  _showSnack(
-                      'Password must be at least 6 characters',
-                      isError: true);
-                  return;
-                }
-                if (newCtrl.text != confirmCtrl.text) {
-                  _showSnack('Passwords do not match',
-                      isError: true);
-                  return;
-                }
-                Navigator.pop(ctx);
-                _showSnack('Password updated successfully!');
-              },
-              child: const Text('Update'),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      // ── Validate ──────────────────────
+                      final current = currentCtrl.text;
+                      final newPw   = newCtrl.text;
+                      final confirm = confirmCtrl.text;
+
+                      if (current.isEmpty) {
+                        setDlgState(() => errorMsg =
+                            'Please enter your current password.');
+                        return;
+                      }
+                      if (current != authVm.currentUser!.password) {
+                        setDlgState(() => errorMsg =
+                            'Current password is incorrect.');
+                        return;
+                      }
+                      if (newPw.length < 3) {
+                        setDlgState(() => errorMsg =
+                            'New password must be at least 3 characters.');
+                        return;
+                      }
+                      if (newPw != confirm) {
+                        setDlgState(() => errorMsg =
+                            'Passwords do not match.');
+                        return;
+                      }
+                      if (newPw == current) {
+                        setDlgState(() => errorMsg =
+                            'New password must differ from current.');
+                        return;
+                      }
+
+                      // ── Save ──────────────────────────
+                      setDlgState(() {
+                        saving   = true;
+                        errorMsg = null;
+                      });
+                      final err = await authVm.updateProfile(
+                        name:     authVm.currentUser!.name,
+                        password: newPw,
+                      );
+                      if (!ctx.mounted) return;
+                      if (err != null) {
+                        setDlgState(() {
+                          saving   = false;
+                          errorMsg = 'Failed to update: $err';
+                        });
+                      } else {
+                        Navigator.pop(ctx);
+                        _showSnack('Password updated successfully!');
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Update'),
             ),
           ],
         ),
@@ -666,6 +754,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   daysWorked:   widget.daysWorked,
                   totalRecords: widget.totalRecords,
                 ),
+                const SizedBox(height: 10),
+
+                // ── Price Rates button ─────────────────
+                _PriceRatesButton(onTap: _showPriceRates),
                 const SizedBox(height: 14),
 
                 // ── Actions ────────────────────────────
@@ -2061,4 +2153,310 @@ class _BonusLabel extends StatelessWidget {
                 color: AppColors.textHint,
                 letterSpacing: 0.8)),
       ]);
+}
+
+// ─────────────────────────────────────────────────────────
+//  PRICE RATES BUTTON
+// ─────────────────────────────────────────────────────────
+class _PriceRatesButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _PriceRatesButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: _kOrange.withValues(alpha: 0.25)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _kOrange.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.price_change_outlined,
+                    color: _kOrange, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('View Price Rates',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: _kDark)),
+                    SizedBox(height: 2),
+                    Text('Product prices set by admin',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: AppColors.textHint.withValues(alpha: 0.5),
+                  size: 20),
+            ]),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────
+//  PRICE RATES SHEET
+// ─────────────────────────────────────────────────────────
+class _PriceRatesSheet extends StatefulWidget {
+  final bool isMasterBaker;
+  const _PriceRatesSheet({required this.isMasterBaker});
+
+  @override
+  State<_PriceRatesSheet> createState() => _PriceRatesSheetState();
+}
+
+class _PriceRatesSheetState extends State<_PriceRatesSheet> {
+  List<ProductModel> _products = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final db = context.read<DatabaseService>();
+      final list = await db.getAllProducts();
+      if (mounted) setState(() { _products = list; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize:     0.4,
+      maxChildSize:     0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _kOrange.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.price_change_outlined,
+                    color: _kOrange, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Price Rates',
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: _kDark,
+                            letterSpacing: -0.3)),
+                    Text('Set by admin · read only',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+
+          const Divider(height: 24, color: AppColors.border),
+
+          // Column headers
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: Row(children: [
+              const Expanded(
+                child: Text('PRODUCT',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textHint,
+                        letterSpacing: 0.8)),
+              ),
+              SizedBox(
+                width: widget.isMasterBaker ? 90 : 80,
+                child: Text('PRICE/SACK',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textHint,
+                        letterSpacing: 0.8)),
+              ),
+              if (widget.isMasterBaker) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 82,
+                  child: Text('BONUS/SACK',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textHint,
+                          letterSpacing: 0.8)),
+                ),
+              ],
+            ]),
+          ),
+
+          // List
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: _kOrange, strokeWidth: 2.5))
+                : _products.isEmpty
+                    ? const Center(
+                        child: Text('No products found',
+                            style: TextStyle(color: AppColors.textHint)))
+                    : ListView.separated(
+                        controller: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                        itemCount: _products.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) => _ProductRateRow(
+                          product:       _products[i],
+                          isMasterBaker: widget.isMasterBaker,
+                        ),
+                      ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  PRODUCT RATE ROW
+// ─────────────────────────────────────────────────────────
+class _ProductRateRow extends StatelessWidget {
+  final ProductModel product;
+  final bool         isMasterBaker;
+  const _ProductRateRow({
+    required this.product,
+    required this.isMasterBaker,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _kOrange.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.bakery_dining_outlined,
+                color: _kOrange, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              product.name,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _kDark),
+            ),
+          ),
+          // Price per sack
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _kOrange.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              formatCurrency(product.pricePerSack),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _kOrange),
+            ),
+          ),
+          // Bonus per sack — master baker only
+          if (isMasterBaker) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF388E3C).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                formatCurrency(product.bonusPerSack),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF388E3C)),
+              ),
+            ),
+          ],
+        ]),
+      );
 }
