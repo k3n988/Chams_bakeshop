@@ -179,4 +179,22 @@ class DatabaseService {
       _supa.deleteChristmasBonusesByProduction(productionId);
   Future<Set<String>> getPaidUserIds(String weekStart) =>
       _supa.getPaidUserIds(weekStart);
+
+  // ─── VALE ENTRIES ─────────────────────────────────────────────────────────
+
+  Future<void> insertValeEntry(Map<String, dynamic> entry) =>
+      _supa.insertValeEntry(entry);
+
+  Future<List<Map<String, dynamic>>> getValeEntriesByUser(String userId) =>
+      _supa.getValeEntriesByUser(userId);
+
+  Future<List<Map<String, dynamic>>> getAllValeEntries() =>
+      _supa.getAllValeEntries();
+
+  Future<void> deleteValeEntry(String id) => _supa.deleteValeEntry(id);
+
+  Future<void> settleValeEntry(String id) => _supa.settleValeEntry(id);
+
+  Future<void> settleAllValeByUser(String userId) =>
+      _supa.settleAllValeByUser(userId);
 }

@@ -16,6 +16,7 @@ import 'features/admin/viewmodel/admin_user_viewmodel.dart';
 import 'features/admin/viewmodel/admin_product_viewmodel.dart';
 import 'features/admin/viewmodel/admin_production_viewmodel.dart';
 import 'features/admin/viewmodel/admin_payroll_viewmodel.dart';
+import 'features/admin/viewmodel/admin_vale_viewmodel.dart';
 
 // ── Master Baker ──
 import 'features/master_baker/viewmodel/baker_production_viewmodel.dart';
@@ -67,6 +68,7 @@ class ChampsBakeshopApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AdminProductViewModel(db)),
         ChangeNotifierProvider(create: (_) => AdminProductionViewModel(db, payrollSvc)),
         ChangeNotifierProvider(create: (_) => AdminPayrollViewModel(db, payrollSvc)),
+        ChangeNotifierProvider(create: (_) => AdminValeViewModel(db)),
 
         // ── Master Baker ──────────────────────────────────────
         ChangeNotifierProvider(create: (_) => BakerProductionViewModel(db, payrollSvc)),

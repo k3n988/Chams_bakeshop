@@ -432,4 +432,39 @@ class SupabaseService {
         .delete()
         .eq('production_id', productionId);
   }
+
+  // ─── VALE ENTRIES ─────────────────────────────────────────────────────────
+
+  Future<void> insertValeEntry(Map<String, dynamic> entry) async {
+    await _db.from('vale_entries').insert(entry);
+  }
+
+  Future<List<Map<String, dynamic>>> getValeEntriesByUser(String userId) async {
+    final rows = await _db
+        .from('vale_entries')
+        .select()
+        .eq('user_id', userId)
+        .order('date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllValeEntries() async {
+    final rows = await _db
+        .from('vale_entries')
+        .select()
+        .order('date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<void> deleteValeEntry(String id) async {
+    await _db.from('vale_entries').delete().eq('id', id);
+  }
+
+  Future<void> settleValeEntry(String id) async {
+    await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
+  }
+
+  Future<void> settleAllValeByUser(String userId) async {
+    await _db.from('vale_entries').update({'is_settled': true}).eq('user_id', userId);
+  }
 }
