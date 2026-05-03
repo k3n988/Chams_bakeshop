@@ -65,23 +65,6 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (role.isNotEmpty) {
       _animCtrl.forward();
-
-      if (role == 'admin') {
-        _emailCtrl.text = 'admin@champs.com';
-        _passCtrl.text = 'admin123';
-      } else if (role == 'master_baker') {
-        _emailCtrl.text = 'mica@baker.com';
-        _passCtrl.text = 'mica123';
-      } else if (role == 'helper') {
-        _emailCtrl.text = 'kenjeternal@helper.com';
-        _passCtrl.text = 'ken123';
-      } else if (role == 'packer') {
-        _emailCtrl.text = 'toy@packer.com';
-        _passCtrl.text = '123';
-      } else if (role == 'seller') {
-        _emailCtrl.text = 'jan@seller.com';
-        _passCtrl.text = '123';
-      }
     } else {
       _animCtrl.reverse();
       _emailCtrl.clear();
