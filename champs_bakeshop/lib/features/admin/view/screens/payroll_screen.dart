@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/network_utils.dart';
 import '../../../../core/models/payroll_model.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../viewmodel/admin_payroll_viewmodel.dart';
@@ -410,6 +411,17 @@ class _BakerHelperPayrollTabState
                   context.read<AdminPayrollViewModel>();
               final messenger =
                   ScaffoldMessenger.of(context);
+              if (!await hasInternet()) {
+                messenger.showSnackBar(SnackBar(
+                  content: const Text(kNoInternetMsg),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  margin: const EdgeInsets.all(12),
+                ));
+                return;
+              }
               await payVM.saveDeduction(
                 userId:    entry.userId,
                 weekStart: payVM.weekStart,
@@ -505,6 +517,17 @@ class _BakerHelperPayrollTabState
                   context.read<AdminPayrollViewModel>();
               final messenger =
                   ScaffoldMessenger.of(context);
+              if (!await hasInternet()) {
+                messenger.showSnackBar(SnackBar(
+                  content: const Text(kNoInternetMsg),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  margin: const EdgeInsets.all(12),
+                ));
+                return;
+              }
               final ok = await payVM.markAsPaid(
                 userId: entry.userId,
                 paidBy: adminId,
@@ -572,6 +595,17 @@ class _BakerHelperPayrollTabState
                   context.read<AdminPayrollViewModel>();
               final messenger =
                   ScaffoldMessenger.of(context);
+              if (!await hasInternet()) {
+                messenger.showSnackBar(SnackBar(
+                  content: const Text(kNoInternetMsg),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  margin: const EdgeInsets.all(12),
+                ));
+                return;
+              }
               final ok =
                   await payVM.markAllAsPaid(paidBy: adminId);
               if (mounted) {

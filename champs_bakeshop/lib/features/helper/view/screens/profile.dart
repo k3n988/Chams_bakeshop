@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/hash_utils.dart';
 import '../../../../core/services/database_service.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
@@ -12,7 +13,6 @@ import '../../../auth/viewmodel/auth_viewmodel.dart';
 // ─────────────────────────────────────────────────────────
 //  CONSTANTS
 // ─────────────────────────────────────────────────────────
-const _kBonusCode        = 'CHAMPS2026';
 const _kBonusUnlockedKey = 'bonus_unlocked_';
 const _kOrange           = Color(0xFFFF7A00);
 const _kDark             = Color(0xFF1A1A1A);
@@ -249,7 +249,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _showBonusCodeDialog() {
     final ctrl = TextEditingController();
-    bool obscure = true;
+    bool obscure  = true;
+    bool checking = false;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -348,24 +349,40 @@ class _ProfileScreenState extends State<ProfileScreen>
           ]),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: checking ? null : () => Navigator.pop(ctx),
                 child: const Text('Cancel')),
             FilledButton(
               style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFC62828)),
-              onPressed: () {
-                if (ctrl.text.trim().toUpperCase() ==
-                    _kBonusCode) {
+              onPressed: checking
+                  ? null
+                  : () async {
+                      setDlg(() => checking = true);
+                      final db = context.read<DatabaseService>();
+                      // Fetch bonus code from Supabase (fallback to hardcoded)
+                      final serverCode = await db
+                          .getConfigValue('bonus_code')
+                          .catchError((_) => null);
+                      final expected =
+                          (serverCode ?? 'CHAMPS2026').toUpperCase();
+                      if (!ctx.mounted) return;
+                      if (ctrl.text.trim().toUpperCase() == expected) {
                   Navigator.pop(ctx);
                   setState(() => _bonusUnlocked = true);
                   _saveBonusUnlocked(true);
                   _openBonusView();
                 } else {
+                      setDlg(() => checking = false);
                   _showSnack('Incorrect bonus code.',
                       isError: true);
                 }
               },
-              child: const Text('Unlock'),
+              child: checking
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Text('Unlock'),
             ),
           ],
         ),
@@ -520,7 +537,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                             'Please enter your current password.');
                         return;
                       }
-                      if (current != authVm.currentUser!.password) {
+                      final stored = authVm.currentUser!.password;
+                      final inputHash = hashPassword(current);
+                      // Support both hashed (migrated) and plaintext (legacy) accounts
+                      final passwordMatches = isHashed(stored)
+                          ? inputHash == stored
+                          : current == stored;
+                      if (!passwordMatches) {
                         setDlgState(() => errorMsg =
                             'Current password is incorrect.');
                         return;

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/batch_production_model.dart';
 import '../../../core/services/database_service.dart';
+import '../../../core/utils/helpers.dart';
 
 class BatchProductionViewModel extends ChangeNotifier {
   final DatabaseService _db;
@@ -39,6 +40,9 @@ class BatchProductionViewModel extends ChangeNotifier {
   String? errorMessage;
   bool    saveSuccess = false;
 
+  // Batches already saved to DB for the selected date
+  List<Map<String, dynamic>> savedBatches = [];
+
   // ── Computed ─────────────────────────────────────────────
 
   String get formattedDate => selectedDate.toString().split(' ')[0];
@@ -60,6 +64,11 @@ class BatchProductionViewModel extends ChangeNotifier {
           .map((u) => {'id': u.id, 'name': u.name})
           .toList();
 
+      // Auto-select the first baker so helper doesn't have to pick manually
+      if (masterBakers.isNotEmpty) {
+        selectedBakerId = masterBakers.first['id'];
+      }
+
       final allProducts = await _db.getAllProducts();
       products = allProducts
           .map((p) => {'id': p.id, 'name': p.name})
@@ -68,11 +77,37 @@ class BatchProductionViewModel extends ChangeNotifier {
       if (products.isNotEmpty) {
         currentProductId = products.first['id'];
       }
+
+      // Load any batches already saved today
+      await _reloadSavedBatches();
     } catch (e) {
-      errorMessage = 'Error loading data: $e';
+      errorMessage = 'Failed to load data. Check your connection.\n$e';
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _reloadSavedBatches() async {
+    try {
+      savedBatches = await _db.getHelperBatches(
+        helperId: currentUserId,
+        dateFrom: formattedDate,
+        dateTo:   formattedDate,
+      );
+    } catch (_) {
+      savedBatches = [];
+    }
+  }
+
+  Future<bool> deleteSavedBatch(String batchId) async {
+    try {
+      await _db.deleteHelperBatch(batchId);
+      savedBatches.removeWhere((b) => b['id'] == batchId);
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -90,7 +125,10 @@ class BatchProductionViewModel extends ChangeNotifier {
 
   void setDate(DateTime date) {
     selectedDate = date;
+    batches.clear();
+    _resetForm();
     notifyListeners();
+    _reloadSavedBatches().then((_) => notifyListeners());
   }
 
   void setBaker(String? id) {
@@ -198,24 +236,28 @@ class BatchProductionViewModel extends ChangeNotifier {
     try {
       for (final batch in batches) {
         final row = {
-          'id':             '${DateTime.now().millisecondsSinceEpoch}_${batch.productId}',
-          'date':           formattedDate,
-          'helper_id':      currentUserId,
+          'id':              generateId('batch'),
+          'date':            formattedDate,
+          'helper_id':       currentUserId,
           'master_baker_id': selectedBakerId!,
-          'product_id':     batch.productId,
-          'cat60':          batch.cat60,
-          'cat36':          batch.cat36,
-          'cat48':          batch.cat48,
-          'subra':          batch.subra,
-          'saka':           batch.saka,
+          'product_id':      batch.productId,
+          'cat60':           batch.cat60,
+          'cat36':           batch.cat36,
+          'cat48':           batch.cat48,
+          'subra':           batch.subra,
+          'saka':            batch.saka,
         };
         await _db.insertHelperBatch(row);
       }
 
+      // Clear pending list and reload all saved batches from DB
+      batches.clear();
+      _resetForm();
       saveSuccess = true;
+      await _reloadSavedBatches();
       return null;
     } catch (e) {
-      errorMessage = 'Error saving batch: $e';
+      errorMessage = 'Save failed — check your connection.\nDetails: $e';
       return errorMessage;
     } finally {
       isSaving = false;

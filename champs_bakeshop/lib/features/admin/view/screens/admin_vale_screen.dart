@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/utils/network_utils.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
 
@@ -637,15 +638,28 @@ class _UserValeSheet extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
                             final confirm = await _confirmDialog(
                                 context,
                                 'Settle All',
                                 'Mark all of $name\'s vale as settled?\nTotal: ${formatCurrency(total)}');
+                            if (confirm != true) return;
+                            if (!await hasInternet()) {
+                              messenger.showSnackBar(SnackBar(
+                                content: const Text(kNoInternetMsg),
+                                backgroundColor: AppColors.danger,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                                margin: const EdgeInsets.all(12),
+                              ));
+                              return;
+                            }
                             if (confirm == true) {
                               final ok =
                                   await vm.settleAllForUser(userId);
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text(ok
                                         ? 'All vale settled!'
@@ -824,6 +838,18 @@ class _UserValeSheet extends StatelessWidget {
                   ? null
                   : () async {
                       if (!formKey.currentState!.validate()) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      if (!await hasInternet()) {
+                        messenger.showSnackBar(SnackBar(
+                          content: const Text(kNoInternetMsg),
+                          backgroundColor: AppColors.danger,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          margin: const EdgeInsets.all(12),
+                        ));
+                        return;
+                      }
                       setDialogState(() => saving = true);
                       final ok = await vm.addEntry(
                         userId:      userId,

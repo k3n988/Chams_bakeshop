@@ -30,9 +30,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey =
       GlobalKey<ScaffoldState>();
 
+  // Pages created once so ChangeNotifierProviders inside them
+  // are never destroyed when switching tabs.
+  late final List<Widget> _pages;
+
   @override
   void initState() {
     super.initState();
+    _pages = [
+      AdminHomeScreen(onNavigate: _navigateFromHome),
+      const ProductionReportsScreen(),
+      const AdminPayrollScreen(),
+      batch_screen.AdminBatchScreen(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminUserViewModel>().loadUsers();
       context.read<AdminProductViewModel>().loadProducts();
@@ -108,12 +118,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     context.watch<AdminPayrollViewModel>();
 
-    final pages = [
-      AdminHomeScreen(onNavigate: _navigateFromHome),
-      const ProductionReportsScreen(),
-      const AdminPayrollScreen(),
-      batch_screen.AdminBatchScreen(),
-    ];
 
     return Scaffold(
       key: _scaffoldKey,
@@ -174,7 +178,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
       ),
 
-      body: pages[_index],
+      body: _pages[_index],
 
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

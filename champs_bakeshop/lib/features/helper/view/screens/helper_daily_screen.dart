@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/services/database_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/helper_salary_viewmodel.dart';
 import '../../../master_baker/viewmodel/baker_production_viewmodel.dart';
@@ -17,6 +18,11 @@ class HelperDailyScreen extends StatefulWidget {
 class _HelperDailyScreenState extends State<HelperDailyScreen> {
   // Default: today
   late DateTime _selectedDate;
+
+  // Batch list for selected date
+  List<Map<String, dynamic>> _batches  = [];
+  Map<String, String>        _products = {}; // productId → productName
+  bool _batchesLoading = false;
 
   @override
   void initState() {
@@ -74,6 +80,34 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
     final vm = context.read<HelperSalaryViewModel>();
     vm.loadDailyRecordsForDate(_userId, _dateStr);
     vm.loadPaidWeeks(_userId);
+    _loadBatches();
+  }
+
+  Future<void> _loadBatches() async {
+    if (!mounted) return;
+    setState(() => _batchesLoading = true);
+    try {
+      final db = context.read<DatabaseService>();
+      final rows = await db.getHelperBatches(
+        helperId: _userId,
+        dateFrom: _dateStr,
+        dateTo:   _dateStr,
+      );
+      // Build product name map lazily
+      if (_products.isEmpty) {
+        final prods = await db.getAllProducts();
+        if (mounted) {
+          setState(() {
+            _products = {for (final p in prods) p.id: p.name};
+          });
+        }
+      }
+      if (mounted) setState(() => _batches = rows);
+    } catch (_) {
+      if (mounted) setState(() => _batches = []);
+    } finally {
+      if (mounted) setState(() => _batchesLoading = false);
+    }
   }
 
   String _weekStartOf(String date) {
@@ -622,6 +656,44 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                   onTap:  () => _showPreview(rec, paid),
                 );
               }),
+
+            // ── My Batches ───────────────────────────────
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const _SectionLabel('MY BATCHES'),
+                if (_batches.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: DashColors.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_batches.length} batch${_batches.length != 1 ? 'es' : ''}',
+                      style: const TextStyle(
+                          fontSize:   11,
+                          fontWeight: FontWeight.w700,
+                          color:      DashColors.primary),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            if (_batchesLoading)
+              const _LoadingCard()
+            else if (_batches.isEmpty)
+              _NoBatchRecord(isToday: _isToday)
+            else
+              ..._batches.asMap().entries.map((e) =>
+                  _BatchCard(
+                    batch:       e.value,
+                    index:       e.key,
+                    productName: _products[e.value['product_id'] as String? ?? ''] ?? 'Unknown',
+                  )),
           ],
         ),
       ),
@@ -1194,6 +1266,166 @@ class _SheetRow extends StatelessWidget {
                   color:      valueColor ?? AppColors.text)),
         ]),
       );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  NO BATCH RECORD
+// ─────────────────────────────────────────────────────────────
+class _NoBatchRecord extends StatelessWidget {
+  final bool isToday;
+  const _NoBatchRecord({required this.isToday});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        decoration: BoxDecoration(
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border:       Border.all(color: AppColors.border),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: DashColors.primary.withValues(alpha: 0.07),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.layers_outlined,
+                size: 30, color: DashColors.primary),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            isToday ? 'No batches added today' : 'No batches on this day',
+            style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize:   14,
+                color:      AppColors.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isToday
+                ? 'Use "Add Production Batch" to log your work'
+                : 'No batch records found for this date',
+            style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+          ),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  BATCH CARD
+// ─────────────────────────────────────────────────────────────
+class _BatchCard extends StatelessWidget {
+  final Map<String, dynamic> batch;
+  final int                  index;
+  final String               productName;
+
+  const _BatchCard({
+    required this.batch,
+    required this.index,
+    required this.productName,
+  });
+
+  String _categorySummary() {
+    final parts = <String>[
+      if ((batch['cat60'] ?? 0) > 0) '60: ${batch['cat60']}',
+      if ((batch['cat36'] ?? 0) > 0) '36: ${batch['cat36']}',
+      if ((batch['cat48'] ?? 0) > 0) '48: ${batch['cat48']}',
+      if ((batch['subra'] ?? 0) > 0) 'Subra: ${batch['subra']}',
+      if ((batch['saka']  ?? 0) > 0) 'Saka: ${batch['saka']}',
+    ];
+    return parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sacks   = (batch['saka'] ?? 0) as int;
+    final summary = _categorySummary();
+
+    return TweenAnimationBuilder<double>(
+      tween:    Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 250 + index * 50),
+      curve:    Curves.easeOut,
+      builder: (_, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(
+            offset: Offset(0, 10 * (1 - v)), child: child),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color:        Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border:       Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color:      Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset:     const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            // Index circle
+            Container(
+              width: 36, height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: DashColors.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${index + 1}',
+                style: const TextStyle(
+                    fontSize:   13,
+                    fontWeight: FontWeight.w800,
+                    color:      DashColors.primary),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Product + categories
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(productName,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize:   14,
+                          color:      AppColors.text)),
+                  const SizedBox(height: 4),
+                  if (summary.isNotEmpty)
+                    Text(summary,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color:    AppColors.textHint)),
+                ],
+              ),
+            ),
+            // Sacks badge
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color:        DashColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$sacks sack${sacks != 1 ? 's' : ''}',
+                style: const TextStyle(
+                    fontSize:   12,
+                    fontWeight: FontWeight.w700,
+                    color:      DashColors.primary),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

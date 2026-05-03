@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/product_model.dart';
 import '../models/production_model.dart';
 import '../models/payroll_model.dart';
+import '../utils/hash_utils.dart';
 
 class SupabaseService {
   SupabaseClient get _db => Supabase.instance.client;
@@ -13,14 +14,34 @@ class SupabaseService {
 
   Future<UserModel?> authenticateUser(
       String email, String password, String role) async {
-    final row = await _db
+    final hashed = hashPassword(password);
+
+    // 1. Try hashed password (already-migrated accounts)
+    var row = await _db
+        .from('users')
+        .select()
+        .eq('email', email.trim().toLowerCase())
+        .eq('password', hashed)
+        .eq('role', role)
+        .maybeSingle();
+
+    if (row != null) return UserModel.fromMap(row);
+
+    // 2. Fallback: try plaintext (legacy accounts not yet migrated)
+    row = await _db
         .from('users')
         .select()
         .eq('email', email.trim().toLowerCase())
         .eq('password', password)
         .eq('role', role)
         .maybeSingle();
-    return row == null ? null : UserModel.fromMap(row);
+
+    if (row == null) return null;
+
+    // 3. Auto-migrate: hash and update the stored password silently
+    final user = UserModel.fromMap(row);
+    await _db.from('users').update({'password': hashed}).eq('id', user.id);
+    return user.copyWith(password: hashed);
   }
 
   Future<List<UserModel>> getAllUsers() async {
@@ -47,11 +68,15 @@ class SupabaseService {
   }
 
   Future<void> insertUser(UserModel user) async {
-    await _db.from('users').insert(user.toMap());
+    final pw      = isHashed(user.password) ? user.password : hashPassword(user.password);
+    final secured = user.copyWith(password: pw);
+    await _db.from('users').insert(secured.toMap());
   }
 
   Future<void> updateUser(UserModel user) async {
-    await _db.from('users').update(user.toMap()).eq('id', user.id);
+    final pw      = isHashed(user.password) ? user.password : hashPassword(user.password);
+    final secured = user.copyWith(password: pw);
+    await _db.from('users').update(secured.toMap()).eq('id', user.id);
   }
 
   Future<void> deleteUser(String id) async {
@@ -466,5 +491,23 @@ class SupabaseService {
 
   Future<void> settleAllValeByUser(String userId) async {
     await _db.from('vale_entries').update({'is_settled': true}).eq('user_id', userId);
+  }
+
+  // ─── APP CONFIG ───────────────────────────────────────────────────────────
+
+  Future<String?> getConfigValue(String key) async {
+    final row = await _db
+        .from('app_config')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle();
+    return row?['value'] as String?;
+  }
+
+  Future<void> setConfigValue(String key, String value) async {
+    await _db.from('app_config').upsert(
+      {'key': key, 'value': value},
+      onConflict: 'key',
+    );
   }
 }

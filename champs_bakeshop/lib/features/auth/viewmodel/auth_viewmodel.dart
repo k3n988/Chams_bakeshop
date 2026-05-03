@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/database_service.dart';
+import '../../../core/utils/hash_utils.dart';
 
 // Keys used to persist the session
 const _kUserId       = 'session_user_id';
@@ -104,15 +105,18 @@ class AuthViewModel extends ChangeNotifier {
   }) async {
     if (_currentUser == null) return 'Not logged in';
     try {
+      final newPw = password.trim().isEmpty
+          ? null
+          : hashPassword(password.trim()); // always store hashed
       final updated = _currentUser!.copyWith(
-        name:     name.trim().isEmpty     ? null : name.trim(),
-        password: password.trim().isEmpty ? null : password.trim(),
+        name:     name.trim().isEmpty ? null : name.trim(),
+        password: newPw,
       );
-      await _db.updateUser(updated);
+      await _db.updateUser(updated); // updateUser also hashes, idempotent
       _currentUser = updated;
       await _saveSession(updated);
       notifyListeners();
-      return null; // success
+      return null;
     } catch (e) {
       return e.toString();
     }

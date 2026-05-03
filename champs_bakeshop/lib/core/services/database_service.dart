@@ -197,4 +197,10 @@ class DatabaseService {
 
   Future<void> settleAllValeByUser(String userId) =>
       _supa.settleAllValeByUser(userId);
+
+  // ─── APP CONFIG ───────────────────────────────────────────────────────────
+
+  Future<String?> getConfigValue(String key) => _supa.getConfigValue(key);
+  Future<void>    setConfigValue(String key, String value) =>
+      _supa.setConfigValue(key, value);
 }

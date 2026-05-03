@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
+import '../../../../core/utils/network_utils.dart';
 import '../../../../core/models/batch_production_model.dart';
 import '../../../../core/services/database_service.dart';
 import '../../viewmodel/batch_production_viewmodel.dart';
@@ -53,7 +54,38 @@ class _AddProductionSheetBody extends StatelessWidget {
           ? const _LoadingState()
           : Column(children: [
               _SheetHandle(),
-              _SheetHeader(onClose: () => Navigator.pop(context)),
+              _SheetHeader(onClose: () async {
+                final vm = context.read<BatchProductionViewModel>();
+                if (vm.batches.isNotEmpty) {
+                  final discard = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Discard batches?',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      content: Text(
+                        '${vm.batches.length} batch${vm.batches.length > 1 ? 'es' : ''} will be lost. '
+                        'Tap "Save Production" first to keep them.',
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(_, false),
+                            child: const Text('Keep Editing')),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.danger),
+                          onPressed: () => Navigator.pop(_, true),
+                          child: const Text('Discard'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (discard != true) return;
+                }
+                if (context.mounted) Navigator.pop(context);
+              }),
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
@@ -75,6 +107,25 @@ class _AddProductionSheetBody extends StatelessWidget {
                                 onChanged: vm.setBaker,
                               ),
                       ]),
+                      const SizedBox(height: 14),
+
+                      // ── Saved batches ──
+                      if (vm.savedBatches.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _SavedBatchListSection(
+                          savedBatches: vm.savedBatches,
+                          getProductName: vm.getProductName,
+                          onDelete: (id) async {
+                            final ok = await vm.deleteSavedBatch(id);
+                            if (!context.mounted) return;
+                            _showSnack(
+                              context,
+                              ok ? 'Batch deleted.' : 'Failed to delete.',
+                              isError: !ok,
+                            );
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 14),
 
                       // ── Batch form ──
@@ -155,14 +206,19 @@ class _AddProductionSheetBody extends StatelessWidget {
 
   Future<void> _save(
       BuildContext context, BatchProductionViewModel vm) async {
+    if (!await hasInternet()) {
+      if (!context.mounted) return;
+      _showSnack(context, kNoInternetMsg, isError: true);
+      return;
+    }
     final error = await vm.save();
     if (!context.mounted) return;
 
     if (error != null) {
       _showSnack(context, error, isError: true);
     } else {
-      Navigator.pop(context);
-      _showSnack(context, 'Production saved successfully!', isSuccess: true);
+      // Stay open — saved batches are now shown in the "SAVED TODAY" list
+      _showSnack(context, 'Batches saved!', isSuccess: true);
     }
   }
 
@@ -905,4 +961,181 @@ class _SaveBar extends StatelessWidget {
           ),
         ]),
       );
+}
+
+// ─────────────────────────────────────────────────────────
+//  SAVED BATCH LIST SECTION
+// ─────────────────────────────────────────────────────────
+class _SavedBatchListSection extends StatelessWidget {
+  final List<Map<String, dynamic>>  savedBatches;
+  final String Function(String)     getProductName;
+  final void Function(String)       onDelete;
+
+  const _SavedBatchListSection({
+    required this.savedBatches,
+    required this.getProductName,
+    required this.onDelete,
+  });
+
+  String _categorySummary(Map<String, dynamic> b) {
+    final parts = <String>[
+      if ((b['cat60'] ?? 0) > 0) '60: ${b['cat60']}',
+      if ((b['cat36'] ?? 0) > 0) '36: ${b['cat36']}',
+      if ((b['cat48'] ?? 0) > 0) '48: ${b['cat48']}',
+      if ((b['subra'] ?? 0) > 0) 'Subra: ${b['subra']}',
+      if ((b['saka']  ?? 0) > 0) 'Saka: ${b['saka']}',
+    ];
+    return parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Container(
+          width: 3, height: 14,
+          decoration: BoxDecoration(
+              color: const Color(0xFF388E3C),
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 8),
+        const Text('SAVED TODAY',
+            style: TextStyle(
+                fontSize:      11,
+                fontWeight:    FontWeight.w800,
+                color:         Color(0xFF388E3C),
+                letterSpacing: 0.8)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color:        const Color(0xFF388E3C).withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '${savedBatches.length} batch${savedBatches.length != 1 ? 'es' : ''}',
+            style: const TextStyle(
+                fontSize:   11,
+                fontWeight: FontWeight.w700,
+                color:      Color(0xFF388E3C)),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      ...savedBatches.asMap().entries.map((e) {
+        final i    = e.key;
+        final b    = e.value;
+        final id   = b['id'] as String? ?? '';
+        final name = getProductName(b['product_id'] as String? ?? '');
+        final saka = (b['saka'] ?? 0) as int;
+        final summary = _categorySummary(b);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color:        Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: const Color(0xFF388E3C).withValues(alpha: 0.25)),
+            boxShadow: [
+              BoxShadow(
+                color:      Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset:     const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Row(children: [
+              // Index circle
+              Container(
+                width: 30, height: 30,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF388E3C),
+                  shape: BoxShape.circle,
+                ),
+                child: Text('${i + 1}',
+                    style: const TextStyle(
+                        fontSize:   11,
+                        fontWeight: FontWeight.w800,
+                        color:      Colors.white)),
+              ),
+              const SizedBox(width: 12),
+              // Name + summary
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize:   14,
+                            color:      DashColors.textPrimary)),
+                    if (summary.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(summary,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color:    DashColors.textHint)),
+                    ],
+                  ],
+                ),
+              ),
+              // Sacks
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF388E3C).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('$saka sack${saka != 1 ? 's' : ''}',
+                    style: const TextStyle(
+                        fontSize:   11,
+                        fontWeight: FontWeight.w700,
+                        color:      Color(0xFF388E3C))),
+              ),
+              // Delete
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: AppColors.danger),
+                padding:     EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                    minWidth: 36, minHeight: 36),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Delete batch?',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      content: Text(
+                          'Remove "$name" from today\'s saved batches?',
+                          style: const TextStyle(
+                              color: AppColors.textSecondary)),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(_, false),
+                            child: const Text('Cancel')),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.danger),
+                          onPressed: () => Navigator.pop(_, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) onDelete(id);
+                },
+              ),
+            ]),
+          ),
+        );
+      }),
+    ]);
+  }
 }
