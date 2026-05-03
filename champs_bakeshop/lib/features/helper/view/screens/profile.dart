@@ -223,6 +223,24 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  // ── My Vale ───────────────────────────────────────────
+  void _showMyVale() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MultiProvider(
+        providers: [
+          Provider.value(value: context.read<DatabaseService>()),
+        ],
+        child: _MyValeSheet(
+          userId:   widget.userId,
+          userName: _displayName,
+        ),
+      ),
+    );
+  }
+
   // ── Price Rates ───────────────────────────────────────
   void _showPriceRates() {
     showModalBottomSheet(
@@ -781,6 +799,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 // ── Price Rates button ─────────────────
                 _PriceRatesButton(onTap: _showPriceRates),
+                const SizedBox(height: 10),
+
+                // ── My Vale button ─────────────────────
+                _MyValeButton(onTap: _showMyVale),
                 const SizedBox(height: 14),
 
                 // ── Actions ────────────────────────────
@@ -2482,4 +2504,382 @@ class _ProductRateRow extends StatelessWidget {
           ],
         ]),
       );
+}
+
+// ─────────────────────────────────────────────────────────
+//  MY VALE BUTTON
+// ─────────────────────────────────────────────────────────
+class _MyValeButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _MyValeButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.danger.withValues(alpha: 0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_outlined,
+                    color: AppColors.danger, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('My Vale',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: _kDark)),
+                    SizedBox(height: 2),
+                    Text('View your borrowed items from the store',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: AppColors.textHint.withValues(alpha: 0.5),
+                  size: 20),
+            ]),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────
+//  MY VALE SHEET
+// ─────────────────────────────────────────────────────────
+class _MyValeSheet extends StatefulWidget {
+  final String userId;
+  final String userName;
+  const _MyValeSheet({required this.userId, required this.userName});
+
+  @override
+  State<_MyValeSheet> createState() => _MyValeSheetState();
+}
+
+class _MyValeSheetState extends State<_MyValeSheet> {
+  List<Map<String, dynamic>> _entries = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final db   = context.read<DatabaseService>();
+      final rows = await db.getValeEntriesByUser(widget.userId);
+      // Show only unsettled
+      if (mounted) {
+        setState(() {
+          _entries = rows
+              .where((r) => !(r['is_settled'] as bool? ?? false))
+              .toList()
+            ..sort((a, b) =>
+                (b['date'] ?? '').compareTo(a['date'] ?? ''));
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _entries = []);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  double get _total =>
+      _entries.fold(0.0, (s, e) => s + (e['price'] as num).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize:     0.4,
+      maxChildSize:     0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.receipt_long_outlined,
+                    color: AppColors.danger, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('My Vale',
+                        style: TextStyle(
+                            fontSize:     17,
+                            fontWeight:   FontWeight.w800,
+                            color:        _kDark,
+                            letterSpacing: -0.3)),
+                    Text(widget.userName,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color:    AppColors.textHint)),
+                  ],
+                ),
+              ),
+              // Total chip
+              if (!_loading)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _total > 0
+                        ? AppColors.danger.withValues(alpha: 0.08)
+                        : AppColors.success.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _total > 0
+                          ? AppColors.danger.withValues(alpha: 0.25)
+                          : AppColors.success.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    formatCurrency(_total),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize:   15,
+                        color: _total > 0
+                            ? AppColors.danger
+                            : AppColors.success),
+                  ),
+                ),
+            ]),
+          ),
+
+          const Divider(height: 20, color: AppColors.border),
+
+          // Content
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.danger, strokeWidth: 2.5))
+                : _entries.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppColors.success
+                                    .withValues(alpha: 0.07),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 40,
+                                  color: AppColors.success),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text('No outstanding vale',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize:   15,
+                                    color:      _kDark)),
+                            const SizedBox(height: 4),
+                            const Text(
+                                'You have no borrowed items from the store.',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color:    AppColors.textHint)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                        itemCount: _entries.length + 1,
+                        itemBuilder: (_, i) {
+                          // Total banner at the bottom
+                          if (i == _entries.length) {
+                            return Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [_kOrange, Color(0xFFFFA03A)],
+                                  begin: Alignment.topLeft,
+                                  end:   Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _kOrange.withValues(alpha: 0.25),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('TOTAL VALE',
+                                          style: TextStyle(
+                                              fontSize:      10,
+                                              fontWeight:    FontWeight.w700,
+                                              color:         Colors.white70,
+                                              letterSpacing: 0.8)),
+                                      SizedBox(height: 2),
+                                      Text('Amount to settle',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color:    Colors.white60)),
+                                    ],
+                                  ),
+                                  Text(
+                                    formatCurrency(_total),
+                                    style: const TextStyle(
+                                        fontSize:     22,
+                                        fontWeight:   FontWeight.w900,
+                                        color:        Colors.white,
+                                        letterSpacing: -0.5),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final e       = _entries[i];
+                          final name    = e['product_name'] as String? ?? '—';
+                          final price   = (e['price'] as num).toDouble();
+                          final date    = (e['date'] ?? '') as String;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color:        Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:      Colors.black
+                                      .withValues(alpha: 0.03),
+                                  blurRadius: 8,
+                                  offset:     const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              child: Row(children: [
+                                // Item icon
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger
+                                        .withValues(alpha: 0.07),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                      Icons.shopping_bag_outlined,
+                                      color: AppColors.danger,
+                                      size: 18),
+                                ),
+                                const SizedBox(width: 12),
+                                // Name + date
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize:   14,
+                                              color:      _kDark)),
+                                      const SizedBox(height: 4),
+                                      Row(children: [
+                                        const Icon(
+                                            Icons.calendar_today_outlined,
+                                            size: 11,
+                                            color: AppColors.textHint),
+                                        const SizedBox(width: 4),
+                                        Text(date,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.textHint)),
+                                      ]),
+                                    ],
+                                  ),
+                                ),
+                                // Price
+                                Text(
+                                  formatCurrency(price),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize:   15,
+                                      color:      AppColors.danger),
+                                ),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
