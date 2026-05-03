@@ -8,7 +8,6 @@ import '../../viewmodel/admin_production_viewmodel.dart';
 import '../../viewmodel/admin_payroll_viewmodel.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
 import 'admin_home_screen.dart';
-import 'admin_vale_screen.dart';
 import 'admin_drawer.dart';
 // ── Use 'as' prefix so Dart knows exactly which file each class comes from ──
 import 'manage_users_screen.dart'    as users_screen;
@@ -114,7 +113,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const ProductionReportsScreen(),
       const AdminPayrollScreen(),
       batch_screen.AdminBatchScreen(),
-      const AdminValeScreen(),
     ];
 
     return Scaffold(
@@ -221,11 +219,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 selectedIcon: Icon(Icons.local_fire_department,
                     color: AppColors.helper),
                 label: 'Batch'),
-            NavigationDestination(
-                icon: Icon(Icons.store_outlined),
-                selectedIcon: Icon(Icons.store,
-                    color: AppColors.primary),
-                label: 'Vale'),
           ],
         ),
       ),

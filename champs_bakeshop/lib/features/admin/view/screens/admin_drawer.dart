@@ -5,10 +5,12 @@ import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/admin_product_viewmodel.dart';
+import '../../viewmodel/admin_vale_viewmodel.dart';
 // ── Use 'as' prefix so Dart knows exactly which file each class comes from ──
 import 'manage_users_screen.dart'    as users_screen;
 import 'manage_products_screen.dart' as products_screen;
 import 'christmas_bonus_screen.dart' as bonus_screen;
+import 'admin_vale_screen.dart';
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -164,6 +166,34 @@ class AdminDrawer extends StatelessWidget {
                     title: 'Products',
                     child: products_screen
                         .ManageProductsScreen(),
+                  ),
+                ),
+              ),
+
+              _DrawerItem(
+                icon:       Icons.store_outlined,
+                color:      AppColors.info,
+                label:      'Vale',
+                subtitle:   () {
+                  final vm = context.read<AdminValeViewModel>();
+                  final total = vm.grandTotal;
+                  return total > 0
+                      ? '₱${total.toStringAsFixed(0)} total outstanding'
+                      : 'Store credit tracker';
+                }(),
+                badgeColor: AppColors.danger,
+                badge: () {
+                  final vm = context.read<AdminValeViewModel>();
+                  final count = vm.nonAdminUsers
+                      .where((u) => vm.userTotal(u.id) > 0)
+                      .length;
+                  return count > 0 ? '$count' : null;
+                }(),
+                onTap: () => _openPage(
+                  context,
+                  _Wrapped(
+                    title: 'Vale',
+                    child: const AdminValeScreen(),
                   ),
                 ),
               ),

@@ -7,6 +7,7 @@ import '../../../../core/widgets/common_widgets.dart';
 import '../../viewmodel/admin_payroll_viewmodel.dart';
 import '../../viewmodel/admin_product_viewmodel.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
+import '../../viewmodel/admin_vale_viewmodel.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import 'payroll_packer_screen.dart';
 import 'payroll_seller_screen.dart';
@@ -126,38 +127,51 @@ class _BakerHelperPayrollTabState
     return '${names[_selectedMonth.month - 1]} ${_selectedMonth.year}';
   }
 
-  void _loadCurrentWeek() {
+  Future<void> _loadCurrentWeek() async {
+    if (!mounted) return;
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
-    payVM.loadWeeklyPayroll(
+    final valeVM = context.read<AdminValeViewModel>();
+    await valeVM.load();
+    await payVM.loadWeeklyPayroll(
         _currentWeekStart,
         prodVM.products,
         userVM.userNameMap,
         userVM.userRoleMap);
+    await _autoApplyValeDeductions();
   }
 
-  void _load() {
+  Future<void> _load() async {
+    if (!mounted) return;
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
+    final valeVM = context.read<AdminValeViewModel>();
     final ws     = payVM.weekStart.isEmpty
         ? _currentWeekStart
         : payVM.weekStart;
-    payVM.loadWeeklyPayroll(
+    await valeVM.load();
+    await payVM.loadWeeklyPayroll(
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
+    await _autoApplyValeDeductions();
   }
 
-  void _changeWeek(int dir) {
+  Future<void> _changeWeek(int dir) async {
+    if (!mounted) return;
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
+    final valeVM = context.read<AdminValeViewModel>();
     if (dir > 0 && _isCurrentWeek) return;
-    payVM.changeWeek(
+    await valeVM.load();
+    await payVM.changeWeek(
         dir, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
+    await _autoApplyValeDeductions();
   }
 
-  void _changeMonth(int dir) {
+  Future<void> _changeMonth(int dir) async {
+    if (!mounted) return;
     final next =
         DateTime(_selectedMonth.year, _selectedMonth.month + dir);
     final now = DateTime.now();
@@ -171,8 +185,49 @@ class _BakerHelperPayrollTabState
     final payVM  = context.read<AdminPayrollViewModel>();
     final prodVM = context.read<AdminProductViewModel>();
     final userVM = context.read<AdminUserViewModel>();
-    payVM.loadWeeklyPayroll(
+    final valeVM = context.read<AdminValeViewModel>();
+    await valeVM.load();
+    await payVM.loadWeeklyPayroll(
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
+    await _autoApplyValeDeductions();
+  }
+
+  /// For every employee who worked this week and has outstanding vale,
+  /// automatically save it as a deduction (only if not already set manually).
+  Future<void> _autoApplyValeDeductions() async {
+    if (!mounted) return;
+    final payVM  = context.read<AdminPayrollViewModel>();
+    final prodVM = context.read<AdminProductViewModel>();
+    final userVM = context.read<AdminUserViewModel>();
+    final valeVM = context.read<AdminValeViewModel>();
+
+    bool anyChanged = false;
+
+    for (final entry in payVM.entries) {
+      // Skip if vale deduction already manually saved for this week
+      if (entry.valeDeduction > 0) continue;
+
+      final valeTotal = valeVM.userTotal(entry.userId);
+      if (valeTotal <= 0) continue;
+
+      // Auto-save vale as deduction, preserving any existing oven/gas/wifi values
+      await payVM.saveDeduction(
+        userId:    entry.userId,
+        weekStart: payVM.weekStart,
+        oven:      entry.ovenDeduction,
+        gas:       entry.gasDeduction,
+        vale:      valeTotal,
+        wifi:      entry.wifiDeduction,
+      );
+      anyChanged = true;
+    }
+
+    // Reload payroll once so the UI reflects the auto-applied deductions
+    if (anyChanged && mounted) {
+      final ws = payVM.weekStart.isEmpty ? _currentWeekStart : payVM.weekStart;
+      await payVM.loadWeeklyPayroll(
+          ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
+    }
   }
 
   Future<void> _pickMonth() async {
@@ -200,19 +255,23 @@ class _BakerHelperPayrollTabState
   }
 
   void _showDeductionDialog(PayrollEntry entry) {
-    final isHelper = entry.role != 'master_baker';
-    final autoOven = isHelper
+    final isHelper  = entry.role != 'master_baker';
+    final autoOven  = isHelper
         ? (entry.ovenExemptDays > 0
             ? 0.0
             : entry.daysWorked * AppConstants.helperOvenDeductionPerDay)
         : 0.0;
-    final ovenCtrl = TextEditingController(
+    final valeVM    = context.read<AdminValeViewModel>();
+    final valeTotal = valeVM.userTotal(entry.userId);
+    final ovenCtrl  = TextEditingController(
         text: entry.ovenDeduction.toStringAsFixed(0));
-    final gasCtrl  = TextEditingController(
+    final gasCtrl   = TextEditingController(
         text: entry.gasDeduction.toStringAsFixed(0));
-    final valeCtrl = TextEditingController(
-        text: entry.valeDeduction.toStringAsFixed(0));
-    final wifiCtrl = TextEditingController(
+    // Auto-fill from vale records if no deduction has been manually saved yet
+    final valeCtrl  = TextEditingController(
+        text: (entry.valeDeduction > 0 ? entry.valeDeduction : valeTotal)
+            .toStringAsFixed(0));
+    final wifiCtrl  = TextEditingController(
         text: entry.wifiDeduction.toStringAsFixed(0));
 
     showDialog(
@@ -303,6 +362,29 @@ class _BakerHelperPayrollTabState
                   label: 'Gas (₱)',
                   icon:  Icons.local_fire_department_outlined),
               const SizedBox(height: 12),
+              if (valeTotal > 0)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.info.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.store_outlined,
+                        size: 14, color: AppColors.info),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Vale balance: ${formatCurrency(valeTotal)} — auto-filled. Edit to override.',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.info),
+                      ),
+                    ),
+                  ]),
+                ),
               _DeducField(
                   controller: valeCtrl,
                   label: 'Vale (₱)',

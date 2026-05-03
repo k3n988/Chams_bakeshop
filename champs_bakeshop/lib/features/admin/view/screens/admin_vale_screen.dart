@@ -5,6 +5,10 @@ import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
 
+// ── Orange palette — matches the admin dashboard ──────────────────────────────
+const _kOrange      = Color(0xFFFF7A00);
+const _kOrangeLight = Color(0xFFFFA03A);
+
 class AdminValeScreen extends StatefulWidget {
   const AdminValeScreen({super.key});
 
@@ -68,10 +72,10 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: _kOrange,
         onRefresh: () => context.read<AdminValeViewModel>().load(),
         child: vm.isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+            ? const Center(child: CircularProgressIndicator(color: _kOrange))
             : CustomScrollView(
                 slivers: [
                   // ── Grand Total Banner ──────────────────────────────────
@@ -81,14 +85,14 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.primaryDark],
+                            colors: [_kOrange, _kOrangeLight],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
+                              color: _kOrange.withValues(alpha: 0.35),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -219,7 +223,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: const BorderSide(
-                                color: AppColors.primary, width: 1.5),
+                                color: _kOrange, width: 1.5),
                           ),
                         ),
                       ),
@@ -281,16 +285,16 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
         padding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
+          color: selected ? _kOrange : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? _kOrange : AppColors.border,
             width: 1.5,
           ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
+                    color: _kOrange.withValues(alpha: 0.25),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   )
@@ -616,7 +620,7 @@ class _UserValeSheet extends StatelessWidget {
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Vale'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: _kOrange,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 13),
@@ -705,7 +709,7 @@ class _UserValeSheet extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: _kOrange,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -747,7 +751,7 @@ class _UserValeSheet extends StatelessWidget {
                   decoration: InputDecoration(
                     labelText: 'Product / Item',
                     prefixIcon: const Icon(Icons.shopping_bag_outlined,
-                        size: 18, color: AppColors.primary),
+                        size: 18, color: _kOrange),
                     filled: true,
                     fillColor: const Color(0xFFF8F4F0),
                     border: OutlineInputBorder(
@@ -761,7 +765,7 @@ class _UserValeSheet extends StatelessWidget {
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(
-                            color: AppColors.primary, width: 1.5)),
+                            color: _kOrange, width: 1.5)),
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                   ),
@@ -778,7 +782,7 @@ class _UserValeSheet extends StatelessWidget {
                   decoration: InputDecoration(
                     labelText: 'Price (₱)',
                     prefixIcon: const Icon(Icons.payments_outlined,
-                        size: 18, color: AppColors.primary),
+                        size: 18, color: _kOrange),
                     filled: true,
                     fillColor: const Color(0xFFF8F4F0),
                     border: OutlineInputBorder(
@@ -792,7 +796,7 @@ class _UserValeSheet extends StatelessWidget {
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(
-                            color: AppColors.primary, width: 1.5)),
+                            color: _kOrange, width: 1.5)),
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                   ),
@@ -843,7 +847,7 @@ class _UserValeSheet extends StatelessWidget {
                       }
                     },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: _kOrange,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -897,11 +901,11 @@ class _EntryRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: _kOrange.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.shopping_bag_outlined,
-                  size: 16, color: AppColors.primary),
+                  size: 16, color: _kOrange),
             ),
             const SizedBox(width: 12),
             // Name + date
