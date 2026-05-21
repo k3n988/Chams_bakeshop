@@ -8,6 +8,7 @@ import '../../../../core/models/packer_payroll_model.dart';
 import '../../../../core/services/packer_service.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../viewmodel/admin_user_viewmodel.dart';
+import '../../viewmodel/admin_vale_viewmodel.dart';
 
 class PackerPayrollTab extends StatefulWidget {
   const PackerPayrollTab({super.key});
@@ -56,6 +57,8 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
   Future<void> _load() async {
     setState(() { _isLoading = true; _error = null; });
     try {
+      final valeVM = context.read<AdminValeViewModel>();
+      await valeVM.load();
       final packers = context
           .read<AdminUserViewModel>()
           .nonAdminUsers
@@ -85,6 +88,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
         _payrollData = newPayrolls;
         _isLoading   = false;
       });
+      await _autoApplyValeDeductions();
     } catch (e) {
       setState(() { _error = e.toString(); _isLoading = false; });
     }
@@ -97,14 +101,65 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
     await _load();
   }
 
+  Future<void> _autoApplyValeDeductions() async {
+    if (!mounted) return;
+    final valeVM = context.read<AdminValeViewModel>();
+    var anyChanged = false;
+
+    for (final packerId in _prodData.keys) {
+      final payroll = _payrollData[packerId];
+      final prods = _prodData[packerId] ?? [];
+      final bundles = prods.fold(0, (s, p) => s + p.bundleCount);
+      final gross = bundles * 4.0;
+
+      if (bundles <= 0 || gross <= 0) continue;
+      if ((payroll?.valeDeduction ?? 0) > 0) continue;
+
+      final totalVale = valeVM.userTotal(packerId);
+      if (totalVale <= 0) continue;
+
+      final appliedVale = totalVale > gross ? gross : totalVale;
+      final consumed = await valeVM.consumeAmountForUser(packerId, appliedVale);
+      if (!consumed) continue;
+
+      await _service.upsertPayroll(
+        packerId:      packerId,
+        weekStart:     _weekStartStr,
+        weekEnd:       _weekEndStr,
+        totalBundles:  bundles,
+        grossSalary:   gross,
+        valeDeduction: appliedVale,
+        netSalary:     gross - appliedVale,
+        isPaid:        payroll?.isPaid ?? false,
+      );
+      anyChanged = true;
+    }
+
+    if (!anyChanged || !mounted) return;
+
+    final refreshed = <String, PackerPayrollModel?>{};
+    for (final packerId in _prodData.keys) {
+      refreshed[packerId] = await _service.getPayrollByWeek(
+        packerId:  packerId,
+        weekStart: _weekStartStr,
+        weekEnd:   _weekEndStr,
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _payrollData = refreshed);
+  }
+
   void _showValeDialog(UserModel packer) {
     final existing    = _payrollData[packer.id];
     final prods       = _prodData[packer.id] ?? [];
     final bundles     = prods.fold(0, (s, p) => s + p.bundleCount);
     final gross       = bundles * 4.0;
+    final totalVale   = context.read<AdminValeViewModel>().userTotal(packer.id);
     final currentVale = existing?.valeDeduction ?? 0.0;
     final valeCtrl    =
-        TextEditingController(text: currentVale.toStringAsFixed(0));
+        TextEditingController(
+            text: (currentVale > 0 ? currentVale : totalVale).toStringAsFixed(0));
 
     showDialog(
       context: context,
@@ -186,7 +241,8 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.packer),
             onPressed: () async {
-              final vale      = double.tryParse(valeCtrl.text) ?? 0;
+              final requestedVale = double.tryParse(valeCtrl.text) ?? 0;
+              final vale      = requestedVale > gross ? gross : requestedVale;
               final messenger = ScaffoldMessenger.of(context);
               try {
                 await _service.upsertPayroll(
@@ -233,7 +289,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
     final bundles = prods.fold(0, (s, p) => s + p.bundleCount);
     final gross   = bundles * 4.0;
     final vale    = payroll?.valeDeduction ?? 0.0;
-    final net     = gross - vale;
+    final net     = gross - vale < 0 ? 0.0 : gross - vale;
 
     showDialog(
       context: context,
@@ -361,7 +417,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
       final bundles = prods.fold(0, (s, pr) => s + pr.bundleCount);
       final gross   = bundles * 4.0;
       final vale    = payroll?.valeDeduction ?? 0.0;
-      totalNet += gross - vale;
+      totalNet += gross - vale < 0 ? 0.0 : gross - vale;
     }
 
     // Only count packers who have actual work this week
@@ -467,7 +523,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                     prods.fold(0, (s, p) => s + p.bundleCount);
                 final gross   = bundles * 4.0;
                 final vale    = payroll?.valeDeduction ?? 0.0;
-                final net     = gross - vale;
+                final net     = gross - vale < 0 ? 0.0 : gross - vale;
                 final isPaid  = payroll?.isPaid ?? false;
 
                 final idx      = sorted.indexOf(packer);

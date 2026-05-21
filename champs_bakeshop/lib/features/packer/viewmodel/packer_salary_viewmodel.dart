@@ -81,13 +81,17 @@ class PackerSalaryViewModel extends ChangeNotifier {
   int    get totalBundles  => _productions.fold(0, (s, p) => s + p.bundleCount);
   double get grossSalary   => totalBundles * AppConstants.packerRatePerBundle;
   double get valeDeduction => _weekPayroll?.valeDeduction ?? 0.0;
-  double get netSalary     => grossSalary - valeDeduction;
+  double get netSalary     => grossSalary - valeDeduction < 0
+      ? 0.0
+      : grossSalary - valeDeduction;
   int    get daysWorked    => _cachedProdByDate.keys.length;
 
   // ── Yearly aggregates (used by profile) ───────────────────
   int    get yearlyBundles => _yearProductions.fold(0, (s, p) => s + p.bundleCount);
   double get yearlyGross   => yearlyBundles * AppConstants.packerRatePerBundle;
-  double get yearlyNet     => yearlyGross - _yearlyVale;
+  double get yearlyNet     => yearlyGross - _yearlyVale < 0
+      ? 0.0
+      : yearlyGross - _yearlyVale;
   int    get yearlyDays    {
     final dates = <String>{};
     for (final p in _yearProductions) { dates.add(p.date); }

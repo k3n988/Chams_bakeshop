@@ -485,6 +485,10 @@ class SupabaseService {
     await _db.from('vale_entries').delete().eq('id', id);
   }
 
+  Future<void> updateValeEntryPrice(String id, double price) async {
+    await _db.from('vale_entries').update({'price': price}).eq('id', id);
+  }
+
   Future<void> settleValeEntry(String id) async {
     await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
   }

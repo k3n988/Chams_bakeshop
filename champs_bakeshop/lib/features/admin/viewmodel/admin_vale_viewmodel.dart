@@ -161,6 +161,31 @@ class AdminValeViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> consumeAmountForUser(String userId, double amount) async {
+    if (amount <= 0) return true;
+    try {
+      final active = userEntries(userId)
+        ..sort((a, b) => a.date.compareTo(b.date));
+      var remaining = amount;
+
+      for (final entry in active) {
+        if (remaining <= 0) break;
+        if (remaining >= entry.price) {
+          await _db.settleValeEntry(entry.id);
+          remaining -= entry.price;
+        } else {
+          await _db.updateValeEntryPrice(entry.id, entry.price - remaining);
+          remaining = 0;
+        }
+      }
+
+      await load();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   String userName(String userId) =>
       _users.where((u) => u.id == userId).firstOrNull?.name ?? '?';
 }

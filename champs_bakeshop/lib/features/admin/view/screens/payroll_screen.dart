@@ -194,7 +194,8 @@ class _BakerHelperPayrollTabState
   }
 
   /// For every employee who worked this week and has outstanding vale,
-  /// automatically save it as a deduction (only if not already set manually).
+  /// keep the saved vale deduction synced to the current outstanding vale,
+  /// capped so take-home never goes negative.
   Future<void> _autoApplyValeDeductions() async {
     if (!mounted) return;
     final payVM  = context.read<AdminPayrollViewModel>();
@@ -205,19 +206,26 @@ class _BakerHelperPayrollTabState
     bool anyChanged = false;
 
     for (final entry in payVM.entries) {
-      // Skip if vale deduction already manually saved for this week
-      if (entry.valeDeduction > 0) continue;
-
       final valeTotal = valeVM.userTotal(entry.userId);
-      if (valeTotal <= 0) continue;
+      final maxValeAllowed = entry.grossSalary +
+          entry.ovenIncentive -
+          entry.ovenDeduction -
+          entry.gasDeduction -
+          entry.wifiDeduction;
+      final targetVale = maxValeAllowed <= 0
+          ? 0.0
+          : (valeTotal > maxValeAllowed ? maxValeAllowed : valeTotal);
 
-      // Auto-save vale as deduction, preserving any existing oven/gas/wifi values
+      // Already correct; nothing to do.
+      if ((entry.valeDeduction - targetVale).abs() < 0.01) continue;
+
+      // Sync payroll deduction to the CURRENT outstanding vale.
       await payVM.saveDeduction(
         userId:    entry.userId,
         weekStart: payVM.weekStart,
         oven:      entry.ovenDeduction,
         gas:       entry.gasDeduction,
-        vale:      valeTotal,
+        vale:      targetVale,
         wifi:      entry.wifiDeduction,
       );
       anyChanged = true;
@@ -422,13 +430,35 @@ class _BakerHelperPayrollTabState
                 ));
                 return;
               }
+              final oven = double.tryParse(ovenCtrl.text) ?? 0;
+              final gas = double.tryParse(gasCtrl.text) ?? 0;
+              final requestedVale = double.tryParse(valeCtrl.text) ?? 0;
+              final wifi = double.tryParse(wifiCtrl.text) ?? 0;
+              final maxValeAllowed =
+                  entry.grossSalary + entry.ovenIncentive - oven - gas - wifi;
+              final allowedVale = maxValeAllowed <= 0
+                  ? 0.0
+                  : (requestedVale > maxValeAllowed
+                      ? maxValeAllowed
+                      : requestedVale);
+              if (requestedVale > allowedVale) {
+                messenger.showSnackBar(SnackBar(
+                  content: Text(
+                      'Vale deduction was capped to ${formatCurrency(allowedVale)} so take-home does not go negative.'),
+                  backgroundColor: AppColors.warning,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  margin: const EdgeInsets.all(12),
+                ));
+              }
               await payVM.saveDeduction(
                 userId:    entry.userId,
                 weekStart: payVM.weekStart,
-                oven:  double.tryParse(ovenCtrl.text)  ?? 0,
-                gas:   double.tryParse(gasCtrl.text)   ?? 0,
-                vale:  double.tryParse(valeCtrl.text)  ?? 0,
-                wifi:  double.tryParse(wifiCtrl.text)  ?? 0,
+                oven:  oven,
+                gas:   gas,
+                vale:  allowedVale,
+                wifi:  wifi,
               );
               if (ctx.mounted) Navigator.pop(ctx);
               _load();

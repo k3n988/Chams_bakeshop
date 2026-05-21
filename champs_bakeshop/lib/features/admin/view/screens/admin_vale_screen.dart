@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/network_utils.dart';
+import '../../../../core/services/database_service.dart';
+import '../../../../core/services/payroll_service.dart';
+import '../../../../core/services/packer_service.dart';
+import '../../../../core/services/seller_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
 
@@ -467,6 +471,8 @@ class _UserCard extends StatelessWidget {
 
 class _UserValeSheet extends StatelessWidget {
   final String userId;
+  static final PackerService _packerService = PackerService();
+  static final SellerService _sellerService = SellerService();
 
   const _UserValeSheet({required this.userId});
 
@@ -596,8 +602,8 @@ class _UserValeSheet extends StatelessWidget {
                             entry: e,
                             onDelete: () async {
                               final confirm =
-                                  await _confirmDialog(context, 'Delete Entry',
-                                      'Delete "${e.productName}" (${formatCurrency(e.price)})?');
+                                  await _confirmDialog(context, 'Tangtanga ang Entry',
+                                      'Tangtangon ang "${e.productName}" (${formatCurrency(e.price)})?');
                               if (confirm == true) {
                                 await vm.deleteEntry(e.id);
                               }
@@ -616,8 +622,8 @@ class _UserValeSheet extends StatelessWidget {
                     // Add Vale button
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () =>
-                            _showAddValeDialog(context, userId, adminId, vm),
+                        onPressed: () => _guardedShowAddValeDialog(
+                            context, userId, adminId, vm),
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Vale'),
                         style: ElevatedButton.styleFrom(
@@ -641,8 +647,8 @@ class _UserValeSheet extends StatelessWidget {
                             final messenger = ScaffoldMessenger.of(context);
                             final confirm = await _confirmDialog(
                                 context,
-                                'Settle All',
-                                'Mark all of $name\'s vale as settled?\nTotal: ${formatCurrency(total)}');
+                                'I-settle Tanan',
+                                'I-settle na ba ang tanang vale ni $name?\nTotal: ${formatCurrency(total)}');
                             if (confirm != true) return;
                             if (!await hasInternet()) {
                               messenger.showSnackBar(SnackBar(
@@ -675,7 +681,7 @@ class _UserValeSheet extends StatelessWidget {
                           },
                           icon: const Icon(Icons.check_circle_outline,
                               size: 18),
-                          label: const Text('Settle All'),
+                          label: const Text('I-settle Tanan'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.success,
                             side: BorderSide(
@@ -729,7 +735,144 @@ class _UserValeSheet extends StatelessWidget {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Confirm'),
+            child: const Text('Oo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<double> _currentPayrollForUser(
+      BuildContext context, AdminValeViewModel vm) async {
+    final user = vm.users.where((u) => u.id == userId).firstOrNull;
+    if (user == null) return 0;
+
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
+    final weekStart =
+        '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+    final weekEnd =
+        '${sunday.year}-${sunday.month.toString().padLeft(2, '0')}-${sunday.day.toString().padLeft(2, '0')}';
+
+    if (user.isPacker) {
+      final prods = await _packerService.getProductionsByWeek(
+        packerId: user.id,
+        weekStart: weekStart,
+        weekEnd: weekEnd,
+      );
+      final bundles = prods.fold<int>(0, (s, p) => s + p.bundleCount);
+      return bundles * AppConstants.packerRatePerBundle;
+    }
+
+    if (user.isSeller) {
+      final remits = await _sellerService.getRemittancesByRange(
+        sellerId: user.id,
+        fromDate: weekStart,
+        toDate: weekEnd,
+      );
+      return remits.fold<double>(0.0, (s, r) => s + r.salary);
+    }
+
+    final db = context.read<DatabaseService>();
+    final payroll = context.read<PayrollService>();
+    final products = await db.getAllProducts();
+    final productions = await db.getProductionsByDateRange(weekStart, weekEnd);
+
+    double gross = 0;
+    for (final prod in productions) {
+      final isMaster = prod.masterBakerId == user.id;
+      final isHelper = prod.helperIds.contains(user.id);
+      if (!isMaster && !isHelper) continue;
+
+      final calc = payroll.computeDaily(prod, products);
+      gross += isMaster
+          ? calc.salaryPerWorker + calc.bakerIncentive
+          : calc.salaryPerWorker;
+    }
+    return gross;
+  }
+
+  Future<void> _guardedShowAddValeDialog(
+      BuildContext context,
+      String userId,
+      String adminId,
+      AdminValeViewModel vm) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final currentPayroll = await _currentPayrollForUser(context, vm);
+    final currentOutstanding = vm.userTotal(userId);
+    final remainingAllowance = currentPayroll - currentOutstanding;
+
+    if (currentPayroll <= 0) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Dili pa pwede makadugang og vale. Wala pa siyay payroll/trabaho karong panahona.'),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
+
+    if (remainingAllowance <= 0) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            'Vale blocked. Adding more would make payroll negative. Payroll limit: ${formatCurrency(currentPayroll)}.'),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+      ));
+      return;
+    }
+
+    _showAddValeDialog(context, userId, adminId, vm);
+  }
+
+  Future<void> _showBlockingErrorDialog(
+      BuildContext context, String title, String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.error_outline,
+                  color: AppColors.danger, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.text),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+              color: AppColors.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kOrange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Sige'),
           ),
         ],
       ),
@@ -850,12 +993,42 @@ class _UserValeSheet extends StatelessWidget {
                         ));
                         return;
                       }
+                      final currentPayroll =
+                          await _currentPayrollForUser(context, vm);
+                      if (currentPayroll <= 0) {
+                        await _showBlockingErrorDialog(
+                          dCtx,
+                          'Dili Pwede ang Vale',
+                          'Wala pay payroll o trabaho kining empleyadoha karong panahona, mao nga dili pa pwede makadugang og vale.',
+                        );
+                        return;
+                      }
+                      final currentOutstanding = vm.userTotal(userId);
+                      final requestedPrice =
+                          double.parse(priceCtrl.text.trim());
+                      final remainingAllowance =
+                          currentPayroll - currentOutstanding;
+                      if (remainingAllowance <= 0) {
+                        await _showBlockingErrorDialog(
+                          dCtx,
+                          'Naabot na ang Limit sa Vale',
+                          'Ang kasamtangang wala pa nabayrang vale naabot na sa payroll limit nga ${formatCurrency(currentPayroll)} ani nga empleyado.',
+                        );
+                        return;
+                      }
+                      if (requestedPrice > remainingAllowance) {
+                        await _showBlockingErrorDialog(
+                          dCtx,
+                          'Sobra ang Vale',
+                          'Dili pwede makadugang og vale nga ${formatCurrency(requestedPrice)}.\n\n${formatCurrency(remainingAllowance)} nalang ang pwede karong payroll.',
+                        );
+                        return;
+                      }
                       setDialogState(() => saving = true);
                       final ok = await vm.addEntry(
                         userId:      userId,
                         productName: productCtrl.text,
-                        price:
-                            double.parse(priceCtrl.text.trim()),
+                        price: requestedPrice,
                         createdBy: adminId,
                       );
                       if (dCtx.mounted) Navigator.pop(dCtx);
