@@ -139,6 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (picked == null) return;
       setState(() => _photoPath = picked.path);
       await _savePhotoPath(picked.path);
+      await context.read<AuthViewModel>().setLocalPhoto(picked.path);
       _avatarAnim..reset()..forward();
     } catch (e) {
       if (!mounted) return;
@@ -146,10 +147,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  void _removePhoto() {
+  Future<void> _removePhoto() async {
     Navigator.pop(context);
     setState(() => _photoPath = null);
-    _savePhotoPath(null);
+    await _savePhotoPath(null);
+    await context.read<AuthViewModel>().clearLocalPhoto();
     _avatarAnim..reset()..forward();
   }
 

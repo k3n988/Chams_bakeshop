@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/helpers.dart';
@@ -145,6 +146,8 @@ class _DashboardAppBar extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
+    final photoPath = context.watch<AuthViewModel>().localPhotoPath;
+    final hasPhoto = photoPath != null && photoPath.isNotEmpty;
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.white,
@@ -165,8 +168,16 @@ class _DashboardAppBar extends StatelessWidget
             ],
             border: Border.all(color: DashColors.border),
           ),
-          child: const Center(
-              child: Text('👷', style: TextStyle(fontSize: 18))),
+          clipBehavior: Clip.antiAlias,
+          child: hasPhoto
+              ? Image.file(
+                  File(photoPath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _DashboardAvatarFallback(
+                    userName: userName,
+                  ),
+                )
+              : _DashboardAvatarFallback(userName: userName),
         ),
         const SizedBox(width: 10),
         Column(
@@ -187,6 +198,26 @@ class _DashboardAppBar extends StatelessWidget
           ],
         ),
       ]),
+    );
+  }
+}
+
+class _DashboardAvatarFallback extends StatelessWidget {
+  final String userName;
+  const _DashboardAvatarFallback({required this.userName});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'H';
+    return Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+          color: DashColors.primary,
+        ),
+      ),
     );
   }
 }
@@ -587,41 +618,31 @@ class _RecentRecords extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Paid/Unpaid badge
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: paid
-                        ? const Color(0xFF388E3C).withValues(alpha: 0.08)
-                        : Colors.orange.withValues(alpha: 0.08),
+                    color: Colors.blueGrey.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: paid
-                          ? const Color(0xFF388E3C).withValues(alpha: 0.2)
-                          : Colors.orange.withValues(alpha: 0.2),
+                      color: Colors.blueGrey.withValues(alpha: 0.18),
                     ),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min,
-                      children: [
-                    Icon(
-                      paid ? Icons.check_circle : Icons.schedule,
-                      size: 14,
-                      color: paid
-                          ? const Color(0xFF388E3C)
-                          : Colors.orange,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      paid ? 'Paid' : 'Unpaid',
-                      style: TextStyle(
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🧑‍🍳', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Master Baker',
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: paid
-                              ? const Color(0xFF388E3C)
-                              : Colors.orange),
-                    ),
-                  ]),
+                          color: Color(0xFF546E7A),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ]),
             ),

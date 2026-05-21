@@ -130,6 +130,15 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearLocalPhoto() async {
+    _localPhotoPath = null;
+    final prefs = await SharedPreferences.getInstance();
+    if (_currentUser != null) {
+      await prefs.remove('${_kUserPhoto}_${_currentUser!.id}');
+    }
+    notifyListeners();
+  }
+
   // ── Helpers ───────────────────────────────────────────────
   Future<void> _saveSession(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
