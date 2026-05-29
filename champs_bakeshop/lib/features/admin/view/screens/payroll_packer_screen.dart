@@ -57,10 +57,10 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
   Future<void> _load() async {
     setState(() { _isLoading = true; _error = null; });
     try {
+      final userVm = context.read<AdminUserViewModel>();
       final valeVM = context.read<AdminValeViewModel>();
       await valeVM.load();
-      final packers = context
-          .read<AdminUserViewModel>()
+      final packers = userVm
           .nonAdminUsers
           .where((u) => u.isPacker)
           .toList();

@@ -224,7 +224,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                               icon:       Icons.attach_money,
                               label:      'Batch Value',
                               value:      formatCurrency(
-                                  prodVm.computeDaily(prod).totalValue as double),
+                                  prodVm.computeDaily(prod).totalValue),
                               valueColor: DashColors.primary,
                             ),
                           ]),
@@ -238,8 +238,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                               icon:  Icons.people_outline,
                               label: 'Per Worker (base)',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).salaryPerWorker
-                                      as double),
+                                  prodVm.computeDaily(prod).salaryPerWorker),
                             ),
                             const Divider(height: 20, color: AppColors.border),
                             Row(
@@ -252,8 +251,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
                                         color:      AppColors.text)),
                                 Text(
                                   formatCurrency(
-                                      prodVm.computeDaily(prod).salaryPerWorker
-                                          as double),
+                                      prodVm.computeDaily(prod).salaryPerWorker),
                                   style: const TextStyle(
                                       fontWeight:   FontWeight.w900,
                                       fontSize:     22,

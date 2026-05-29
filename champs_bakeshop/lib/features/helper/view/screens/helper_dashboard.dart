@@ -739,8 +739,7 @@ class _RecentRecords extends StatelessWidget {
                               icon:  Icons.attach_money,
                               label: 'Batch Value',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).totalValue
-                                      as double),
+                                  prodVm.computeDaily(prod).totalValue),
                               valueColor: DashColors.primary,
                             ),
                           ]),
@@ -754,8 +753,7 @@ class _RecentRecords extends StatelessWidget {
                               icon:  Icons.calculate_outlined,
                               label: 'Per Worker (base)',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).salaryPerWorker
-                                      as double),
+                                  prodVm.computeDaily(prod).salaryPerWorker),
                             ),
                             const Divider(
                                 height: 20, color: DashColors.border),
@@ -770,8 +768,7 @@ class _RecentRecords extends StatelessWidget {
                                         color: DashColors.textPrimary)),
                                 Text(
                                   formatCurrency(
-                                      prodVm.computeDaily(prod).salaryPerWorker
-                                          as double),
+                                      prodVm.computeDaily(prod).salaryPerWorker),
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 22,

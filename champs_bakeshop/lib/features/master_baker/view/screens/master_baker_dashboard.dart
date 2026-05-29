@@ -356,7 +356,7 @@ class _DashboardHome extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth >= 600;
-    final isAdmin = (user.role as String).toLowerCase() == 'admin';
+    final isAdmin = user.role.toLowerCase() == 'admin';
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isWide ? 24 : 16),
@@ -888,8 +888,7 @@ class _RecentRecords extends StatelessWidget {
                               icon: Icons.attach_money,
                               label: 'Batch Value',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).totalValue
-                                      as double),
+                                  prodVm.computeDaily(prod).totalValue),
                               valueColor: AppColors.masterBaker,
                             ),
                           ]),
@@ -903,18 +902,14 @@ class _RecentRecords extends StatelessWidget {
                               icon: Icons.people_outline,
                               label: 'Per Worker (base)',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).salaryPerWorker
-                                      as double),
+                                  prodVm.computeDaily(prod).salaryPerWorker),
                             ),
-                            if ((prodVm.computeDaily(prod).bakerIncentive
-                                    as double) >
-                                0)
+                            if (prodVm.computeDaily(prod).bakerIncentive > 0)
                               _PreviewDataRow(
                                 icon: Icons.star_outline,
                                 label: 'Baker Incentive',
                                 value: formatCurrency(
-                                    prodVm.computeDaily(prod).bakerIncentive
-                                        as double),
+                                    prodVm.computeDaily(prod).bakerIncentive),
                                 valueColor: const Color(0xFF1976D2),
                               ),
                             const Divider(
@@ -930,12 +925,8 @@ class _RecentRecords extends StatelessWidget {
                                         color: AppColors.text)),
                                 Text(
                                   formatCurrency(
-                                    (prodVm.computeDaily(prod).salaryPerWorker
-                                            as double) +
-                                        (prodVm
-                                                .computeDaily(prod)
-                                                .bakerIncentive
-                                            as double),
+                                    prodVm.computeDaily(prod).salaryPerWorker +
+                                        prodVm.computeDaily(prod).bakerIncentive,
                                   ),
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w900,

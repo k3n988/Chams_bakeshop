@@ -727,7 +727,7 @@ class _MonthBonusTabState extends State<_MonthBonusTab> {
               const _FieldLabel('Worker'),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: selectedUserId,
+                initialValue: selectedUserId,
                 isExpanded: true,
                 decoration: _inputDec(hint: 'Select worker'),
                 items: workers.map((w) {

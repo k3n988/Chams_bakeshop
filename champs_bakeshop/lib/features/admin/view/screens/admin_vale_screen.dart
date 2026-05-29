@@ -801,6 +801,7 @@ class _UserValeSheet extends StatelessWidget {
       AdminValeViewModel vm) async {
     final messenger = ScaffoldMessenger.of(context);
     final currentPayroll = await _currentPayrollForUser(context, vm);
+    if (!context.mounted) return;
     final currentOutstanding = vm.userTotal(userId);
     final remainingAllowance = currentPayroll - currentOutstanding;
 
@@ -864,7 +865,7 @@ class _UserValeSheet extends StatelessWidget {
         ),
         actions: [
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(context).pop(),
             style: ElevatedButton.styleFrom(
               backgroundColor: _kOrange,
               foregroundColor: Colors.white,
@@ -995,6 +996,7 @@ class _UserValeSheet extends StatelessWidget {
                       }
                       final currentPayroll =
                           await _currentPayrollForUser(context, vm);
+                      if (!dCtx.mounted) return;
                       if (currentPayroll <= 0) {
                         await _showBlockingErrorDialog(
                           dCtx,
@@ -1031,19 +1033,18 @@ class _UserValeSheet extends StatelessWidget {
                         price: requestedPrice,
                         createdBy: adminId,
                       );
-                      if (dCtx.mounted) Navigator.pop(dCtx);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(ok
-                                ? 'Vale entry added!'
-                                : 'Failed to add entry.'),
-                            backgroundColor: ok
-                                ? AppColors.success
-                                : AppColors.danger,
-                          ),
-                        );
-                      }
+                      if (!dCtx.mounted || !context.mounted) return;
+                      Navigator.pop(dCtx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(ok
+                              ? 'Vale entry added!'
+                              : 'Failed to add entry.'),
+                          backgroundColor: ok
+                              ? AppColors.success
+                              : AppColors.danger,
+                        ),
+                      );
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _kOrange,

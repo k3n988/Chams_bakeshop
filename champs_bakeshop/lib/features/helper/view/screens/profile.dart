@@ -132,14 +132,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _pickImage(ImageSource source) async {
     Navigator.pop(context);
     try {
+      final authVm = context.read<AuthViewModel>();
       final picker = ImagePicker();
       final picked = await picker.pickImage(
           source: source, imageQuality: 85,
           maxWidth: 600, maxHeight: 600);
       if (picked == null) return;
+      if (!mounted) return;
       setState(() => _photoPath = picked.path);
       await _savePhotoPath(picked.path);
-      await context.read<AuthViewModel>().setLocalPhoto(picked.path);
+      await authVm.setLocalPhoto(picked.path);
       _avatarAnim..reset()..forward();
     } catch (e) {
       if (!mounted) return;
@@ -148,10 +150,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _removePhoto() async {
+    final authVm = context.read<AuthViewModel>();
     Navigator.pop(context);
     setState(() => _photoPath = null);
     await _savePhotoPath(null);
-    await context.read<AuthViewModel>().clearLocalPhoto();
+    if (!mounted) return;
+    await authVm.clearLocalPhoto();
     _avatarAnim..reset()..forward();
   }
 

@@ -50,14 +50,18 @@ class _BakerProductionInputScreenState
 
   @override
   void dispose() {
-    for (final item in _items) item.dispose();
+    for (final item in _items) {
+      item.dispose();
+    }
     super.dispose();
   }
 
   void _toggleHelper(String id) => setState(() {
         if (_selectedHelpers.contains(id)) {
           _selectedHelpers.remove(id);
-          if (_ovenHelperId == id) _ovenHelperId = null;
+          if (_ovenHelperId == id) {
+            _ovenHelperId = null;
+          }
         } else {
           _selectedHelpers.add(id);
         }
@@ -556,7 +560,7 @@ class _BakerProductionInputScreenState
                             Expanded(
                               flex: 3,
                               child: DropdownButtonFormField<String>(
-                                value: item.productId,
+                                initialValue: item.productId,
                                 isExpanded: true,
                                 decoration: InputDecoration(
                                   hintText: 'Select product',

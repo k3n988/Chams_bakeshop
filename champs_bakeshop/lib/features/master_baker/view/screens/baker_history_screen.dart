@@ -1096,12 +1096,14 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
       if (e.productId == null) return 'Select a product for every row.';
       final s = int.tryParse(e.sacksCtrl.text.trim()) ?? 0;
       final k = int.tryParse(e.kgCtrl.text.trim()) ?? 0;
-      if (s <= 0 && k <= 0)
+      if (s <= 0 && k <= 0) {
         return 'Sacks or KG must be > 0 for each row.';
+      }
     }
     final ids = _items.map((e) => e.productId).toList();
-    if (ids.toSet().length != ids.length)
+    if (ids.toSet().length != ids.length) {
       return 'Duplicate products found.';
+    }
     return null;
   }
 

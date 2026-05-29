@@ -161,7 +161,9 @@ class _PackerWeeklyReportTabState
 
   Future<void> _changeWeek(int dir) async {
     // Block going forward past current week
-    if (dir > 0 && _isCurrentWeek) return;
+    if (dir > 0 && _isCurrentWeek) {
+      return;
+    }
     setState(() {
       _weekStart = _weekStart.add(Duration(days: 7 * dir));
       _expandedPackerId = null;
@@ -380,7 +382,9 @@ class _PackerDailyReportTabState
 
   void _changeDay(int dir) {
     final next = _selectedDate.add(Duration(days: dir));
-    if (next.isAfter(DateTime.now())) return;
+    if (next.isAfter(DateTime.now())) {
+      return;
+    }
     setState(() => _selectedDate = next);
     _load();
   }

@@ -362,7 +362,9 @@ class _SellerDailyReportTabState
 
   void _changeDay(int dir) {
     final next = _selDate.add(Duration(days: dir));
-    if (next.isAfter(DateTime.now())) return;
+    if (next.isAfter(DateTime.now())) {
+      return;
+    }
     setState(() => _selDate = next);
     _load();
   }

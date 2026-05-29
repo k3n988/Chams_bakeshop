@@ -305,7 +305,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                               icon:       Icons.attach_money,
                               label:      'Batch Value',
                               value:      formatCurrency(
-                                  prodVm.computeDaily(prod).totalValue as double),
+                                  prodVm.computeDaily(prod).totalValue),
                               valueColor: DashColors.primary,
                             ),
                           ]),
@@ -319,7 +319,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                               icon:  Icons.people_outline,
                               label: 'Per Worker (base)',
                               value: formatCurrency(
-                                  prodVm.computeDaily(prod).salaryPerWorker as double),
+                                  prodVm.computeDaily(prod).salaryPerWorker),
                             ),
                             const Divider(height: 20, color: AppColors.border),
                             Row(
@@ -332,8 +332,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                                         color:      AppColors.text)),
                                 Text(
                                   formatCurrency(
-                                      prodVm.computeDaily(prod).salaryPerWorker
-                                          as double),
+                                      prodVm.computeDaily(prod).salaryPerWorker),
                                   style: const TextStyle(
                                       fontWeight:   FontWeight.w900,
                                       fontSize:     22,
@@ -724,7 +723,9 @@ class _DayNavigator extends StatelessWidget {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
     if (selectedDate.year == yesterday.year &&
         selectedDate.month == yesterday.month &&
-        selectedDate.day == yesterday.day) return 'Yesterday';
+        selectedDate.day == yesterday.day) {
+      return 'Yesterday';
+    }
     const months = [
       'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'

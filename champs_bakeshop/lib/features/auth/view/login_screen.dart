@@ -226,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 8),
 
                   DropdownButtonFormField<String>(
-                    value: _selectedRole.isEmpty ? null : _selectedRole,
+                    initialValue: _selectedRole.isEmpty ? null : _selectedRole,
                     decoration:
                         _inputDecoration('-- Choose Role --', Icons.badge_outlined),
                     items: const [
