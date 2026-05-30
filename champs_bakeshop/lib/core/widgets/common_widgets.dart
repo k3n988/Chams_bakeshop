@@ -77,12 +77,19 @@ class RoleBadge extends StatelessWidget {
       case 'master_baker':
         color = AppColors.masterBaker;
         label = 'Master Baker';
+        break;
       case 'helper':
         color = AppColors.helper;
         label = 'Helper';
+        break;
       case 'admin':
         color = AppColors.primary;
         label = 'Admin';
+        break;
+      case 'cashier':
+        color = const Color(0xFFFF7A00);
+        label = 'Cashier';
+        break;
       default:
         color = AppColors.textHint;
         label = role;

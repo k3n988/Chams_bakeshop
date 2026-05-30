@@ -31,45 +31,50 @@ class AdminUserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> addUser({
+  Future<String?> addUser({
     required String name,
     required String email,
     required String password,
     required String role,
   }) async {
     try {
+      final normalizedEmail = email.toLowerCase().trim();
+      final existing = await _db.getUserByEmail(normalizedEmail);
+      if (existing != null) {
+        return 'Email already exists.';
+      }
       final user = UserModel(
         id: generateId('u'),
         name: name.toUpperCase(),
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         password: password,
         role: role,
       );
       await _db.insertUser(user);
       await loadUsers();
-      return true;
+      return null;
     } catch (e) {
-      return false;
+      return e.toString();
     }
   }
 
-  Future<bool> updateUser(UserModel user) async {
+  Future<String?> updateUser(UserModel user) async {
     try {
       await _db.updateUser(user);
       await loadUsers();
-      return true;
+      return null;
     } catch (e) {
-      return false;
+      return e.toString();
     }
   }
 
-  Future<bool> deleteUser(String id) async {
+  Future<String?> deleteUser(String id) async {
     try {
       await _db.deleteUser(id);
       await loadUsers();
-      return true;
+      return null;
     } catch (e) {
-      return false;
+      return e.toString();
     }
   }
 }

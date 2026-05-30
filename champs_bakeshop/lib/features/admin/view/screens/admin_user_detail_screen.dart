@@ -51,6 +51,17 @@ class AdminUserDetailScreen extends StatelessWidget {
         child: _UserDetailShell(user: user),
       );
     }
+    if (user.isCashier) {
+      return Scaffold(
+        appBar: AppBar(title: Text(user.name)),
+        body: const Center(
+          child: Text(
+            'Cashier accounts can access Vale only.',
+            style: TextStyle(color: AppColors.textHint),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: Text(user.name)),
       body: Center(

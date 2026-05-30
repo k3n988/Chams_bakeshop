@@ -545,6 +545,8 @@ class _BakerHelperPayrollTabState
               Navigator.pop(ctx);
               final payVM     =
                   context.read<AdminPayrollViewModel>();
+              final valeVM    =
+                  context.read<AdminValeViewModel>();
               final messenger =
                   ScaffoldMessenger.of(context);
               if (!await hasInternet()) {
@@ -563,6 +565,10 @@ class _BakerHelperPayrollTabState
                 paidBy: adminId,
                 amount: entry.finalSalary,
               );
+              if (ok) {
+                await valeVM.consumeAmountForUser(
+                    entry.userId, entry.valeDeduction);
+              }
               if (mounted) {
                 messenger.showSnackBar(SnackBar(
                   content: Text(ok
@@ -623,6 +629,8 @@ class _BakerHelperPayrollTabState
               Navigator.pop(ctx);
               final payVM     =
                   context.read<AdminPayrollViewModel>();
+              final valeVM    =
+                  context.read<AdminValeViewModel>();
               final messenger =
                   ScaffoldMessenger.of(context);
               if (!await hasInternet()) {
@@ -638,6 +646,12 @@ class _BakerHelperPayrollTabState
               }
               final ok =
                   await payVM.markAllAsPaid(paidBy: adminId);
+              if (ok) {
+                for (final entry in unpaid) {
+                  await valeVM.consumeAmountForUser(
+                      entry.userId, entry.valeDeduction);
+                }
+              }
               if (mounted) {
                 messenger.showSnackBar(SnackBar(
                   content: Text(ok

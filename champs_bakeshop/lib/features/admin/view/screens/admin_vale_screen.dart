@@ -54,6 +54,20 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AdminValeViewModel>();
+    final settledEntries = vm.entries
+        .where((e) => e.isSettled)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final settledThisWeek = settledEntries.where((e) {
+      final parsed = DateTime.tryParse(e.date);
+      if (parsed == null) return false;
+      final day = DateTime(parsed.year, parsed.month, parsed.day);
+      return !day.isBefore(weekStart) && !day.isAfter(weekEnd);
+    }).toList();
 
     // Filter users
     var users = vm.nonAdminUsers;
@@ -105,61 +119,86 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                         ),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 18),
-                        child: Row(
+                        child: Stack(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.store,
-                                  color: Colors.white, size: 24),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Total Outstanding Vale',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    formatCurrency(vm.grandTotal),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            Row(
                               children: [
-                                Text(
-                                  '${vm.activeEntries.length}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.store,
+                                      color: Colors.white, size: 24),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Total Outstanding Vale',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        formatCurrency(vm.grandTotal),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const Text(
-                                  'items',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 11,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '${vm.activeEntries.length}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const Text(
+                                      'items',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: IconButton(
+                                tooltip: 'Settled history',
+                                onPressed: settledThisWeek.isEmpty
+                                    ? null
+                                    : () => _showSettledHistorySheet(
+                                        context, settledThisWeek, vm),
+                                icon: const Icon(
+                                  Icons.history_outlined,
+                                  color: Colors.white,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.white.withValues(alpha: 0.18),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -255,7 +294,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                             ),
                           ),
                         )
-                      : SliverPadding(
+                  : SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
@@ -275,6 +314,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                             ),
                           ),
                         ),
+
                 ],
               ),
       ),
@@ -467,7 +507,207 @@ class _UserCard extends StatelessWidget {
   }
 }
 
+void _showSettledHistorySheet(BuildContext context, List<ValeEntry> entries,
+    AdminValeViewModel vm) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8F4F0),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Settled Vale This Week',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${entries.length}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _SettledHistorySection(
+                  entries: entries,
+                  userNameOf: vm.userName,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 // ─── User Vale Sheet ─────────────────────────────────────────────────────────
+
+class _SettledHistorySection extends StatelessWidget {
+  final List<ValeEntry> entries;
+  final String Function(String userId) userNameOf;
+
+  const _SettledHistorySection({
+    required this.entries,
+    required this.userNameOf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final recent = entries.take(8).toList();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.history_outlined,
+                  color: AppColors.success, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Settled History',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                ),
+              ),
+            ),
+            Text(
+              '${entries.length}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.success,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          ...recent.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F4F0),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.check_circle_outline,
+                          color: AppColors.success, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            e.productName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.text,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${userNameOf(e.userId)} • ${e.date}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      formatCurrency(e.price),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: () async {
+                        final vm = context.read<AdminValeViewModel>();
+                        final messenger = ScaffoldMessenger.of(context);
+                        final ok = await vm.restoreEntry(e.id);
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(ok
+                              ? 'Vale restored.'
+                              : 'Failed to restore vale.'),
+                          backgroundColor:
+                              ok ? AppColors.success : AppColors.danger,
+                        ));
+                      },
+                      icon: const Icon(Icons.restore_outlined,
+                          size: 18, color: AppColors.info),
+                      tooltip: 'Restore',
+                    ),
+                  ]),
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
 
 class _UserValeSheet extends StatelessWidget {
   final String userId;
@@ -742,9 +982,9 @@ class _UserValeSheet extends StatelessWidget {
     );
   }
 
-  Future<double> _currentPayrollForUser(
-      BuildContext context, AdminValeViewModel vm) async {
-    final user = vm.users.where((u) => u.id == userId).firstOrNull;
+Future<double> _currentPayrollForUser(
+    BuildContext context, String userId, AdminValeViewModel vm) async {
+  final user = vm.users.where((u) => u.id == userId).firstOrNull;
     if (user == null) return 0;
 
     final now = DateTime.now();
@@ -775,8 +1015,8 @@ class _UserValeSheet extends StatelessWidget {
       return remits.fold<double>(0.0, (s, r) => s + r.salary);
     }
 
-    final db = context.read<DatabaseService>();
-    final payroll = context.read<PayrollService>();
+  final db = context.read<DatabaseService>();
+  final payroll = context.read<PayrollService>();
     final products = await db.getAllProducts();
     final productions = await db.getProductionsByDateRange(weekStart, weekEnd);
 
@@ -794,16 +1034,16 @@ class _UserValeSheet extends StatelessWidget {
     return gross;
   }
 
-  Future<void> _guardedShowAddValeDialog(
-      BuildContext context,
-      String userId,
-      String adminId,
-      AdminValeViewModel vm) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final currentPayroll = await _currentPayrollForUser(context, vm);
-    if (!context.mounted) return;
-    final currentOutstanding = vm.userTotal(userId);
-    final remainingAllowance = currentPayroll - currentOutstanding;
+Future<void> _guardedShowAddValeDialog(
+    BuildContext context,
+    String userId,
+    String adminId,
+    AdminValeViewModel vm) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final currentPayroll = await _currentPayrollForUser(context, userId, vm);
+  if (!context.mounted) return;
+  final currentOutstanding = vm.userTotal(userId);
+  final remainingAllowance = currentPayroll - currentOutstanding;
 
     if (currentPayroll <= 0) {
       messenger.showSnackBar(const SnackBar(
@@ -826,13 +1066,13 @@ class _UserValeSheet extends StatelessWidget {
       return;
     }
 
-    _showAddValeDialog(context, userId, adminId, vm);
-  }
+  _showAddValeDialog(context, userId, adminId, vm);
+}
 
-  Future<void> _showBlockingErrorDialog(
-      BuildContext context, String title, String message) {
-    return showDialog<void>(
-      context: context,
+Future<void> _showBlockingErrorDialog(
+    BuildContext context, String title, String message) {
+  return showDialog<void>(
+    context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16)),
@@ -880,17 +1120,17 @@ class _UserValeSheet extends StatelessWidget {
     );
   }
 
-  void _showAddValeDialog(BuildContext context, String userId,
-      String adminId, AdminValeViewModel vm) {
-    final productCtrl = TextEditingController();
-    final priceCtrl   = TextEditingController();
-    final formKey     = GlobalKey<FormState>();
-    bool saving       = false;
+void _showAddValeDialog(
+    BuildContext context, String userId, String adminId, AdminValeViewModel vm) {
+  final productCtrl = TextEditingController();
+  final priceCtrl = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  bool saving = false;
 
-    showDialog(
-      context: context,
-      builder: (dCtx) => StatefulBuilder(
-        builder: (dCtx, setDialogState) => AlertDialog(
+  showDialog(
+    context: context,
+    builder: (dCtx) => StatefulBuilder(
+      builder: (dCtx, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
           title: const Text(
@@ -995,11 +1235,11 @@ class _UserValeSheet extends StatelessWidget {
                         return;
                       }
                       final currentPayroll =
-                          await _currentPayrollForUser(context, vm);
-                      if (!dCtx.mounted) return;
+                          await _currentPayrollForUser(context, userId, vm);
+                      if (!context.mounted) return;
                       if (currentPayroll <= 0) {
                         await _showBlockingErrorDialog(
-                          dCtx,
+                          context,
                           'Dili Pwede ang Vale',
                           'Wala pay payroll o trabaho kining empleyadoha karong panahona, mao nga dili pa pwede makadugang og vale.',
                         );
@@ -1012,7 +1252,7 @@ class _UserValeSheet extends StatelessWidget {
                           currentPayroll - currentOutstanding;
                       if (remainingAllowance <= 0) {
                         await _showBlockingErrorDialog(
-                          dCtx,
+                          context,
                           'Naabot na ang Limit sa Vale',
                           'Ang kasamtangang wala pa nabayrang vale naabot na sa payroll limit nga ${formatCurrency(currentPayroll)} ani nga empleyado.',
                         );
@@ -1020,21 +1260,22 @@ class _UserValeSheet extends StatelessWidget {
                       }
                       if (requestedPrice > remainingAllowance) {
                         await _showBlockingErrorDialog(
-                          dCtx,
+                          context,
                           'Sobra ang Vale',
                           'Dili pwede makadugang og vale nga ${formatCurrency(requestedPrice)}.\n\n${formatCurrency(remainingAllowance)} nalang ang pwede karong payroll.',
                         );
                         return;
                       }
                       setDialogState(() => saving = true);
+                      final navigator = Navigator.of(context);
                       final ok = await vm.addEntry(
                         userId:      userId,
                         productName: productCtrl.text,
                         price: requestedPrice,
                         createdBy: adminId,
                       );
-                      if (!dCtx.mounted || !context.mounted) return;
-                      Navigator.pop(dCtx);
+                      if (!context.mounted) return;
+                      navigator.pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(ok

@@ -198,6 +198,8 @@ class DatabaseService {
 
   Future<void> settleValeEntry(String id) => _supa.settleValeEntry(id);
 
+  Future<void> restoreValeEntry(String id) => _supa.restoreValeEntry(id);
+
   Future<void> settleAllValeByUser(String userId) =>
       _supa.settleAllValeByUser(userId);
 

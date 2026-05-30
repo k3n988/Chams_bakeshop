@@ -42,7 +42,7 @@ Future<void> main() async {
   );
 
   runApp(const ChampsBakeshopApp());
-}
+} 
 
 class ChampsBakeshopApp extends StatelessWidget {
   const ChampsBakeshopApp({super.key});

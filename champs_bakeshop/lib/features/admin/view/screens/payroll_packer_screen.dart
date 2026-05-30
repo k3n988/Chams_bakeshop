@@ -119,8 +119,6 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
       if (totalVale <= 0) continue;
 
       final appliedVale = totalVale > gross ? gross : totalVale;
-      final consumed = await valeVM.consumeAmountForUser(packerId, appliedVale);
-      if (!consumed) continue;
 
       await _service.upsertPayroll(
         packerId:      packerId,
@@ -351,6 +349,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
             onPressed: () async {
               Navigator.pop(ctx);
               final messenger = ScaffoldMessenger.of(context);
+              final valeVM = context.read<AdminValeViewModel>();
               try {
                 await _service.upsertPayroll(
                   packerId:      packer.id,
@@ -362,6 +361,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                   netSalary:     net,
                   isPaid:        true,
                 );
+                await valeVM.consumeAmountForUser(packer.id, vale);
                 await _load();
                 if (mounted) {
                   messenger.showSnackBar(SnackBar(

@@ -73,6 +73,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // ── Role helpers ──────────────────────────────────────────
   static const _roles = [
     ('all',          'All'),
+    ('cashier',      'Cashier'),
     ('master_baker', 'Master Baker'),
     ('helper',       'Helper'),
     ('packer',       'Packer'),
@@ -82,6 +83,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Color _roleColor(String role) {
     switch (role) {
       case 'master_baker': return AppColors.masterBaker;
+      case 'cashier':      return const Color(0xFFFF7A00);
       case 'helper':       return AppColors.helper;
       case 'packer':       return AppColors.packer;
       case 'seller':       return AppColors.seller;
@@ -165,6 +167,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                     prefixIcon: Icon(Icons.badge_outlined)),
                 items: const [
                   DropdownMenuItem(
+                      value: 'cashier',
+                      child: Text('Cashier')),
+                  DropdownMenuItem(
                       value: 'master_baker',
                       child: Text('Master Baker')),
                   DropdownMenuItem(
@@ -209,9 +214,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                     context.read<AdminUserViewModel>();
                 final messenger =
                     ScaffoldMessenger.of(context);
-                bool ok;
+                String? error;
                 if (isEdit) {
-                  ok = await vm.updateUser(user.copyWith(
+                  error = await vm.updateUser(user.copyWith(
                     name:     nameCtrl.text
                         .trim()
                         .toUpperCase(),
@@ -222,20 +227,25 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                     role:     role,
                   ));
                 } else {
-                  ok = await vm.addUser(
+                  error = await vm.addUser(
                       name:     nameCtrl.text.trim(),
                       email:    emailCtrl.text.trim(),
                       password: passCtrl.text,
                       role:     role);
                 }
-                if (ok && ctx.mounted) {
+                if (!ctx.mounted) return;
+                if (error == null) {
                   Navigator.pop(ctx);
                   messenger.showSnackBar(SnackBar(
-                      content: Text(isEdit
-                          ? 'User updated!'
-                          : 'User added!'),
-                      backgroundColor: AppColors.success));
+                    content: Text(isEdit ? 'User updated!' : 'User added!'),
+                    backgroundColor: AppColors.success,
+                  ));
                   await _reloadProfiles();
+                } else {
+                  messenger.showSnackBar(SnackBar(
+                    content: Text(error),
+                    backgroundColor: AppColors.danger,
+                  ));
                 }
               },
               child:
@@ -304,15 +314,22 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             ),
             onPressed: () async {
               final messenger = ScaffoldMessenger.of(context);
-              await context
+              final error = await context
                   .read<AdminUserViewModel>()
                   .deleteUser(user.id);
-              if (ctx.mounted) Navigator.pop(ctx);
-              messenger.showSnackBar(
-                  SnackBar(
-                      content:
-                          Text('${user.name} removed'),
-                      backgroundColor: AppColors.danger));
+              if (!ctx.mounted) return;
+              if (error == null) {
+                Navigator.pop(ctx);
+                messenger.showSnackBar(SnackBar(
+                  content: Text('${user.name} removed'),
+                  backgroundColor: AppColors.danger,
+                ));
+              } else {
+                messenger.showSnackBar(SnackBar(
+                  content: Text(error),
+                  backgroundColor: AppColors.danger,
+                ));
+              }
             },
             child: const Text('Remove'),
           ),
@@ -788,6 +805,7 @@ class _EmptyRoleState extends StatelessWidget {
       case 'helper':       return 'Helpers';
       case 'packer':       return 'Packers';
       case 'seller':       return 'Sellers';
+      case 'cashier':      return 'Cashiers';
       default:             return 'Users';
     }
   }

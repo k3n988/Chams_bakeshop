@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import '../../admin/view/screens/admin_dashboard.dart';
+import '../../admin/view/screens/admin_vale_screen.dart';
 import '../../master_baker/view/screens/master_baker_dashboard.dart';
 import '../../helper/view/screens/helper_dashboard.dart';
 import '../../packer/view/screens/packer_dashboard.dart';
@@ -103,6 +104,8 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (user.isAdmin) {
         destination = const AdminDashboard();
+      } else if (user.isCashier) {
+        destination = const AdminValeScreen();
       } else if (user.isMasterBaker) {
         destination = const MasterBakerDashboard();
       } else if (user.isPacker) {
@@ -232,6 +235,8 @@ class _LoginScreenState extends State<LoginScreen>
                     items: const [
                       DropdownMenuItem(
                           value: 'admin', child: Text('Admin (Owner)')),
+                      DropdownMenuItem(
+                          value: 'cashier', child: Text('Cashier')),
                       DropdownMenuItem(
                           value: 'master_baker', child: Text('Master Baker')),
                       DropdownMenuItem(value: 'helper', child: Text('Helper')),

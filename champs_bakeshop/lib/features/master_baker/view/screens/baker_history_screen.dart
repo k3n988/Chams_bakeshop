@@ -348,7 +348,7 @@ class _HistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalEarnings =
-        (calc.salaryPerWorker as double) + (calc.bakerIncentive as double);
+        calc.salaryPerWorker + calc.bakerIncentive;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -436,13 +436,13 @@ class _HistoryCard extends StatelessWidget {
                 child: Row(children: [
                   _StatPill(
                     label: 'Value',
-                    value: formatCurrency(calc.totalValue as double),
+                    value: formatCurrency(calc.totalValue),
                     color: AppColors.masterBaker,
                   ),
                   const SizedBox(width: 8),
                   _StatPill(
                     label: 'Incentive',
-                    value: formatCurrency(calc.bakerIncentive as double),
+                    value: formatCurrency(calc.bakerIncentive),
                     color: const Color(0xFF1976D2),
                   ),
                   const Spacer(),
@@ -539,7 +539,7 @@ class _HistoryCard extends StatelessWidget {
 
   void _showPreviewSheet(BuildContext context) {
     final totalEarnings =
-        (calc.salaryPerWorker as double) + (calc.bakerIncentive as double);
+        calc.salaryPerWorker + calc.bakerIncentive;
 
     showModalBottomSheet(
       context: context,
@@ -652,7 +652,7 @@ class _HistoryCard extends StatelessWidget {
                     _SheetRow(
                       icon: Icons.attach_money,
                       label: 'Batch Value',
-                      value: formatCurrency(calc.totalValue as double),
+                      value: formatCurrency(calc.totalValue),
                       valueColor: AppColors.masterBaker,
                     ),
                   ]),
@@ -664,15 +664,13 @@ class _HistoryCard extends StatelessWidget {
                     _SheetRow(
                       icon: Icons.people_outline,
                       label: 'Per Worker (base)',
-                      value: formatCurrency(
-                          calc.salaryPerWorker as double),
+                      value: formatCurrency(calc.salaryPerWorker),
                     ),
-                    if ((calc.bakerIncentive as double) > 0)
+                    if (calc.bakerIncentive > 0)
                       _SheetRow(
                         icon: Icons.star_outline,
                         label: 'Baker Incentive',
-                        value: formatCurrency(
-                            calc.bakerIncentive as double),
+                        value: formatCurrency(calc.bakerIncentive),
                         valueColor: const Color(0xFF1976D2),
                       ),
                     const Divider(
@@ -1210,10 +1208,11 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                 final v = int.tryParse(
                                         entry.sacksCtrl.text) ??
                                     0;
-                                if (v > 0)
+                                if (v > 0) {
                                   setState(() => entry
                                       .sacksCtrl.text =
                                       (v - 1).toString());
+                                }
                               },
                             ),
                             const SizedBox(width: 6),
@@ -1284,8 +1283,9 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                               8)),
                                 ),
                                 onChanged: (v) {
-                                  if ((int.tryParse(v) ?? 0) > 24)
-                                    entry.kgCtrl.text = '24';
+                                if ((int.tryParse(v) ?? 0) > 24) {
+                                  entry.kgCtrl.text = '24';
+                                }
                                   setState(() {});
                                 },
                               ),

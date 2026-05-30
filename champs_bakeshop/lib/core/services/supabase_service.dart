@@ -493,6 +493,10 @@ class SupabaseService {
     await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
   }
 
+  Future<void> restoreValeEntry(String id) async {
+    await _db.from('vale_entries').update({'is_settled': false}).eq('id', id);
+  }
+
   Future<void> settleAllValeByUser(String userId) async {
     await _db.from('vale_entries').update({'is_settled': true}).eq('user_id', userId);
   }

@@ -581,7 +581,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                             color:    AppColors.textHint)),
                   ],
                 ),
-                if (!_isToday)
+                if (!_isToday) ...[
                   GestureDetector(
                     onTap: () {
                       setState(() => _selectedDate = DateTime.now());
@@ -598,20 +598,23 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
                                 .withValues(alpha: 0.2)),
                       ),
                       child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.today_outlined,
-                                size:  13,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.today_outlined,
+                              size: 13, color: DashColors.primary),
+                          SizedBox(width: 5),
+                          Text(
+                            'Today',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                                 color: DashColors.primary),
-                            SizedBox(width: 5),
-                            Text('Today',
-                                style: TextStyle(
-                                    fontSize:   12,
-                                    fontWeight: FontWeight.w700,
-                                    color:      DashColors.primary)),
-                          ]),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 16),

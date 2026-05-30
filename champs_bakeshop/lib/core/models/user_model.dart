@@ -3,7 +3,7 @@ class UserModel {
   final String name;
   final String email;
   final String password;
-  final String role; // admin, master_baker, helper
+  final String role; // admin, cashier, master_baker, helper
 
   UserModel({
     required this.id,
@@ -47,6 +47,8 @@ class UserModel {
     switch (role) {
       case 'admin':
         return 'Admin';
+      case 'cashier':
+        return 'Admin (Cashier)';
       case 'master_baker':
         return 'Master Baker';
       case 'helper':
@@ -57,8 +59,9 @@ class UserModel {
   }
 
   bool get isAdmin => role == 'admin';
+  bool get isCashier => role == 'cashier';
   bool get isMasterBaker => role == 'master_baker';
   bool get isHelper => role == 'helper';
   bool get isPacker => role == 'packer';
-bool get isSeller => role == 'seller';
+  bool get isSeller => role == 'seller';
 }

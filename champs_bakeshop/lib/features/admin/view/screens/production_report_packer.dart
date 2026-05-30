@@ -635,7 +635,9 @@ class _DayNav extends StatelessWidget {
         DateTime.now().subtract(const Duration(days: 1));
     if (selectedDate.year == yesterday.year &&
         selectedDate.month == yesterday.month &&
-        selectedDate.day == yesterday.day) return 'Yesterday';
+        selectedDate.day == yesterday.day) {
+      return 'Yesterday';
+    }
     const months = [
       'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'
