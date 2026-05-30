@@ -8,6 +8,7 @@ import '../../../../core/services/payroll_service.dart';
 import '../../../../core/services/packer_service.dart';
 import '../../../../core/services/seller_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
+import '../../../auth/view/login_screen.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
 
 // ── Orange palette — matches the admin dashboard ──────────────────────────────
@@ -24,6 +25,15 @@ class AdminValeScreen extends StatefulWidget {
 class _AdminValeScreenState extends State<AdminValeScreen> {
   String _selectedRole = 'all';
   final TextEditingController _searchCtrl = TextEditingController();
+
+  Future<void> _logout() async {
+    await context.read<AuthViewModel>().logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  }
 
   @override
   void dispose() {
@@ -54,15 +64,23 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AdminValeViewModel>();
-    final settledEntries = vm.entries
-        .where((e) => e.isSettled)
+    final authVm = context.watch<AuthViewModel>();
+    final isCashier = authVm.currentUser?.isCashier == true;
+    final visibleUsers =
+        vm.nonAdminUsers.where((u) => u.role != 'cashier').toList();
+    final visibleUserIds = visibleUsers.map((u) => u.id).toSet();
+    final visibleActiveEntries = vm.activeEntries
+        .where((e) => visibleUserIds.contains(e.userId))
+        .toList();
+    final visibleSettledEntries = vm.entries
+        .where((e) => e.isSettled && visibleUserIds.contains(e.userId))
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     final now = DateTime.now();
     final weekStart = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
     final weekEnd = weekStart.add(const Duration(days: 6));
-    final settledThisWeek = settledEntries.where((e) {
+    final settledThisWeek = visibleSettledEntries.where((e) {
       final parsed = DateTime.tryParse(e.date);
       if (parsed == null) return false;
       final day = DateTime(parsed.year, parsed.month, parsed.day);
@@ -70,7 +88,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
     }).toList();
 
     // Filter users
-    var users = vm.nonAdminUsers;
+    var users = visibleUsers;
     if (_selectedRole != 'all') {
       users = users.where((u) => u.role == _selectedRole).toList();
     }
@@ -90,6 +108,36 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
+      appBar: isCashier
+          ? AppBar(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              elevation: 0,
+              title: const Text(
+                'Vale',
+                style: TextStyle(
+                  color: AppColors.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Settled history',
+                  icon: const Icon(Icons.history_outlined, color: _kOrange),
+                  onPressed: settledThisWeek.isEmpty
+                      ? null
+                      : () => _showSettledHistorySheet(
+                          context, settledThisWeek, vm),
+                ),
+                IconButton(
+                  tooltip: 'Logout',
+                  icon: const Icon(Icons.logout, color: AppColors.danger),
+                  onPressed: _logout,
+                ),
+                const SizedBox(width: 8),
+              ],
+            )
+          : null,
       body: RefreshIndicator(
         color: _kOrange,
         onRefresh: () => context.read<AdminValeViewModel>().load(),
@@ -149,7 +197,8 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        formatCurrency(vm.grandTotal),
+                                        formatCurrency(visibleActiveEntries
+                                            .fold(0.0, (s, e) => s + e.price)),
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 26,
@@ -163,7 +212,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '${vm.activeEntries.length}',
+                                      '${visibleActiveEntries.length}',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 22,
@@ -181,25 +230,26 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                                 ),
                               ],
                             ),
-                            Positioned(
-                              top: -6,
-                              right: -6,
-                              child: IconButton(
-                                tooltip: 'Settled history',
-                                onPressed: settledThisWeek.isEmpty
-                                    ? null
-                                    : () => _showSettledHistorySheet(
-                                        context, settledThisWeek, vm),
-                                icon: const Icon(
-                                  Icons.history_outlined,
-                                  color: Colors.white,
-                                ),
-                                style: IconButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.18),
+                            if (!isCashier)
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: IconButton(
+                                  tooltip: 'Settled history',
+                                  onPressed: settledThisWeek.isEmpty
+                                      ? null
+                                      : () => _showSettledHistorySheet(
+                                          context, settledThisWeek, vm),
+                                  icon: const Icon(
+                                    Icons.history_outlined,
+                                    color: Colors.white,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor:
+                                        Colors.white.withValues(alpha: 0.18),
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -507,8 +557,8 @@ class _UserCard extends StatelessWidget {
   }
 }
 
-void _showSettledHistorySheet(BuildContext context, List<ValeEntry> entries,
-    AdminValeViewModel vm) {
+void _showSettledHistorySheet(
+    BuildContext context, List<ValeEntry> entries, AdminValeViewModel vm) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -841,9 +891,11 @@ class _UserValeSheet extends StatelessWidget {
                           return _EntryRow(
                             entry: e,
                             onDelete: () async {
-                              final confirm =
-                                  await _confirmDialog(context, 'Tangtanga ang Entry',
-                                      'Tangtangon ang "${e.productName}" (${formatCurrency(e.price)})?');
+                              final confirm = await _confirmDialog(
+                                context,
+                                'Tangtanga ang Entry',
+                                'Tangtangon ang "${e.productName}" (${formatCurrency(e.price)})?',
+                              );
                               if (confirm == true) {
                                 await vm.deleteEntry(e.id);
                               }
@@ -901,22 +953,19 @@ class _UserValeSheet extends StatelessWidget {
                               ));
                               return;
                             }
-                            if (confirm == true) {
-                              final ok =
-                                  await vm.settleAllForUser(userId);
-                              if (context.mounted) {
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(ok
-                                        ? 'All vale settled!'
-                                        : 'Failed to settle vale.'),
-                                    backgroundColor: ok
-                                        ? AppColors.success
-                                        : AppColors.danger,
-                                  ),
-                                );
-                                if (ok) Navigator.of(context).pop();
-                              }
+                            final ok = await vm.settleAllForUser(userId);
+                            if (context.mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(ok
+                                      ? 'All vale settled!'
+                                      : 'Failed to settle vale.'),
+                                  backgroundColor: ok
+                                      ? AppColors.success
+                                      : AppColors.danger,
+                                ),
+                              );
+                              if (ok) Navigator.of(context).pop();
                             }
                           },
                           icon: const Icon(Icons.check_circle_outline,
@@ -1314,7 +1363,7 @@ void _showAddValeDialog(
 
 class _EntryRow extends StatelessWidget {
   final ValeEntry entry;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
   const _EntryRow({required this.entry, required this.onDelete});
 
@@ -1391,16 +1440,17 @@ class _EntryRow extends StatelessWidget {
                 color: AppColors.danger,
               ),
             ),
-            const SizedBox(width: 4),
-            // Delete
-            IconButton(
-              onPressed: onDelete,
-              icon: Icon(Icons.delete_outline,
-                  size: 18,
-                  color: AppColors.danger.withValues(alpha: 0.7)),
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(),
-            ),
+            if (onDelete != null) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: onDelete,
+                icon: Icon(Icons.delete_outline,
+                    size: 18,
+                    color: AppColors.danger.withValues(alpha: 0.7)),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ],
         ),
       ),
