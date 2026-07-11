@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/services/database_service.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import '../../admin/view/screens/admin_dashboard.dart';
 import '../../admin/view/screens/admin_vale_screen.dart';
@@ -38,6 +41,8 @@ class _LoginScreenState extends State<LoginScreen>
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
 
+  static const String _defaultPassword = '123';
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +63,23 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  Future<void> _autofillCredentials(String role) async {
+    final db = context.read<DatabaseService>();
+    final users = await db.getUsersByRole(role);
+
+    if (!mounted || _selectedRole != role) return;
+
+    final matchedUser = users.firstOrNull;
+    if (matchedUser == null) {
+      _emailCtrl.clear();
+      _passCtrl.text = _defaultPassword;
+      return;
+    }
+
+    _emailCtrl.text = matchedUser.email.trim().toLowerCase();
+    _passCtrl.text = _defaultPassword;
+  }
+
   void _onRoleChanged(String? role) {
     if (role == null) return;
 
@@ -66,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (role.isNotEmpty) {
       _animCtrl.forward();
+      unawaited(_autofillCredentials(role));
     } else {
       _animCtrl.reverse();
       _emailCtrl.clear();

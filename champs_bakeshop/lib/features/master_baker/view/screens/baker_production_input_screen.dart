@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/models/product_model.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/models/production_model.dart';
+import '../../../../core/services/payroll_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/baker_production_viewmodel.dart';
 
@@ -109,6 +111,52 @@ class _BakerProductionInputScreenState
           ))
       .toList();
 
+  double _previewBakerIncentive(BakerProductionViewModel vm) {
+    final productMap = {for (final p in vm.products) p.id: p};
+    double totalEffectiveSacks = 0;
+
+    for (final item in _validItems) {
+      final product = productMap[item.productId];
+      if (product == null) continue;
+      if (PayrollService.isIncentiveExemptProduct(product)) continue;
+      totalEffectiveSacks += item.effectiveSacks;
+    }
+
+    return totalEffectiveSacks * PayrollService.incentivePerSack;
+  }
+
+  void _showSaveSuccessFeedback() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: const Row(children: [
+          Icon(Icons.check_circle, color: AppColors.success, size: 24),
+          SizedBox(width: 10),
+          Text('Production Saved'),
+        ]),
+        content: const Text(
+          'Production has been saved successfully.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                color: AppColors.masterBaker,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     final messenger = ScaffoldMessenger.of(context);
 
@@ -180,6 +228,7 @@ class _BakerProductionInputScreenState
           ..clear()
           ..add(_ItemData());
       });
+      _showSaveSuccessFeedback();
     } else if (result == false) {
       messenger.showSnackBar(SnackBar(
         content: const Row(children: [
@@ -214,6 +263,7 @@ class _BakerProductionInputScreenState
     final vm = context.watch<BakerProductionViewModel>();
     final preview =
         vm.previewSalary(_validItems, _selectedHelpers.length);
+    final previewBakerIncentive = _previewBakerIncentive(vm);
 
     return ColoredBox(
       color: Colors.white,
@@ -726,20 +776,9 @@ class _BakerProductionInputScreenState
                                     isDense: true,
                                   ),
                                   onChanged: (v) {
-                                    final parsed =
-                                        int.tryParse(v) ?? 0;
-                                    final clamped =
-                                        parsed.clamp(0, 24);
-                                    setState(
-                                        () => item.extraKg = clamped);
-                                    if (parsed > 24) {
-                                      item.kgCtrl
-                                        ..text = '24'
-                                        ..selection =
-                                            TextSelection.fromPosition(
-                                                const TextPosition(
-                                                    offset: 2));
-                                    }
+                                    final parsed = int.tryParse(v) ?? 0;
+                                    setState(() => item.extraKg =
+                                        parsed < 0 ? 0 : parsed);
                                   },
                                 ),
                               ),
@@ -781,6 +820,13 @@ class _BakerProductionInputScreenState
                 children: [
                   const _SectionLabel('PRODUCTION PREVIEW'),
                   const SizedBox(height: 16),
+
+                  _ProductBreakdown(
+                    items: _validItems,
+                    products: vm.products,
+                  ),
+                  if (_validItems.isNotEmpty)
+                    const SizedBox(height: 12),
 
                   // Summary rows
                   _PreviewRow(
@@ -836,7 +882,7 @@ class _BakerProductionInputScreenState
                                   fontSize: 13,
                                   color: AppColors.textSecondary)),
                           Text(
-                            formatCurrency(preview.bakerIncentive),
+                            formatCurrency(previewBakerIncentive),
                             style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primaryDark,
@@ -868,7 +914,7 @@ class _BakerProductionInputScreenState
                                   color: AppColors.text)),
                           Text(
                             formatCurrency(preview.salaryPerWorker +
-                                preview.bakerIncentive),
+                                previewBakerIncentive),
                             style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 18,
@@ -997,6 +1043,169 @@ class _PreviewRow extends StatelessWidget {
                   color: valueColor ?? AppColors.text)),
         ]),
       );
+}
+
+class _ProductBreakdown extends StatelessWidget {
+  final List<ProductionItem> items;
+  final List<ProductModel> products;
+
+  const _ProductBreakdown({
+    required this.items,
+    required this.products,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final productMap = {for (final product in products) product.id: product};
+    final rows = items
+        .map((item) {
+          final product = productMap[item.productId];
+          if (product == null) return null;
+          return _BreakdownData(item: item, product: product);
+        })
+        .whereType<_BreakdownData>()
+        .toList();
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.masterBaker.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.masterBaker.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Product Breakdown',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (var i = 0; i < rows.length; i++) ...[
+            _ProductBreakdownItem(data: rows[i]),
+            if (i != rows.length - 1)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Divider(color: AppColors.border, height: 1),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductBreakdownItem extends StatelessWidget {
+  final _BreakdownData data;
+
+  const _ProductBreakdownItem({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final item = data.item;
+    final product = data.product;
+    final pricePerKg = product.pricePerSack / 25;
+    final sacksSubtotal = item.sacks * product.pricePerSack;
+    final kgSubtotal = item.extraKg * pricePerKg;
+    final subtotal = sacksSubtotal + kgSubtotal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          product.name,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.text,
+          ),
+        ),
+        if (item.sacks > 0)
+          _BreakdownMoneyRow(
+            label:
+                '${item.sacks} ${item.sacks == 1 ? 'sack' : 'sacks'} x ${formatCurrency(product.pricePerSack)}',
+            value: formatCurrency(sacksSubtotal),
+          ),
+        if (item.extraKg > 0)
+          _BreakdownMoneyRow(
+            label:
+                '${item.extraKg} kg x ${formatCurrency(pricePerKg)}',
+            value: formatCurrency(kgSubtotal),
+          ),
+        if (item.sacks > 0 && item.extraKg > 0)
+          _BreakdownMoneyRow(
+            label: 'Subtotal',
+            value: formatCurrency(subtotal),
+            isSubtotal: true,
+          ),
+      ],
+    );
+  }
+}
+
+class _BreakdownMoneyRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isSubtotal;
+
+  const _BreakdownMoneyRow({
+    required this.label,
+    required this.value,
+    this.isSubtotal = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    isSubtotal ? FontWeight.w700 : FontWeight.w500,
+                color: isSubtotal
+                    ? AppColors.text
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight:
+                  isSubtotal ? FontWeight.w800 : FontWeight.w700,
+              color: isSubtotal
+                  ? AppColors.primaryDark
+                  : AppColors.text,
+            ),
+          ),
+        ]),
+      );
+}
+
+class _BreakdownData {
+  final ProductionItem item;
+  final ProductModel product;
+
+  const _BreakdownData({
+    required this.item,
+    required this.product,
+  });
 }
 
 class _CounterBtn extends StatelessWidget {

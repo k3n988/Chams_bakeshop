@@ -434,18 +434,30 @@ class _HistoryCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
                 child: Row(children: [
-                  _StatPill(
-                    label: 'Value',
-                    value: formatCurrency(calc.totalValue),
-                    color: AppColors.masterBaker,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _StatPill(
+                          label: 'Value',
+                          value: formatCurrency(calc.totalValue),
+                          color: AppColors.masterBaker,
+                        ),
+                        _StatPill(
+                          label: 'Per Worker',
+                          value: formatCurrency(calc.salaryPerWorker),
+                          color: AppColors.success,
+                        ),
+                        _StatPill(
+                          label: 'Incentive',
+                          value: formatCurrency(calc.bakerIncentive),
+                          color: const Color(0xFF1976D2),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  _StatPill(
-                    label: 'Incentive',
-                    value: formatCurrency(calc.bakerIncentive),
-                    color: const Color(0xFF1976D2),
-                  ),
-                  const Spacer(),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -1117,8 +1129,9 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
         .map((e) => ProductionItem(
               productId: e.productId!,
               sacks: int.tryParse(e.sacksCtrl.text.trim()) ?? 0,
-              extraKg: (int.tryParse(e.kgCtrl.text.trim()) ?? 0)
-                  .clamp(0, 24),
+              extraKg: (int.tryParse(e.kgCtrl.text.trim()) ?? 0) < 0
+                  ? 0
+                  : (int.tryParse(e.kgCtrl.text.trim()) ?? 0),
             ))
         .toList();
     final updated = widget.prod
@@ -1270,7 +1283,7 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                     fontSize: 14),
                                 decoration: InputDecoration(
                                   isDense: true,
-                                  labelText: 'KG (0–24)',
+                                  labelText: 'KG',
                                   labelStyle: const TextStyle(
                                       fontSize: 9),
                                   contentPadding:
@@ -1283,9 +1296,6 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
                                               8)),
                                 ),
                                 onChanged: (v) {
-                                if ((int.tryParse(v) ?? 0) > 24) {
-                                  entry.kgCtrl.text = '24';
-                                }
                                   setState(() {});
                                 },
                               ),
@@ -1435,7 +1445,9 @@ class _EditProductionSheetState extends State<_EditProductionSheet>
               productId: e.productId!,
               sacks: int.tryParse(e.sacksCtrl.text) ?? 0,
               extraKg:
-                  (int.tryParse(e.kgCtrl.text) ?? 0).clamp(0, 24),
+                  (int.tryParse(e.kgCtrl.text) ?? 0) < 0
+                      ? 0
+                      : (int.tryParse(e.kgCtrl.text) ?? 0),
             ))
         .toList();
     final preview =

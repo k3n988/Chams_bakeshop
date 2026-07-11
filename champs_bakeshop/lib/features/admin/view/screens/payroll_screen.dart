@@ -96,13 +96,9 @@ class _BakerHelperPayrollTab extends StatefulWidget {
 
 class _BakerHelperPayrollTabState
     extends State<_BakerHelperPayrollTab> {
-  late DateTime _selectedMonth;
-
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedMonth = DateTime(now.year, now.month);
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _loadCurrentWeek());
   }
@@ -112,20 +108,6 @@ class _BakerHelperPayrollTabState
   bool get _isCurrentWeek {
     final payVM = context.read<AdminPayrollViewModel>();
     return payVM.weekStart == _currentWeekStart;
-  }
-
-  bool get _isCurrentMonth {
-    final now = DateTime.now();
-    return _selectedMonth.year == now.year &&
-        _selectedMonth.month == now.month;
-  }
-
-  String get _monthLabel {
-    const names = [
-      'January','February','March','April','May','June',
-      'July','August','September','October','November','December'
-    ];
-    return '${names[_selectedMonth.month - 1]} ${_selectedMonth.year}';
   }
 
   Future<void> _loadCurrentWeek() async {
@@ -168,28 +150,6 @@ class _BakerHelperPayrollTabState
     await valeVM.load();
     await payVM.changeWeek(
         dir, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
-    await _autoApplyValeDeductions();
-  }
-
-  Future<void> _changeMonth(int dir) async {
-    if (!mounted) return;
-    final next =
-        DateTime(_selectedMonth.year, _selectedMonth.month + dir);
-    final now = DateTime.now();
-    if (next.isAfter(DateTime(now.year, now.month))) return;
-    setState(() => _selectedMonth = next);
-    final firstDay =
-        DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final monday =
-        firstDay.subtract(Duration(days: firstDay.weekday - 1));
-    final ws     = monday.toString().split(' ')[0];
-    final payVM  = context.read<AdminPayrollViewModel>();
-    final prodVM = context.read<AdminProductViewModel>();
-    final userVM = context.read<AdminUserViewModel>();
-    final valeVM = context.read<AdminValeViewModel>();
-    await valeVM.load();
-    await payVM.loadWeeklyPayroll(
-        ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
     await _autoApplyValeDeductions();
   }
 
@@ -239,37 +199,9 @@ class _BakerHelperPayrollTabState
     }
   }
 
-  Future<void> _pickMonth() async {
-    final now    = DateTime.now();
-    final picked = await showDatePicker(
-      context:     context,
-      initialDate: _selectedMonth,
-      firstDate:   DateTime(2024),
-      lastDate:    now,
-      helpText:    'Select Month',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-              primary:   AppColors.primary,
-              onSurface: AppColors.text),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null && mounted) {
-      setState(() =>
-          _selectedMonth = DateTime(picked.year, picked.month));
-      _changeMonth(0);
-    }
-  }
-
   void _showDeductionDialog(PayrollEntry entry) {
     final isHelper  = entry.role != 'master_baker';
-    final autoOven  = isHelper
-        ? (entry.ovenExemptDays > 0
-            ? 0.0
-            : entry.daysWorked * AppConstants.helperOvenDeductionPerDay)
-        : 0.0;
+    final autoOven  = isHelper ? entry.ovenDeduction : 0.0;
     final valeVM    = context.read<AdminValeViewModel>();
     final valeTotal = valeVM.userTotal(entry.userId);
     final ovenCtrl  = TextEditingController(
@@ -342,8 +274,8 @@ class _BakerHelperPayrollTabState
                     child: Text(
                       isHelper
                           ? entry.ovenExemptDays > 0
-                              ? 'Oven helper (${entry.ovenExemptDays}d) — fully exempt from deduction. Oven pay: +₱${entry.ovenIncentive.toStringAsFixed(0)}.'
-                              : 'Auto: ₱${autoOven.toStringAsFixed(0)} (₱${AppConstants.helperOvenDeductionPerDay.toStringAsFixed(0)} × ${entry.daysWorked}d). Override below.'
+                              ? 'Oven helper (${entry.ovenExemptDays}d). Oven pay: +₱${entry.ovenIncentive.toStringAsFixed(0)} from helpers who did not operate the oven.'
+                              : 'Auto: ₱${autoOven.toStringAsFixed(0)} oven deduction from non-oven helper days. Override below.'
                           : 'Master Baker — no oven deduction.',
                       style: TextStyle(
                           fontSize: 11,
@@ -476,6 +408,25 @@ class _BakerHelperPayrollTabState
           ),
         ],
       ),
+    );
+  }
+
+  void _showPayrollTable(List<PayrollEntry> entries) {
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No payroll data to show.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) => _PayrollTableSheet(entries: entries),
     );
   }
 
@@ -695,64 +646,56 @@ class _BakerHelperPayrollTabState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const _PageHeader(
-                title:    'Baker / Helper Payroll',
-                subtitle: 'Automated salary computation',
-                icon:     Icons.payments_outlined,
-              ),
-              if (!isThisWeek)
-                GestureDetector(
-                  onTap: _loadCurrentWeek,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary
-                          .withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: AppColors.primary
-                              .withValues(alpha: 0.2)),
-                    ),
-                    child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.today_outlined,
-                              size: 12,
-                              color: AppColors.primary),
-                          SizedBox(width: 4),
-                          Text('This Week',
-                              style: TextStyle(
-                                  fontSize:   11,
-                                  fontWeight: FontWeight.w700,
-                                  color:      AppColors.primary)),
-                        ]),
+          if (!isThisWeek) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: _loadCurrentWeek,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary
+                        .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.primary
+                            .withValues(alpha: 0.2)),
                   ),
+                  child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.today_outlined,
+                            size: 12,
+                            color: AppColors.primary),
+                        SizedBox(width: 4),
+                        Text('This Week',
+                            style: TextStyle(
+                                fontSize:   11,
+                                fontWeight: FontWeight.w700,
+                                color:      AppColors.primary)),
+                      ]),
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
 
-          _MonthNavigator(
-            label:          _monthLabel,
-            isCurrentMonth: _isCurrentMonth,
-            onPrev:         () => _changeMonth(-1),
-            onNext:         _isCurrentMonth
-                ? null
-                : () => _changeMonth(1),
-            onTap: _pickMonth,
-          ),
-          const SizedBox(height: 10),
-
-          _WeekNavigator(
-            weekStart:     payVM.weekStart,
-            weekEnd:       payVM.weekEnd,
-            isCurrentWeek: isThisWeek,
-            onPrev:        () => _changeWeek(-1),
-            onNext:        isThisWeek ? null : () => _changeWeek(1),
+          Row(children: [
+            Expanded(
+              child: _WeekNavigator(
+                weekStart:     payVM.weekStart,
+                weekEnd:       payVM.weekEnd,
+                isCurrentWeek: isThisWeek,
+                onPrev:        () => _changeWeek(-1),
+                onNext:        isThisWeek ? null : () => _changeWeek(1),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _TableViewButton(
+              onTap: () => _showPayrollTable(sortedEntries),
+            ),
+          ],
           ),
           const SizedBox(height: 16),
 
@@ -818,93 +761,6 @@ class _BakerHelperPayrollTabState
 // ─────────────────────────────────────────────────────────────
 //  MONTH NAVIGATOR
 // ─────────────────────────────────────────────────────────────
-class _MonthNavigator extends StatelessWidget {
-  final String        label;
-  final bool          isCurrentMonth;
-  final VoidCallback  onPrev;
-  final VoidCallback? onNext;
-  final VoidCallback  onTap;
-
-  const _MonthNavigator({
-    required this.label,
-    required this.isCurrentMonth,
-    required this.onPrev,
-    required this.onNext,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color:        Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border:       Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color:      Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset:     const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(children: [
-          _PayNavBtn(icon: Icons.chevron_left, onTap: onPrev),
-          Expanded(
-            child: GestureDetector(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.calendar_month_outlined,
-                        size:  15,
-                        color: isCurrentMonth
-                            ? AppColors.primary
-                            : AppColors.textHint),
-                    const SizedBox(width: 8),
-                    Text(label,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize:   14,
-                            color: isCurrentMonth
-                                ? AppColors.primary
-                                : AppColors.text,
-                            letterSpacing: -0.2)),
-                    if (isCurrentMonth) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('THIS MONTH',
-                            style: TextStyle(
-                                fontSize:   8,
-                                fontWeight: FontWeight.w800,
-                                color:      Colors.white,
-                                letterSpacing: 0.5)),
-                      ),
-                    ],
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down,
-                        size: 18, color: AppColors.textHint),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          _PayNavBtn(
-            icon:     Icons.chevron_right,
-            onTap:    onNext,
-            disabled: onNext == null,
-          ),
-        ]),
-      );
-}
-
 // ─────────────────────────────────────────────────────────────
 //  WEEK NAVIGATOR
 // ─────────────────────────────────────────────────────────────
@@ -1036,6 +892,170 @@ class _PayNavBtn extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 //  SECTION DIVIDER
 // ─────────────────────────────────────────────────────────────
+class _TableViewButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _TableViewButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.table_chart_outlined,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      );
+}
+
+class _PayrollTableSheet extends StatelessWidget {
+  final List<PayrollEntry> entries;
+
+  const _PayrollTableSheet({required this.entries});
+
+  String _firstName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '-';
+    return trimmed.split(RegExp(r'\s+')).first;
+  }
+
+  @override
+  Widget build(BuildContext context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.78,
+        minChildSize: 0.45,
+        maxChildSize: 0.92,
+        builder: (context, scrollController) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.table_chart_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Payroll Table',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.text,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppColors.textHint),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: WidgetStatePropertyAll(
+                      AppColors.primary.withValues(alpha: 0.08),
+                    ),
+                    headingTextStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryDark,
+                    ),
+                    dataTextStyle: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.text,
+                    ),
+                    horizontalMargin: 12,
+                    columnSpacing: 18,
+                    columns: const [
+                      DataColumn(label: Text('First Name')),
+                      DataColumn(
+                        numeric: true,
+                        label: Text('Total Amount'),
+                      ),
+                      DataColumn(numeric: true, label: Text('WiFi')),
+                      DataColumn(numeric: true, label: Text('Gas')),
+                      DataColumn(numeric: true, label: Text('Vale')),
+                      DataColumn(
+                        numeric: true,
+                        label: Text('Final Amount'),
+                      ),
+                    ],
+                    rows: entries.map((entry) {
+                      final totalAmount =
+                          entry.grossSalary + entry.ovenIncentive;
+
+                      return DataRow(cells: [
+                        DataCell(Text(
+                          _firstName(entry.name),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        )),
+                        DataCell(Text(formatCurrency(totalAmount))),
+                        DataCell(Text(formatCurrency(entry.wifiDeduction))),
+                        DataCell(Text(formatCurrency(entry.gasDeduction))),
+                        DataCell(Text(formatCurrency(entry.valeDeduction))),
+                        DataCell(Text(
+                          formatCurrency(entry.finalSalary),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.success,
+                          ),
+                        )),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 class _SectionDivider extends StatelessWidget {
   final String label;
   final Color  color;

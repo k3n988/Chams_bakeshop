@@ -101,7 +101,9 @@ class BakerProductionViewModel extends ChangeNotifier {
         final eff = item.effectiveSacks;
         totalValue          += product.pricePerSack * eff;
         totalBonusAmount    += product.bonusPerSack * eff;
-        totalEffectiveSacks += eff;
+        if (!PayrollService.isIncentiveExemptProduct(product)) {
+          totalEffectiveSacks += eff;
+        }
         totalSacks          += item.sacks;
         totalExtraKg        += item.extraKg;
       }

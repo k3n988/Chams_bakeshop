@@ -11,6 +11,11 @@ class PayrollService {
 
   static const double incentivePerSack = 100.0;
 
+  static bool isIncentiveExemptProduct(ProductModel product) {
+    final name = product.name.trim().toLowerCase();
+    return name.contains('pandesal');
+  }
+
   DailySalaryResult computeDaily(
       ProductionModel production, List<ProductModel> products) {
     double totalValue = 0;
@@ -26,7 +31,9 @@ class PayrollService {
         final effective = item.effectiveSacks;
         totalValue += product.pricePerSack * effective;
         totalBonusAmount += product.bonusPerSack * effective;
-        totalEffectiveSacks += effective;
+        if (!isIncentiveExemptProduct(product)) {
+          totalEffectiveSacks += effective;
+        }
         totalSacks += item.sacks;
         totalExtraKg += item.extraKg;
       }
@@ -66,6 +73,11 @@ class PayrollService {
     for (final prod in productions) {
       final calc = computeDaily(prod, products);
       final allIds = [prod.masterBakerId, ...prod.helperIds];
+      final ovenHelperId = prod.ovenHelperId;
+      const ovenDeductionPerDay = AppConstants.helperOvenDeductionPerDay;
+      final nonOvenHelperCount = ovenHelperId == null
+          ? 0
+          : prod.helperIds.where((id) => id != ovenHelperId).length;
 
       for (final wid in allIds) {
         workers.putIfAbsent(
@@ -86,7 +98,12 @@ class PayrollService {
           w.baseSalary += calc.salaryPerWorker + calc.bakerIncentive;
         } else {
           w.baseSalary += calc.salaryPerWorker;
-          if (prod.ovenHelperId == wid) {
+          if (ovenHelperId == wid) {
+            w.ovenIncentive += nonOvenHelperCount * ovenDeductionPerDay;
+          } else {
+            w.ovenDeduction += ovenDeductionPerDay;
+          }
+          if (ovenHelperId == wid) {
             w.ovenExemptDays += 1; // this helper operated the oven — exempt
           }
         }
@@ -103,18 +120,12 @@ class PayrollService {
       //   deduction for the whole week (not just the oven days)
       // - On top of that, they earn ₱15 incentive for each day they did the oven
       // Regular helpers (no oven days) → ₱15 deduction per day as usual
-      final autoOven = w.isMaster
-          ? 0.0
-          : (w.ovenExemptDays > 0
-              ? 0.0
-              : w.daysWorked * AppConstants.helperOvenDeductionPerDay);
+      final autoOven = w.isMaster ? 0.0 : w.ovenDeduction;
       final ovenDeduction = (ded != null && ded.oven > 0)
           ? ded.oven
           : autoOven;
       // Oven incentive: ₱15 per day the helper operated the oven (added to salary)
-      final ovenIncentive = w.isMaster
-          ? 0.0
-          : w.ovenExemptDays * AppConstants.helperOvenDeductionPerDay;
+      final ovenIncentive = w.isMaster ? 0.0 : w.ovenIncentive;
 
       return PayrollEntry(
         userId: w.userId,
@@ -142,6 +153,8 @@ class _WorkerAccum {
   final String role;
   double baseSalary = 0;
   double bonusTotal = 0;
+  double ovenDeduction = 0;
+  double ovenIncentive = 0;
   int daysWorked = 0;
   int ovenExemptDays = 0;
   bool isMaster = false;
