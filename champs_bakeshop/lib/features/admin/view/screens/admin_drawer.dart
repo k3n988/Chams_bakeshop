@@ -11,6 +11,7 @@ import 'manage_users_screen.dart'    as users_screen;
 import 'manage_products_screen.dart' as products_screen;
 import 'christmas_bonus_screen.dart' as bonus_screen;
 import 'admin_vale_screen.dart';
+import '../../../master_baker/view/screens/baker_production_input_screen.dart';
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -194,6 +195,22 @@ class AdminDrawer extends StatelessWidget {
                   _Wrapped(
                     title: 'Vale',
                     child: const AdminValeScreen(),
+                  ),
+                ),
+              ),
+
+              _DrawerItem(
+                icon:       Icons.add_chart_outlined,
+                color:      AppColors.masterBaker,
+                label:      'Master Baker Productions',
+                subtitle:   'Add production for master bakers',
+                onTap: () => _openPage(
+                  context,
+                  _Wrapped(
+                    title: 'Master Baker Productions',
+                    child: const BakerProductionInputScreen(
+                      adminMode: true,
+                    ),
                   ),
                 ),
               ),

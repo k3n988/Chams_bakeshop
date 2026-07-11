@@ -6,6 +6,7 @@ import '../../../../core/utils/helpers.dart';
 import '../../../../core/models/production_model.dart';
 import '../../../../core/services/payroll_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
+import '../../../admin/viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/baker_production_viewmodel.dart';
 
 // ─── Item row state ───────────────────────────────────────────────────────────
@@ -26,7 +27,15 @@ class _ItemData {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class BakerProductionInputScreen extends StatefulWidget {
-  const BakerProductionInputScreen({super.key});
+  final bool adminMode;
+  final String? initialMasterBakerId;
+
+  const BakerProductionInputScreen({
+    super.key,
+    this.adminMode = false,
+    this.initialMasterBakerId,
+  });
+
   @override
   State<BakerProductionInputScreen> createState() =>
       _BakerProductionInputScreenState();
@@ -35,6 +44,7 @@ class BakerProductionInputScreen extends StatefulWidget {
 class _BakerProductionInputScreenState
     extends State<BakerProductionInputScreen> {
   String _date = DateTime.now().toString().split(' ')[0];
+  String? _selectedMasterBakerId;
   final Set<String> _selectedHelpers = {};
   String? _ovenHelperId;
   final List<_ItemData> _items = [_ItemData()];
@@ -42,10 +52,21 @@ class _BakerProductionInputScreenState
   @override
   void initState() {
     super.initState();
+    _selectedMasterBakerId = widget.initialMasterBakerId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = context.read<AuthViewModel>().currentUser;
-      if (user != null) {
-        context.read<BakerProductionViewModel>().loadData(user.id);
+      if (widget.adminMode) {
+        final userVM = context.read<AdminUserViewModel>();
+        if (userVM.users.isEmpty) {
+          userVM.loadUsers();
+        }
+        context
+            .read<BakerProductionViewModel>()
+            .loadData(_selectedMasterBakerId ?? '');
+      } else {
+        final user = context.read<AuthViewModel>().currentUser;
+        if (user != null) {
+          context.read<BakerProductionViewModel>().loadData(user.id);
+        }
       }
     });
   }
@@ -68,6 +89,12 @@ class _BakerProductionInputScreenState
           _selectedHelpers.add(id);
         }
       });
+
+  void _setMasterBaker(String? id) {
+    if (id == null || id == _selectedMasterBakerId) return;
+    setState(() => _selectedMasterBakerId = id);
+    context.read<BakerProductionViewModel>().loadData(id);
+  }
 
   void _addItem() => setState(() => _items.add(_ItemData()));
 
@@ -160,6 +187,26 @@ class _BakerProductionInputScreenState
   Future<void> _submit() async {
     final messenger = ScaffoldMessenger.of(context);
 
+    final signedInUser = context.read<AuthViewModel>().currentUser;
+    final masterBakerId =
+        widget.adminMode ? _selectedMasterBakerId : signedInUser?.id;
+
+    if (masterBakerId == null || masterBakerId.isEmpty) {
+      messenger.showSnackBar(SnackBar(
+        content: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('Select a master baker'),
+        ]),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+      ));
+      return;
+    }
+
     if (_selectedHelpers.isEmpty) {
       messenger.showSnackBar(SnackBar(
         content: const Row(children: [
@@ -193,11 +240,10 @@ class _BakerProductionInputScreenState
       return;
     }
 
-    final user = context.read<AuthViewModel>().currentUser!;
     final result =
         await context.read<BakerProductionViewModel>().addProduction(
               date: _date,
-              masterBakerId: user.id,
+              masterBakerId: masterBakerId,
               helperIds: _selectedHelpers.toList(),
               items: _validItems,
               ovenHelperId: _ovenHelperId,
@@ -261,9 +307,14 @@ class _BakerProductionInputScreenState
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BakerProductionViewModel>();
+    final adminUserVM =
+        widget.adminMode ? context.watch<AdminUserViewModel>() : null;
+    final masterBakers = adminUserVM?.masterBakers ?? const [];
     final preview =
         vm.previewSalary(_validItems, _selectedHelpers.length);
     final previewBakerIncentive = _previewBakerIncentive(vm);
+    final salaryLabel =
+        widget.adminMode ? 'Baker Salary (est.)' : 'Your Salary (est.)';
 
     return ColoredBox(
       color: Colors.white,
@@ -343,6 +394,83 @@ class _BakerProductionInputScreenState
               ),
             ),
             const SizedBox(height: 14),
+
+            if (widget.adminMode) ...[
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionLabel('MASTER BAKER'),
+                    const SizedBox(height: 12),
+                    if (masterBakers.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.danger.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: const Row(children: [
+                          Icon(Icons.person_off_outlined,
+                              color: AppColors.danger, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No master bakers found',
+                              style: TextStyle(
+                                  color: AppColors.danger, fontSize: 13),
+                            ),
+                          ),
+                        ]),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedMasterBakerId,
+                        decoration: InputDecoration(
+                          hintText: 'Select Master Baker',
+                          prefixIcon: const Icon(Icons.person_outline,
+                              color: AppColors.masterBaker),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: AppColors.masterBaker, width: 1.5),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 13),
+                        ),
+                        items: masterBakers
+                            .map((baker) => DropdownMenuItem(
+                                  value: baker.id,
+                                  child: Text(
+                                    baker.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: _setMasterBaker,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
 
             // ── Helpers ──────────────────────────────────────────
             _SectionCard(
@@ -907,8 +1035,8 @@ class _BakerProductionInputScreenState
                         mainAxisAlignment:
                             MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Your Salary (est.)',
-                              style: TextStyle(
+                          Text(salaryLabel,
+                              style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14,
                                   color: AppColors.text)),
