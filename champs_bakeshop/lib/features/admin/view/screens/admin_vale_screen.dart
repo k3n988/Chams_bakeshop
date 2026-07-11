@@ -151,6 +151,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
     double weekUserTotal(String userId) => visibleActiveEntries
         .where((e) => e.userId == userId)
         .fold(0.0, (s, e) => s + e.price);
+    final lockedUserIds = vm.paidUserIdsForWeek(weekStart);
 
     // Filter users
     var users = visibleUsers;
@@ -513,6 +514,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                                   user: user,
                                   total: total,
                                   hasResto: hasResto,
+                                  isLocked: lockedUserIds.contains(user.id),
                                   roleColor: _roleColor(user.role),
                                   roleLabel: _roleLabel(user.role),
                                   onTap: () =>
@@ -588,6 +590,7 @@ class _UserCard extends StatelessWidget {
   final dynamic user;
   final double total;
   final bool hasResto;
+  final bool isLocked;
   final Color roleColor;
   final String roleLabel;
   final VoidCallback onTap;
@@ -596,6 +599,7 @@ class _UserCard extends StatelessWidget {
     required this.user,
     required this.total,
     required this.hasResto,
+    required this.isLocked,
     required this.roleColor,
     required this.roleLabel,
     required this.onTap,
@@ -610,13 +614,18 @@ class _UserCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         elevation: 0,
         child: InkWell(
-          onTap: onTap,
+          onTap: isLocked ? null : onTap,
           borderRadius: BorderRadius.circular(14),
           child: Container(
             decoration: BoxDecoration(
+              color: isLocked
+                  ? AppColors.textHint.withValues(alpha: 0.03)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: total > 0
+                color: isLocked
+                    ? AppColors.textHint.withValues(alpha: 0.18)
+                    : total > 0
                     ? AppColors.danger.withValues(alpha: 0.25)
                     : AppColors.border,
                 width: 1,
@@ -699,6 +708,32 @@ class _UserCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                          if (isLocked)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.textHint
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock_outline,
+                                      size: 10, color: AppColors.textHint),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Locked',
+                                    style: TextStyle(
+                                      color: AppColors.textHint,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -735,9 +770,14 @@ class _UserCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right,
-                    color: AppColors.textHint.withValues(alpha: 0.6),
-                    size: 20),
+                if (isLocked)
+                  Icon(Icons.lock_outline,
+                      color: AppColors.textHint.withValues(alpha: 0.65),
+                      size: 18)
+                else
+                  Icon(Icons.chevron_right,
+                      color: AppColors.textHint.withValues(alpha: 0.6),
+                      size: 20),
               ],
             ),
           ),
@@ -1110,7 +1150,7 @@ class _UserValeSheet extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () => _guardedShowAddValeDialog(
-                            context, userId, adminId, vm),
+                            context, userId, adminId, vm, weekStart),
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Vale'),
                         style: ElevatedButton.styleFrom(
@@ -1230,12 +1270,17 @@ Future<void> _guardedShowAddValeDialog(
     BuildContext context,
     String userId,
     String adminId,
-    AdminValeViewModel vm) async {
-  _showAddValeDialog(context, userId, adminId, vm);
+    AdminValeViewModel vm,
+    DateTime weekStart) async {
+  _showAddValeDialog(context, userId, adminId, vm, weekStart);
 }
 
 void _showAddValeDialog(
-    BuildContext context, String userId, String adminId, AdminValeViewModel vm) {
+    BuildContext context,
+    String userId,
+    String adminId,
+    AdminValeViewModel vm,
+    DateTime weekStart) {
   final productCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final formKey = GlobalKey<FormState>();
@@ -1352,18 +1397,26 @@ void _showAddValeDialog(
                           double.parse(priceCtrl.text.trim());
                       setDialogState(() => saving = true);
                       final navigator = Navigator.of(context);
+                      final isLocked =
+                          await vm.isUserPaidForWeek(userId, weekStart);
+                      final targetDate = isLocked
+                          ? weekStart.add(const Duration(days: 7))
+                          : weekStart;
                       final ok = await vm.addEntry(
                         userId:      userId,
                         productName: productCtrl.text,
                         price: requestedPrice,
                         createdBy: adminId,
+                        date: targetDate,
                       );
                       if (!context.mounted) return;
                       navigator.pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(ok
-                              ? 'Vale entry added!'
+                              ? isLocked
+                                  ? 'Week locked. Vale added to next week!'
+                                  : 'Vale entry added!'
                               : 'Failed to add entry.'),
                           backgroundColor: ok
                               ? AppColors.success

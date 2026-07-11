@@ -40,6 +40,7 @@ class AdminValeViewModel extends ChangeNotifier {
 
   List<UserModel>  _users   = [];
   List<ValeEntry>  _entries = [];
+  final Map<String, Set<String>> _paidUserIdsByWeek = {};
   bool   _isLoading = false;
   String? _error;
 
@@ -64,6 +65,9 @@ class AdminValeViewModel extends ChangeNotifier {
   /// Grand total of all unsettled vale
   double get grandTotal =>
       activeEntries.fold(0.0, (s, e) => s + e.price);
+
+  String _dateStr(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   /// Unsettled entries for one user, newest first
   List<ValeEntry> userEntries(String userId) => activeEntries
@@ -117,6 +121,25 @@ class AdminValeViewModel extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<bool> isUserPaidForWeek(String userId, DateTime weekStart) async {
+    final weekStartStr = _dateStr(weekStart);
+    final paidIds = await _db.getPaidUserIds(weekStartStr);
+    _paidUserIdsByWeek[weekStartStr] = paidIds;
+    return paidIds.contains(userId);
+  }
+
+  Set<String> paidUserIdsForWeek(DateTime weekStart) {
+    final weekStartStr = _dateStr(weekStart);
+    final cached = _paidUserIdsByWeek[weekStartStr];
+    if (cached != null) return cached;
+
+    _db.getPaidUserIds(weekStartStr).then((ids) {
+      _paidUserIdsByWeek[weekStartStr] = ids;
+      notifyListeners();
+    }).catchError((_) {});
+    return const {};
   }
 
   Future<bool> deleteEntry(String id) async {
