@@ -96,9 +96,10 @@ class AdminValeViewModel extends ChangeNotifier {
     required String productName,
     required double price,
     required String createdBy,
+    DateTime? date,
   }) async {
     try {
-      final now = DateTime.now();
+      final now = date ?? DateTime.now();
       final dateStr =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final entry = {

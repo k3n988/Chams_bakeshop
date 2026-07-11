@@ -236,7 +236,7 @@ class AdminPayrollViewModel extends ChangeNotifier {
           userId: e.userId,
           weekStart: _weekStart,
           paidBy: paidBy,
-          amount: e.finalSalary,
+          amount: e.finalSalary < 0 ? 0 : e.finalSalary,
         );
       }
 

@@ -154,8 +154,7 @@ class _BakerHelperPayrollTabState
   }
 
   /// For every employee who worked this week and has outstanding vale,
-  /// keep the saved vale deduction synced to the current outstanding vale,
-  /// capped so take-home never goes negative.
+  /// keep the saved vale deduction synced to the full current outstanding vale.
   Future<void> _autoApplyValeDeductions() async {
     if (!mounted) return;
     final payVM  = context.read<AdminPayrollViewModel>();
@@ -167,17 +166,9 @@ class _BakerHelperPayrollTabState
 
     for (final entry in payVM.entries) {
       final valeTotal = valeVM.userTotal(entry.userId);
-      final maxValeAllowed = entry.grossSalary +
-          entry.ovenIncentive -
-          entry.ovenDeduction -
-          entry.gasDeduction -
-          entry.wifiDeduction;
-      final targetVale = maxValeAllowed <= 0
-          ? 0.0
-          : (valeTotal > maxValeAllowed ? maxValeAllowed : valeTotal);
 
       // Already correct; nothing to do.
-      if ((entry.valeDeduction - targetVale).abs() < 0.01) continue;
+      if ((entry.valeDeduction - valeTotal).abs() < 0.01) continue;
 
       // Sync payroll deduction to the CURRENT outstanding vale.
       await payVM.saveDeduction(
@@ -185,7 +176,7 @@ class _BakerHelperPayrollTabState
         weekStart: payVM.weekStart,
         oven:      entry.ovenDeduction,
         gas:       entry.gasDeduction,
-        vale:      targetVale,
+        vale:      valeTotal,
         wifi:      entry.wifiDeduction,
       );
       anyChanged = true;
@@ -197,6 +188,50 @@ class _BakerHelperPayrollTabState
       await payVM.loadWeeklyPayroll(
           ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
     }
+  }
+
+  double _coveredValeAmount(PayrollEntry entry) {
+    final availableForVale = entry.grossSalary +
+        entry.ovenIncentive -
+        entry.ovenDeduction -
+        entry.gasDeduction -
+        entry.wifiDeduction;
+    if (availableForVale <= 0) return 0;
+    return entry.valeDeduction > availableForVale
+        ? availableForVale
+        : entry.valeDeduction;
+  }
+
+  DateTime _nextWeekStartDate(AdminPayrollViewModel payVM) {
+    final parsed = DateTime.tryParse(payVM.weekStart);
+    final base = parsed ?? DateTime.now();
+    return DateTime(base.year, base.month, base.day)
+        .add(const Duration(days: 7));
+  }
+
+  Future<bool> _settleValeForPayroll({
+    required PayrollEntry entry,
+    required AdminValeViewModel valeVM,
+    required AdminPayrollViewModel payVM,
+    required String adminId,
+  }) async {
+    if (entry.finalSalary >= 0) {
+      return valeVM.consumeAmountForUser(
+          entry.userId, _coveredValeAmount(entry));
+    }
+
+    final resto = -entry.finalSalary;
+    final consumed =
+        await valeVM.consumeAmountForUser(entry.userId, entry.valeDeduction);
+    if (!consumed) return false;
+
+    return valeVM.addEntry(
+      userId: entry.userId,
+      productName: 'Resto',
+      price: resto,
+      createdBy: adminId,
+      date: _nextWeekStartDate(payVM),
+    );
   }
 
   void _showDeductionDialog(PayrollEntry entry) {
@@ -366,30 +401,12 @@ class _BakerHelperPayrollTabState
               final gas = double.tryParse(gasCtrl.text) ?? 0;
               final requestedVale = double.tryParse(valeCtrl.text) ?? 0;
               final wifi = double.tryParse(wifiCtrl.text) ?? 0;
-              final maxValeAllowed =
-                  entry.grossSalary + entry.ovenIncentive - oven - gas - wifi;
-              final allowedVale = maxValeAllowed <= 0
-                  ? 0.0
-                  : (requestedVale > maxValeAllowed
-                      ? maxValeAllowed
-                      : requestedVale);
-              if (requestedVale > allowedVale) {
-                messenger.showSnackBar(SnackBar(
-                  content: Text(
-                      'Vale deduction was capped to ${formatCurrency(allowedVale)} so take-home does not go negative.'),
-                  backgroundColor: AppColors.warning,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  margin: const EdgeInsets.all(12),
-                ));
-              }
               await payVM.saveDeduction(
                 userId:    entry.userId,
                 weekStart: payVM.weekStart,
                 oven:  oven,
                 gas:   gas,
-                vale:  allowedVale,
+                vale:  requestedVale,
                 wifi:  wifi,
               );
               if (ctx.mounted) Navigator.pop(ctx);
@@ -433,6 +450,9 @@ class _BakerHelperPayrollTabState
   void _confirmMarkPaid(PayrollEntry entry) {
     final adminId =
         context.read<AuthViewModel>().currentUser?.id ?? 'admin';
+    final isResto = entry.finalSalary < 0;
+    final actionColor = isResto ? AppColors.danger : AppColors.success;
+    final restoAmount = -entry.finalSalary;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -442,19 +462,26 @@ class _BakerHelperPayrollTabState
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
+              color: actionColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.check_circle_outline,
-                color: AppColors.success, size: 20),
+            child: Icon(
+                isResto
+                    ? Icons.add_card_outlined
+                    : Icons.check_circle_outline,
+                color: actionColor,
+                size: 20),
           ),
           const SizedBox(width: 12),
-          const Text('Confirm Payment',
+          Text(isResto ? 'Convert Resto' : 'Confirm Payment',
               style: TextStyle(
                   fontSize: 16, fontWeight: FontWeight.w800)),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Mark ${entry.name} as paid for this week?',
+          Text(
+              isResto
+                  ? 'Convert ${formatCurrency(restoAmount)} remaining balance to Vale as "Resto" for next week?'
+                  : 'Mark ${entry.name} as paid for this week?',
               style: const TextStyle(
                   color: AppColors.textSecondary)),
           const SizedBox(height: 12),
@@ -462,10 +489,9 @@ class _BakerHelperPayrollTabState
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.08),
+              color: actionColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppColors.success.withValues(alpha: 0.2)),
+              border: Border.all(color: actionColor.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -475,9 +501,9 @@ class _BakerHelperPayrollTabState
                         fontWeight: FontWeight.w600,
                         fontSize: 13)),
                 Text(formatCurrency(entry.finalSalary),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        color:      AppColors.success,
+                        color:      actionColor,
                         fontSize:   20)),
               ],
             ),
@@ -488,10 +514,14 @@ class _BakerHelperPayrollTabState
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel')),
           FilledButton.icon(
-            icon:  const Icon(Icons.check_circle_outline, size: 18),
-            label: const Text('Confirm Paid'),
+            icon: Icon(
+                isResto
+                    ? Icons.add_card_outlined
+                    : Icons.check_circle_outline,
+                size: 18),
+            label: Text(isResto ? 'Convert Resto' : 'Confirm Paid'),
             style: FilledButton.styleFrom(
-                backgroundColor: AppColors.success),
+                backgroundColor: actionColor),
             onPressed: () async {
               Navigator.pop(ctx);
               final payVM     =
@@ -514,19 +544,28 @@ class _BakerHelperPayrollTabState
               final ok = await payVM.markAsPaid(
                 userId: entry.userId,
                 paidBy: adminId,
-                amount: entry.finalSalary,
+                amount: entry.finalSalary < 0 ? 0 : entry.finalSalary,
               );
+              var valeOk = true;
               if (ok) {
-                await valeVM.consumeAmountForUser(
-                    entry.userId, entry.valeDeduction);
+                valeOk = await _settleValeForPayroll(
+                  entry: entry,
+                  valeVM: valeVM,
+                  payVM: payVM,
+                  adminId: adminId,
+                );
               }
               if (mounted) {
+                final success = ok && valeOk;
                 messenger.showSnackBar(SnackBar(
-                  content: Text(ok
-                      ? '${entry.name} marked as paid!'
+                  content: Text(success
+                      ? isResto
+                          ? '${entry.name} converted to Resto for next week!'
+                          : '${entry.name} marked as paid!'
                       : 'Error saving payment.'),
-                  backgroundColor:
-                      ok ? AppColors.success : AppColors.danger,
+                  backgroundColor: success
+                      ? (isResto ? AppColors.danger : AppColors.success)
+                      : AppColors.danger,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -597,16 +636,26 @@ class _BakerHelperPayrollTabState
               }
               final ok =
                   await payVM.markAllAsPaid(paidBy: adminId);
+              var convertedRestoCount = 0;
               if (ok) {
                 for (final entry in unpaid) {
-                  await valeVM.consumeAmountForUser(
-                      entry.userId, entry.valeDeduction);
+                  final settled = await _settleValeForPayroll(
+                    entry: entry,
+                    valeVM: valeVM,
+                    payVM: payVM,
+                    adminId: adminId,
+                  );
+                  if (settled && entry.finalSalary < 0) {
+                    convertedRestoCount++;
+                  }
                 }
               }
               if (mounted) {
                 messenger.showSnackBar(SnackBar(
                   content: Text(ok
-                      ? 'All employees marked as paid!'
+                      ? convertedRestoCount > 0
+                          ? 'All paid. $convertedRestoCount Resto balance${convertedRestoCount == 1 ? '' : 's'} moved to next week!'
+                          : 'All employees marked as paid!'
                       : 'Error saving payments.'),
                   backgroundColor:
                       ok ? AppColors.success : AppColors.danger,
@@ -1040,9 +1089,11 @@ class _PayrollTableSheet extends StatelessWidget {
                         DataCell(Text(formatCurrency(entry.valeDeduction))),
                         DataCell(Text(
                           formatCurrency(entry.finalSalary),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w900,
-                            color: AppColors.success,
+                            color: entry.finalSalary < 0
+                                ? AppColors.danger
+                                : AppColors.success,
                           ),
                         )),
                       ]);
@@ -1132,7 +1183,7 @@ class _TotalPayrollBanner extends StatelessWidget {
               ],
             ),
             Text(formatCurrency(total),
-                style: const TextStyle(
+                style: TextStyle(
                     color:         Colors.white,
                     fontWeight:    FontWeight.w900,
                     fontSize:      26,
@@ -1255,6 +1306,9 @@ class _EmployeeCard extends StatelessWidget {
     final isBaker   = e.role == 'master_baker';
     final roleColor =
         isBaker ? AppColors.masterBaker : AppColors.helper;
+    final finalSalaryColor =
+        e.finalSalary < 0 ? AppColors.danger : const Color(0xFF1A1A1A);
+    final isResto = e.finalSalary < 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1322,10 +1376,10 @@ class _EmployeeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(formatCurrency(e.finalSalary),
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize:   20,
                           fontWeight: FontWeight.w900,
-                          color:      Color(0xFF1A1A1A))),
+                          color:      finalSalaryColor)),
                   const Text('Take-Home',
                       style: TextStyle(
                           fontSize: 10,
@@ -1420,11 +1474,15 @@ class _EmployeeCard extends StatelessWidget {
                     )
                   : FilledButton.icon(
                       onPressed: isPaying ? null : onMarkPaid,
-                      icon:  const Icon(
-                          Icons.payments_outlined, size: 16),
-                      label: const Text('Mark Paid'),
+                      icon: Icon(
+                          isResto
+                              ? Icons.add_card_outlined
+                              : Icons.payments_outlined,
+                          size: 16),
+                      label: Text(isResto ? 'Convert Resto' : 'Mark Paid'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.success,
+                        backgroundColor:
+                            isResto ? AppColors.danger : AppColors.success,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         textStyle: const TextStyle(

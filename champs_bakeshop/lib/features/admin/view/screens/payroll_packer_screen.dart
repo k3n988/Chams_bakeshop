@@ -118,16 +118,14 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
       final totalVale = valeVM.userTotal(packerId);
       if (totalVale <= 0) continue;
 
-      final appliedVale = totalVale > gross ? gross : totalVale;
-
       await _service.upsertPayroll(
         packerId:      packerId,
         weekStart:     _weekStartStr,
         weekEnd:       _weekEndStr,
         totalBundles:  bundles,
         grossSalary:   gross,
-        valeDeduction: appliedVale,
-        netSalary:     gross - appliedVale,
+        valeDeduction: totalVale,
+        netSalary:     gross - totalVale,
         isPaid:        payroll?.isPaid ?? false,
       );
       anyChanged = true;
@@ -240,7 +238,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                 backgroundColor: AppColors.packer),
             onPressed: () async {
               final requestedVale = double.tryParse(valeCtrl.text) ?? 0;
-              final vale      = requestedVale > gross ? gross : requestedVale;
+              final vale      = requestedVale;
               final messenger = ScaffoldMessenger.of(context);
               try {
                 await _service.upsertPayroll(
@@ -287,7 +285,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
     final bundles = prods.fold(0, (s, p) => s + p.bundleCount);
     final gross   = bundles * 4.0;
     final vale    = payroll?.valeDeduction ?? 0.0;
-    final net     = gross - vale < 0 ? 0.0 : gross - vale;
+    final net     = gross - vale;
 
     showDialog(
       context: context,
@@ -329,9 +327,9 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                     style: TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 13)),
                 Text(formatCurrency(net),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        color:      AppColors.success,
+                        color:      net < 0 ? AppColors.danger : AppColors.success,
                         fontSize:   20)),
               ],
             ),
@@ -361,7 +359,8 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                   netSalary:     net,
                   isPaid:        true,
                 );
-                await valeVM.consumeAmountForUser(packer.id, vale);
+                await valeVM.consumeAmountForUser(
+                    packer.id, vale > gross ? gross : vale);
                 await _load();
                 if (mounted) {
                   messenger.showSnackBar(SnackBar(
@@ -417,7 +416,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
       final bundles = prods.fold(0, (s, pr) => s + pr.bundleCount);
       final gross   = bundles * 4.0;
       final vale    = payroll?.valeDeduction ?? 0.0;
-      totalNet += gross - vale < 0 ? 0.0 : gross - vale;
+      totalNet += gross - vale;
     }
 
     // Only count packers who have actual work this week
@@ -523,7 +522,7 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                     prods.fold(0, (s, p) => s + p.bundleCount);
                 final gross   = bundles * 4.0;
                 final vale    = payroll?.valeDeduction ?? 0.0;
-                final net     = gross - vale < 0 ? 0.0 : gross - vale;
+                final net     = gross - vale;
                 final isPaid  = payroll?.isPaid ?? false;
 
                 final idx      = sorted.indexOf(packer);
@@ -818,10 +817,12 @@ class _PackerPayrollCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(formatCurrency(net),
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize:   20,
                             fontWeight: FontWeight.w900,
-                            color:      Color(0xFF1A1A1A))),
+                            color:      net < 0
+                                ? AppColors.danger
+                                : const Color(0xFF1A1A1A))),
                     const Text('Take-Home',
                         style: TextStyle(
                             fontSize: 10,

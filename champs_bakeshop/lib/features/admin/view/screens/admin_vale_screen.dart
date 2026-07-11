@@ -3,10 +3,6 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/utils/network_utils.dart';
-import '../../../../core/services/database_service.dart';
-import '../../../../core/services/payroll_service.dart';
-import '../../../../core/services/packer_service.dart';
-import '../../../../core/services/seller_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
 import '../../viewmodel/admin_vale_viewmodel.dart';
@@ -25,6 +21,70 @@ class AdminValeScreen extends StatefulWidget {
 class _AdminValeScreenState extends State<AdminValeScreen> {
   String _selectedRole = 'all';
   final TextEditingController _searchCtrl = TextEditingController();
+  late DateTime _selectedWeekStart = _startOfWeek(DateTime.now());
+
+  static DateTime _startOfWeek(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    return day.subtract(Duration(days: day.weekday - 1));
+  }
+
+  static const _monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  String _monthName(int month) => _monthNames[month - 1];
+
+  String _weekLabel(DateTime start) {
+    final end = start.add(const Duration(days: 6));
+    if (start.month == end.month && start.year == end.year) {
+      return '${_monthName(start.month)} ${start.day}-${end.day}, ${start.year}';
+    }
+    return '${_monthName(start.month)} ${start.day} - ${_monthName(end.month)} ${end.day}, ${end.year}';
+  }
+
+  bool get _isSelectedWeekCurrent =>
+      _selectedWeekStart.isAtSameMomentAs(_startOfWeek(DateTime.now()));
+
+  void _changeWeek(int direction) {
+    setState(() {
+      _selectedWeekStart =
+          _selectedWeekStart.add(Duration(days: 7 * direction));
+    });
+  }
+
+  Future<void> _pickWeek() async {
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedWeekStart,
+      currentDate: today,
+      firstDate: DateTime(today.year - 2, 1, 1),
+      lastDate: DateTime(today.year + 1, 12, 31),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: _kOrange,
+            onPrimary: Colors.white,
+            onSurface: AppColors.text,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() => _selectedWeekStart = _startOfWeek(picked));
+  }
 
   Future<void> _logout() async {
     await context.read<AuthViewModel>().logout();
@@ -69,23 +129,28 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
     final visibleUsers =
         vm.nonAdminUsers.where((u) => u.role != 'cashier').toList();
     final visibleUserIds = visibleUsers.map((u) => u.id).toSet();
+    final weekStart = _selectedWeekStart;
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    bool isInSelectedWeek(ValeEntry e) {
+      final parsed = DateTime.tryParse(e.date);
+      if (parsed == null) return false;
+      final day = DateTime(parsed.year, parsed.month, parsed.day);
+      return !day.isBefore(weekStart) && !day.isAfter(weekEnd);
+    }
+
     final visibleActiveEntries = vm.activeEntries
-        .where((e) => visibleUserIds.contains(e.userId))
+        .where((e) => visibleUserIds.contains(e.userId) && isInSelectedWeek(e))
         .toList();
     final visibleSettledEntries = vm.entries
         .where((e) => e.isSettled && visibleUserIds.contains(e.userId))
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
-    final now = DateTime.now();
-    final weekStart = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
-    final weekEnd = weekStart.add(const Duration(days: 6));
     final settledThisWeek = visibleSettledEntries.where((e) {
-      final parsed = DateTime.tryParse(e.date);
-      if (parsed == null) return false;
-      final day = DateTime(parsed.year, parsed.month, parsed.day);
-      return !day.isBefore(weekStart) && !day.isAfter(weekEnd);
+      return isInSelectedWeek(e);
     }).toList();
+    double weekUserTotal(String userId) => visibleActiveEntries
+        .where((e) => e.userId == userId)
+        .fold(0.0, (s, e) => s + e.price);
 
     // Filter users
     var users = visibleUsers;
@@ -99,8 +164,8 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
 
     // Sort: users with vale > 0 first (desc total), then zero
     users.sort((a, b) {
-      final ta = vm.userTotal(a.id);
-      final tb = vm.userTotal(b.id);
+      final ta = weekUserTotal(a.id);
+      final tb = weekUserTotal(b.id);
       if (ta > 0 && tb == 0) return -1;
       if (ta == 0 && tb > 0) return 1;
       return tb.compareTo(ta);
@@ -188,7 +253,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       const Text(
-                                        'Total Outstanding Vale',
+                                        'Weekly Outstanding Vale',
                                         style: TextStyle(
                                           color: Colors.white70,
                                           fontSize: 12,
@@ -279,6 +344,93 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                     ),
                   ),
 
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Container(
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF9F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _kOrange.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              tooltip: 'Previous week',
+                              onPressed: () => _changeWeek(-1),
+                              icon: const Icon(
+                                Icons.chevron_left,
+                                color: _kOrange,
+                                size: 18,
+                              ),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                onTap: _pickWeek,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_month_outlined,
+                                      color: _kOrange,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        _weekLabel(weekStart),
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: _kOrange,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_isSelectedWeekCurrent) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: _kOrange,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'THIS WEEK',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Next week',
+                              onPressed: () => _changeWeek(1),
+                              icon: Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: _kOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // ── Search Field ────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
@@ -350,14 +502,22 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                             delegate: SliverChildBuilderDelegate(
                               (ctx, i) {
                                 final user = users[i];
-                                final total = vm.userTotal(user.id);
+                                final total = weekUserTotal(user.id);
+                                final hasResto = visibleActiveEntries.any((e) =>
+                                    e.userId == user.id &&
+                                    e.productName
+                                        .trim()
+                                        .toLowerCase()
+                                        .contains('resto'));
                                 return _UserCard(
                                   user: user,
                                   total: total,
+                                  hasResto: hasResto,
                                   roleColor: _roleColor(user.role),
                                   roleLabel: _roleLabel(user.role),
                                   onTap: () =>
-                                      _showUserValeSheet(context, user.id),
+                                      _showUserValeSheet(
+                                          context, user.id, weekStart),
                                 );
                               },
                               childCount: users.length,
@@ -411,12 +571,13 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
 
   // ── User Vale Bottom Sheet ──────────────────────────────────────────────
 
-  void _showUserValeSheet(BuildContext context, String userId) {
+  void _showUserValeSheet(
+      BuildContext context, String userId, DateTime weekStart) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _UserValeSheet(userId: userId),
+      builder: (_) => _UserValeSheet(userId: userId, weekStart: weekStart),
     );
   }
 }
@@ -426,6 +587,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
 class _UserCard extends StatelessWidget {
   final dynamic user;
   final double total;
+  final bool hasResto;
   final Color roleColor;
   final String roleLabel;
   final VoidCallback onTap;
@@ -433,6 +595,7 @@ class _UserCard extends StatelessWidget {
   const _UserCard({
     required this.user,
     required this.total,
+    required this.hasResto,
     required this.roleColor,
     required this.roleLabel,
     required this.onTap,
@@ -499,21 +662,44 @@ class _UserCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: roleColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          roleLabel,
-                          style: TextStyle(
-                            color: roleColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: roleColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              roleLabel,
+                              style: TextStyle(
+                                color: roleColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (hasResto)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Resto',
+                                style: TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -527,18 +713,22 @@ class _UserCard extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
-                        color: total > 0
-                            ? AppColors.danger
-                            : AppColors.success,
+                        color: hasResto ? AppColors.danger : AppColors.success,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      total > 0 ? 'outstanding' : 'no vale',
+                      hasResto
+                          ? 'Resto'
+                          : total > 0
+                              ? 'outstanding'
+                              : 'no vale',
                       style: TextStyle(
                         fontSize: 10,
-                        color: total > 0
-                            ? AppColors.danger.withValues(alpha: 0.7)
+                        color: hasResto
+                            ? AppColors.danger
+                            : total > 0
+                            ? AppColors.success.withValues(alpha: 0.7)
                             : AppColors.success.withValues(alpha: 0.7),
                       ),
                     ),
@@ -761,16 +951,21 @@ class _SettledHistorySection extends StatelessWidget {
 
 class _UserValeSheet extends StatelessWidget {
   final String userId;
-  static final PackerService _packerService = PackerService();
-  static final SellerService _sellerService = SellerService();
+  final DateTime weekStart;
 
-  const _UserValeSheet({required this.userId});
+  const _UserValeSheet({required this.userId, required this.weekStart});
 
   @override
   Widget build(BuildContext context) {
     final vm      = context.watch<AdminValeViewModel>();
-    final entries = vm.userEntries(userId);
-    final total   = vm.userTotal(userId);
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final entries = vm.userEntries(userId).where((e) {
+      final parsed = DateTime.tryParse(e.date);
+      if (parsed == null) return false;
+      final day = DateTime(parsed.year, parsed.month, parsed.day);
+      return !day.isBefore(weekStart) && !day.isAfter(weekEnd);
+    }).toList();
+    final total   = entries.fold(0.0, (s, e) => s + e.price);
     final name    = vm.userName(userId);
     final authVm  = context.read<AuthViewModel>();
     final adminId = authVm.currentUser?.id ?? '';
@@ -1031,143 +1226,13 @@ class _UserValeSheet extends StatelessWidget {
     );
   }
 
-Future<double> _currentPayrollForUser(
-    BuildContext context, String userId, AdminValeViewModel vm) async {
-  final user = vm.users.where((u) => u.id == userId).firstOrNull;
-    if (user == null) return 0;
-
-    final now = DateTime.now();
-    final monday = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
-    final sunday = monday.add(const Duration(days: 6));
-    final weekStart =
-        '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
-    final weekEnd =
-        '${sunday.year}-${sunday.month.toString().padLeft(2, '0')}-${sunday.day.toString().padLeft(2, '0')}';
-
-    if (user.isPacker) {
-      final prods = await _packerService.getProductionsByWeek(
-        packerId: user.id,
-        weekStart: weekStart,
-        weekEnd: weekEnd,
-      );
-      final bundles = prods.fold<int>(0, (s, p) => s + p.bundleCount);
-      return bundles * AppConstants.packerRatePerBundle;
-    }
-
-    if (user.isSeller) {
-      final remits = await _sellerService.getRemittancesByRange(
-        sellerId: user.id,
-        fromDate: weekStart,
-        toDate: weekEnd,
-      );
-      return remits.fold<double>(0.0, (s, r) => s + r.salary);
-    }
-
-  final db = context.read<DatabaseService>();
-  final payroll = context.read<PayrollService>();
-    final products = await db.getAllProducts();
-    final productions = await db.getProductionsByDateRange(weekStart, weekEnd);
-
-    double gross = 0;
-    for (final prod in productions) {
-      final isMaster = prod.masterBakerId == user.id;
-      final isHelper = prod.helperIds.contains(user.id);
-      if (!isMaster && !isHelper) continue;
-
-      final calc = payroll.computeDaily(prod, products);
-      gross += isMaster
-          ? calc.salaryPerWorker + calc.bakerIncentive
-          : calc.salaryPerWorker;
-    }
-    return gross;
-  }
-
 Future<void> _guardedShowAddValeDialog(
     BuildContext context,
     String userId,
     String adminId,
     AdminValeViewModel vm) async {
-  final messenger = ScaffoldMessenger.of(context);
-  final currentPayroll = await _currentPayrollForUser(context, userId, vm);
-  if (!context.mounted) return;
-  final currentOutstanding = vm.userTotal(userId);
-  final remainingAllowance = currentPayroll - currentOutstanding;
-
-    if (currentPayroll <= 0) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text(
-            'Dili pa pwede makadugang og vale. Wala pa siyay payroll/trabaho karong panahona.'),
-        backgroundColor: AppColors.danger,
-      ));
-      return;
-    }
-
-    if (remainingAllowance <= 0) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(
-            'Vale blocked. Adding more would make payroll negative. Payroll limit: ${formatCurrency(currentPayroll)}.'),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(12),
-      ));
-      return;
-    }
-
   _showAddValeDialog(context, userId, adminId, vm);
 }
-
-Future<void> _showBlockingErrorDialog(
-    BuildContext context, String title, String message) {
-  return showDialog<void>(
-    context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.danger.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.error_outline,
-                  color: AppColors.danger, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          message,
-          style: const TextStyle(
-              color: AppColors.textSecondary, fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kOrange,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Sige'),
-          ),
-        ],
-      ),
-    );
-  }
 
 void _showAddValeDialog(
     BuildContext context, String userId, String adminId, AdminValeViewModel vm) {
@@ -1283,38 +1348,8 @@ void _showAddValeDialog(
                         ));
                         return;
                       }
-                      final currentPayroll =
-                          await _currentPayrollForUser(context, userId, vm);
-                      if (!context.mounted) return;
-                      if (currentPayroll <= 0) {
-                        await _showBlockingErrorDialog(
-                          context,
-                          'Dili Pwede ang Vale',
-                          'Wala pay payroll o trabaho kining empleyadoha karong panahona, mao nga dili pa pwede makadugang og vale.',
-                        );
-                        return;
-                      }
-                      final currentOutstanding = vm.userTotal(userId);
                       final requestedPrice =
                           double.parse(priceCtrl.text.trim());
-                      final remainingAllowance =
-                          currentPayroll - currentOutstanding;
-                      if (remainingAllowance <= 0) {
-                        await _showBlockingErrorDialog(
-                          context,
-                          'Naabot na ang Limit sa Vale',
-                          'Ang kasamtangang wala pa nabayrang vale naabot na sa payroll limit nga ${formatCurrency(currentPayroll)} ani nga empleyado.',
-                        );
-                        return;
-                      }
-                      if (requestedPrice > remainingAllowance) {
-                        await _showBlockingErrorDialog(
-                          context,
-                          'Sobra ang Vale',
-                          'Dili pwede makadugang og vale nga ${formatCurrency(requestedPrice)}.\n\n${formatCurrency(remainingAllowance)} nalang ang pwede karong payroll.',
-                        );
-                        return;
-                      }
                       setDialogState(() => saving = true);
                       final navigator = Navigator.of(context);
                       final ok = await vm.addEntry(
