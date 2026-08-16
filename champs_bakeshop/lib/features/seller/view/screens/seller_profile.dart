@@ -7,6 +7,7 @@ import '../../../../core/utils/helpers.dart';
 
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/seller_remittance_viewmodel.dart';
+import 'seller_monthly_screen.dart';
 
 import '../../../../features/auth/view/login_screen.dart';
 
@@ -233,6 +234,30 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         const SizedBox(height: 24),
 
         // ── Logout ───────────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.seller,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.calendar_month_outlined, size: 18),
+            label: const Text('Monthly',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SellerMonthlyScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
         SizedBox(
           width: double.infinity,
           height: 50,

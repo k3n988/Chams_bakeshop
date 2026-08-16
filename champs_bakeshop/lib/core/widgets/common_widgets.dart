@@ -90,6 +90,14 @@ class RoleBadge extends StatelessWidget {
         color = const Color(0xFFFF7A00);
         label = 'Cashier';
         break;
+      case 'seller':
+        color = AppColors.seller;
+        label = 'Seller';
+        break;
+      case 'seller_baker':
+        color = AppColors.seller;
+        label = 'Seller & Baker';
+        break;
       default:
         color = AppColors.textHint;
         label = role;

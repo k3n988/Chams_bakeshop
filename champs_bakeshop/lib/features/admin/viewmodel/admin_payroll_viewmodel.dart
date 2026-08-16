@@ -92,7 +92,7 @@ class AdminPayrollViewModel extends ChangeNotifier {
     _packerTotalCount   = packers.length;
 
     // Seller weekly total — sum salary from remittances this week
-    final sellers = users.where((u) => u.role == 'seller').toList();
+    final sellers = users.where((u) => u.isSeller).toList();
     double sellerTotal = 0.0;
     _sellerWeeklyMap   = {};
     for (final s in sellers) {

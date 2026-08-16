@@ -78,6 +78,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     ('helper',       'Helper'),
     ('packer',       'Packer'),
     ('seller',       'Seller'),
+    ('seller_baker', 'Seller & Baker'),
   ];
 
   Color _roleColor(String role) {
@@ -87,6 +88,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       case 'helper':       return AppColors.helper;
       case 'packer':       return AppColors.packer;
       case 'seller':       return AppColors.seller;
+      case 'seller_baker': return AppColors.seller;
       default:             return const Color(0xFFFF8C00);
     }
   }
@@ -178,6 +180,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   DropdownMenuItem(
                       value: 'packer',
                       child: Text('Packer')),
+                  DropdownMenuItem(
+                      value: 'seller_baker',
+                      child: Text('Seller & Baker')),
                   DropdownMenuItem(
                       value: 'seller',
                       child: Text('Seller')),
@@ -805,6 +810,7 @@ class _EmptyRoleState extends StatelessWidget {
       case 'helper':       return 'Helpers';
       case 'packer':       return 'Packers';
       case 'seller':       return 'Sellers';
+      case 'seller_baker': return 'Seller & Bakers';
       case 'cashier':      return 'Cashiers';
       default:             return 'Users';
     }

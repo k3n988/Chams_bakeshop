@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
+import '../../../master_baker/view/screens/baker_production_input_screen.dart';
 import '../../viewmodel/seller_session_viewmodel.dart';
 import 'seller_daily_screen.dart';
 import 'seller_weekly_screen.dart';
-import 'seller_monthly_screen.dart';
 import 'seller_profile.dart';
 import 'seller_session_input.dart';
 
@@ -20,7 +20,7 @@ class SellerDashboard extends StatefulWidget {
 class _SellerDashboardState extends State<SellerDashboard> {
   int _currentIndex = 0;
 
-  static const _navItems = [
+  static const _sellerNavItems = [
     BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         activeIcon: Icon(Icons.home),
@@ -34,9 +34,28 @@ class _SellerDashboardState extends State<SellerDashboard> {
         activeIcon: Icon(Icons.calendar_view_week),
         label: 'Weekly'),
     BottomNavigationBarItem(
-        icon: Icon(Icons.calendar_month_outlined),
-        activeIcon: Icon(Icons.calendar_month),
-        label: 'Monthly'),
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person),
+        label: 'Profile'),
+  ];
+
+  static const _sellerBakerNavItems = [
+    BottomNavigationBarItem(
+        icon: Icon(Icons.home_outlined),
+        activeIcon: Icon(Icons.home),
+        label: 'Home'),
+    BottomNavigationBarItem(
+        icon: Icon(Icons.receipt_long_outlined),
+        activeIcon: Icon(Icons.receipt_long),
+        label: 'Daily'),
+    BottomNavigationBarItem(
+        icon: Icon(Icons.calendar_view_week_outlined),
+        activeIcon: Icon(Icons.calendar_view_week),
+        label: 'Weekly'),
+    BottomNavigationBarItem(
+        icon: Icon(Icons.bakery_dining_outlined),
+        activeIcon: Icon(Icons.bakery_dining),
+        label: 'Production'),
     BottomNavigationBarItem(
         icon: Icon(Icons.person_outline),
         activeIcon: Icon(Icons.person),
@@ -55,14 +74,20 @@ class _SellerDashboardState extends State<SellerDashboard> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthViewModel>().currentUser!;
+    final hasProductionNav = user.isSellerBaker;
 
     final pages = [
       _SellerHomePage(user: user),
       const SellerDailyScreen(),
       const SellerWeeklyScreen(),
-      const SellerMonthlyScreen(),
+      if (hasProductionNav) const BakerProductionInputScreen(),
       const SellerProfileScreen(),
     ];
+    final navItems = hasProductionNav ? _sellerBakerNavItems : _sellerNavItems;
+
+    if (_currentIndex >= pages.length) {
+      _currentIndex = pages.length - 1;
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
@@ -90,8 +115,8 @@ class _SellerDashboardState extends State<SellerDashboard> {
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       color: AppColors.text)),
-              const Text('Seller',
-                  style: TextStyle(
+              Text(user.roleDisplay,
+                  style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500)),
@@ -132,7 +157,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         backgroundColor: Colors.white,
         elevation: 12,
-        items: _navItems,
+        items: navItems,
       ),
     );
   }

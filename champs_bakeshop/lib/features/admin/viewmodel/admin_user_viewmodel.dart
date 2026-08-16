@@ -54,6 +54,10 @@ class AdminUserViewModel extends ChangeNotifier {
       await loadUsers();
       return null;
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('users_role_check')) {
+        return 'Database role constraint is not updated yet. Run sql/add_seller_baker_role.sql first.';
+      }
       return e.toString();
     }
   }
@@ -64,6 +68,10 @@ class AdminUserViewModel extends ChangeNotifier {
       await loadUsers();
       return null;
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('users_role_check')) {
+        return 'Database role constraint is not updated yet. Run sql/add_seller_baker_role.sql first.';
+      }
       return e.toString();
     }
   }

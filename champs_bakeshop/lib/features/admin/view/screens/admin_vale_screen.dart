@@ -45,6 +45,53 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
 
   String _monthName(int month) => _monthNames[month - 1];
 
+  bool _isRestoEntry(ValeEntry entry) =>
+      entry.productName.trim().toLowerCase().contains('resto');
+
+  List<_RestoWeekGroup> _buildRestoGroups(
+    List<ValeEntry> entries,
+    List<dynamic> users,
+  ) {
+    final usersById = {for (final u in users) u.id: u};
+    final grouped = <String, _RestoWeekGroup>{};
+
+    for (final entry in entries.where(_isRestoEntry)) {
+      final user = usersById[entry.userId];
+      if (user == null) continue;
+
+      final parsed = DateTime.tryParse(entry.date);
+      if (parsed == null) continue;
+
+      final weekStart = _startOfWeek(parsed);
+      final key =
+          '${entry.userId}_${weekStart.year}-${weekStart.month}-${weekStart.day}';
+      final existing = grouped[key];
+
+      if (existing == null) {
+        grouped[key] = _RestoWeekGroup(
+          user: user,
+          weekStart: weekStart,
+          total: entry.price,
+          itemCount: 1,
+        );
+      } else {
+        grouped[key] = existing.copyWith(
+          total: existing.total + entry.price,
+          itemCount: existing.itemCount + 1,
+        );
+      }
+    }
+
+    final groups = grouped.values.toList()
+      ..sort((a, b) {
+        final weekCompare = b.weekStart.compareTo(a.weekStart);
+        if (weekCompare != 0) return weekCompare;
+        return a.user.name.compareTo(b.user.name);
+      });
+
+    return groups;
+  }
+
   String _weekLabel(DateTime start) {
     final end = start.add(const Duration(days: 6));
     if (start.month == end.month && start.year == end.year) {
@@ -107,6 +154,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
       case 'helper':       return AppColors.helper;
       case 'packer':       return AppColors.packer;
       case 'seller':       return AppColors.seller;
+      case 'seller_baker': return AppColors.seller;
       default:             return AppColors.textHint;
     }
   }
@@ -117,6 +165,7 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
       case 'helper':       return 'Helper';
       case 'packer':       return 'Packer';
       case 'seller':       return 'Seller';
+      case 'seller_baker': return 'Seller & Baker';
       default:             return role;
     }
   }
@@ -145,6 +194,12 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
         .where((e) => e.isSettled && visibleUserIds.contains(e.userId))
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
+    final restoGroups = _buildRestoGroups(
+      vm.activeEntries
+          .where((e) => visibleUserIds.contains(e.userId))
+          .toList(),
+      visibleUsers,
+    );
     final settledThisWeek = visibleSettledEntries.where((e) {
       return isInSelectedWeek(e);
     }).toList();
@@ -326,6 +381,34 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                      child: OutlinedButton.icon(
+                        onPressed: restoGroups.isEmpty
+                            ? null
+                            : () => _showAllRestoSheet(context, restoGroups),
+                        icon: const Icon(Icons.list_alt_outlined, size: 18),
+                        label: Text(
+                          restoGroups.isEmpty
+                              ? 'No Resto'
+                              : 'All Resto (${restoGroups.length})',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _kOrange,
+                          side: BorderSide(
+                            color: _kOrange.withValues(alpha: 0.30),
+                          ),
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -339,6 +422,8 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                             _roleChip('packer', 'Packer'),
                             const SizedBox(width: 8),
                             _roleChip('seller', 'Seller'),
+                            const SizedBox(width: 8),
+                            _roleChip('seller_baker', 'Seller & Baker'),
                           ],
                         ),
                       ),
@@ -582,9 +667,286 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
       builder: (_) => _UserValeSheet(userId: userId, weekStart: weekStart),
     );
   }
+
+  void _showAllRestoSheet(
+    BuildContext context,
+    List<_RestoWeekGroup> groups,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _AllRestoSheet(
+        groups: groups,
+        roleColor: _roleColor,
+        roleLabel: _roleLabel,
+        weekLabel: _weekLabel,
+        onSelect: (group) {
+          Navigator.pop(sheetContext);
+          setState(() {
+            _selectedRole = 'all';
+            _searchCtrl.clear();
+            _selectedWeekStart = group.weekStart;
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _showUserValeSheet(context, group.user.id, group.weekStart);
+          });
+        },
+      ),
+    );
+  }
+}
+
+class _RestoWeekGroup {
+  final dynamic user;
+  final DateTime weekStart;
+  final double total;
+  final int itemCount;
+
+  const _RestoWeekGroup({
+    required this.user,
+    required this.weekStart,
+    required this.total,
+    required this.itemCount,
+  });
+
+  _RestoWeekGroup copyWith({
+    double? total,
+    int? itemCount,
+  }) =>
+      _RestoWeekGroup(
+        user: user,
+        weekStart: weekStart,
+        total: total ?? this.total,
+        itemCount: itemCount ?? this.itemCount,
+      );
 }
 
 // ─── User Card ──────────────────────────────────────────────────────────────
+
+class _AllRestoSheet extends StatelessWidget {
+  final List<_RestoWeekGroup> groups;
+  final Color Function(String role) roleColor;
+  final String Function(String role) roleLabel;
+  final String Function(DateTime start) weekLabel;
+  final ValueChanged<_RestoWeekGroup> onSelect;
+
+  const _AllRestoSheet({
+    required this.groups,
+    required this.roleColor,
+    required this.roleLabel,
+    required this.weekLabel,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8F4F0),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _kOrange.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long_outlined,
+                      color: _kOrange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'All Resto',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.text,
+                          ),
+                        ),
+                        Text(
+                          'Tap an item to open the week of the debt',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                itemCount: groups.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final group = groups[index];
+                  final color = roleColor(group.user.role);
+                  return Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () => onSelect(group),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _kOrange.withValues(alpha: 0.14),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.10),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                group.user.name.isNotEmpty
+                                    ? group.user.name[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    group.user.name,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: color.withValues(alpha: 0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          roleLabel(group.user.role),
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _kOrange.withValues(alpha: 0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          weekLabel(group.weekStart),
+                                          style: const TextStyle(
+                                            color: _kOrange,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${group.itemCount} resto item${group.itemCount == 1 ? '' : 's'}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  formatCurrency(group.total),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: AppColors.textHint,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _UserCard extends StatelessWidget {
   final dynamic user;

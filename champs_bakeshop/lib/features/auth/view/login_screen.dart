@@ -264,6 +264,10 @@ class _LoginScreenState extends State<LoginScreen>
                           value: 'master_baker', child: Text('Master Baker')),
                       DropdownMenuItem(value: 'helper', child: Text('Helper')),
                       DropdownMenuItem(value: 'packer', child: Text('Packer')),
+                      DropdownMenuItem(
+                        value: 'seller_baker',
+                        child: Text('Seller & Baker'),
+                      ),
                       DropdownMenuItem(value: 'seller', child: Text('Seller')),
                     ],
                     onChanged: _onRoleChanged,

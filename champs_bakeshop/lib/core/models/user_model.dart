@@ -53,6 +53,12 @@ class UserModel {
         return 'Master Baker';
       case 'helper':
         return 'Helper';
+      case 'packer':
+        return 'Packer';
+      case 'seller':
+        return 'Seller';
+      case 'seller_baker':
+        return 'Seller & Baker';
       default:
         return role;
     }
@@ -63,5 +69,6 @@ class UserModel {
   bool get isMasterBaker => role == 'master_baker';
   bool get isHelper => role == 'helper';
   bool get isPacker => role == 'packer';
-  bool get isSeller => role == 'seller';
+  bool get isSeller => role == 'seller' || role == 'seller_baker';
+  bool get isSellerBaker => role == 'seller_baker';
 }
