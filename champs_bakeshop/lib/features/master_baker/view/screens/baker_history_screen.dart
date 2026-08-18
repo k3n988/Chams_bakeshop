@@ -32,7 +32,14 @@ String _formatRange(DateTime start, DateTime end) {
 }
 
 class BakerHistoryScreen extends StatefulWidget {
-  const BakerHistoryScreen({super.key});
+  final bool showHeader;
+  final bool adminMode;
+
+  const BakerHistoryScreen({
+    super.key,
+    this.showHeader = true,
+    this.adminMode = false,
+  });
 
   @override
   State<BakerHistoryScreen> createState() => _BakerHistoryScreenState();
@@ -47,6 +54,12 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
   void initState() {
     super.initState();
     _weekAnchor = _weekStart(DateTime.now());
+    if (widget.adminMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<BakerProductionViewModel>().loadAllData();
+      });
+    }
   }
 
   bool get _isCurrentWeek =>
@@ -81,8 +94,12 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
 
   Future<void> _deleteRecord(
       BakerProductionViewModel vm, String productionId) async {
-    final userId =
-        context.read<AuthViewModel>().currentUser?.id ?? '';
+    final record = vm.productions
+        .where((p) => p.id == productionId)
+        .firstOrNull;
+    final userId = widget.adminMode
+        ? record?.masterBakerId ?? ''
+        : context.read<AuthViewModel>().currentUser?.id ?? '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -150,19 +167,21 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Production History',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.text,
-                        letterSpacing: -0.5)),
-                const SizedBox(height: 2),
-                Text(
-                  '${vm.productions.length} total records',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textHint),
-                ),
-                const SizedBox(height: 14),
+                if (widget.showHeader) ...[
+                  const Text('Production History',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.text,
+                          letterSpacing: -0.5)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${vm.productions.length} total records',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textHint),
+                  ),
+                  const SizedBox(height: 14),
+                ],
 
                 // ── Week navigator ────────────────────────────────
                 Container(
@@ -257,6 +276,7 @@ class _BakerHistoryScreenState extends State<BakerHistoryScreen> {
                             calc: calc,
                             vm: vm,
                             index: i,
+                            showMasterBaker: widget.adminMode,
                             onDelete: () =>
                                 _deleteRecord(vm, prod.id),
                           );
@@ -335,6 +355,7 @@ class _HistoryCard extends StatelessWidget {
   final dynamic calc;
   final BakerProductionViewModel vm;
   final int index;
+  final bool showMasterBaker;
   final VoidCallback onDelete;
 
   const _HistoryCard({
@@ -342,6 +363,7 @@ class _HistoryCard extends StatelessWidget {
     required this.calc,
     required this.vm,
     required this.index,
+    this.showMasterBaker = false,
     required this.onDelete,
   });
 
@@ -349,6 +371,7 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalEarnings =
         calc.salaryPerWorker + calc.bakerIncentive;
+    final masterBakerName = vm.userName(prod.masterBakerId);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -403,6 +426,16 @@ class _HistoryCard extends StatelessWidget {
                                 color: AppColors.text,
                                 letterSpacing: -0.3)),
                         const SizedBox(height: 2),
+                        if (showMasterBaker) ...[
+                          Text(
+                            masterBakerName,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.masterBaker),
+                          ),
+                          const SizedBox(height: 2),
+                        ],
                         Text(
                           '${prod.totalWorkers} workers  ·  ${prod.totalSacks} sacks'
                           '${prod.totalExtraKg > 0 ? ' + ${prod.totalExtraKg} kg' : ''}',

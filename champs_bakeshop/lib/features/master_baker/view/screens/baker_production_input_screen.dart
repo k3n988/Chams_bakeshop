@@ -8,6 +8,7 @@ import '../../../../core/services/payroll_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../admin/viewmodel/admin_user_viewmodel.dart';
 import '../../viewmodel/baker_production_viewmodel.dart';
+import 'baker_history_screen.dart';
 
 // ─── Item row state ───────────────────────────────────────────────────────────
 class _ItemData {
@@ -325,12 +326,55 @@ class _BakerProductionInputScreenState
           children: [
 
             // ── Page Header ──────────────────────────────────────
-            const Text('Add Production',
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.text,
-                    letterSpacing: -0.5)),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Add Production',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.text,
+                          letterSpacing: -0.5)),
+                ),
+                if (widget.adminMode)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(
+                              title: const Text('Baker History'),
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.text,
+                              elevation: 0,
+                              surfaceTintColor: Colors.white,
+                            ),
+                            body: const BakerHistoryScreen(
+                              showHeader: false,
+                              adminMode: true,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.history_outlined, size: 18),
+                    label: const Text('History'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.masterBaker,
+                      side: BorderSide(
+                        color: AppColors.masterBaker.withValues(alpha: 0.45),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 3),
             const Text('Record your daily bakery production',
                 style: TextStyle(

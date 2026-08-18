@@ -1184,7 +1184,7 @@ void _showSettledHistorySheet(
                   children: [
                     const Expanded(
                       child: Text(
-                        'Settled Vale This Week',
+                        'Vale History This Week',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 18,
@@ -1218,6 +1218,47 @@ void _showSettledHistorySheet(
 }
 
 // ─── User Vale Sheet ─────────────────────────────────────────────────────────
+
+Future<bool?> _confirmDeleteValeHistoryEntry(
+  BuildContext context,
+  ValeEntry entry,
+) {
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Delete Vale Entry',
+        style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.text),
+      ),
+      content: Text(
+        'Delete "${entry.productName}" (${formatCurrency(entry.price)}) from history?',
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: AppColors.textHint),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+}
 
 class _SettledHistorySection extends StatelessWidget {
   final List<ValeEntry> entries;
@@ -1254,7 +1295,7 @@ class _SettledHistorySection extends StatelessWidget {
             const SizedBox(width: 10),
             const Expanded(
               child: Text(
-                'Settled History',
+                'Vale History',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -1272,7 +1313,15 @@ class _SettledHistorySection extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 12),
-          ...recent.map((e) => Padding(
+          ...recent.map((e) {
+            final statusColor =
+                e.isDeleted ? AppColors.danger : AppColors.success;
+            final statusIcon = e.isDeleted
+                ? Icons.delete_outline
+                : Icons.check_circle_outline;
+            final statusLabel = e.isDeleted ? 'Deleted' : 'Settled';
+
+            return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
                   padding: const EdgeInsets.all(12),
@@ -1286,11 +1335,10 @@ class _SettledHistorySection extends StatelessWidget {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.check_circle_outline,
-                          color: AppColors.success, size: 18),
+                      child: Icon(statusIcon, color: statusColor, size: 18),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1307,7 +1355,7 @@ class _SettledHistorySection extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${userNameOf(e.userId)} • ${e.date}',
+                            '$statusLabel - ${userNameOf(e.userId)} - ${e.date}',
                             style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.textHint,
@@ -1318,33 +1366,67 @@ class _SettledHistorySection extends StatelessWidget {
                     ),
                     Text(
                       formatCurrency(e.price),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.success,
+                        color: statusColor,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    IconButton(
-                      onPressed: () async {
-                        final vm = context.read<AdminValeViewModel>();
-                        final messenger = ScaffoldMessenger.of(context);
-                        final ok = await vm.restoreEntry(e.id);
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(ok
-                              ? 'Vale restored.'
-                              : 'Failed to restore vale.'),
-                          backgroundColor:
-                              ok ? AppColors.success : AppColors.danger,
-                        ));
-                      },
-                      icon: const Icon(Icons.restore_outlined,
-                          size: 18, color: AppColors.info),
-                      tooltip: 'Restore',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            final vm = context.read<AdminValeViewModel>();
+                            final messenger = ScaffoldMessenger.of(context);
+                            final ok = await vm.restoreEntry(e.id);
+                            messenger.showSnackBar(SnackBar(
+                              content: Text(ok
+                                  ? 'Vale restored.'
+                                  : 'Failed to restore vale.'),
+                              backgroundColor:
+                                  ok ? AppColors.success : AppColors.danger,
+                            ));
+                          },
+                          icon: const Icon(Icons.restore_outlined,
+                              size: 18, color: AppColors.info),
+                          tooltip: 'Restore',
+                        ),
+                        IconButton(
+                          onPressed: () async {
+                            final confirmed =
+                                await _confirmDeleteValeHistoryEntry(
+                              context,
+                              e,
+                            );
+                            if (confirmed != true || !context.mounted) {
+                              return;
+                            }
+
+                            final vm = context.read<AdminValeViewModel>();
+                            final messenger = ScaffoldMessenger.of(context);
+                            final ok = await vm.deleteEntry(e.id);
+                            if (!context.mounted) return;
+                            messenger.showSnackBar(SnackBar(
+                              content: Text(ok
+                                  ? 'Vale entry deleted.'
+                                  : 'Failed to delete vale. Please try again.'),
+                              backgroundColor:
+                                  ok ? AppColors.success : AppColors.danger,
+                            ));
+                            if (ok) Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.delete_outline,
+                              size: 18, color: AppColors.danger),
+                          tooltip: 'Delete',
+                        ),
+                      ],
                     ),
                   ]),
                 ),
-              )),
+              );
+          }),
         ],
       ),
     );
@@ -1488,13 +1570,23 @@ class _UserValeSheet extends StatelessWidget {
                           return _EntryRow(
                             entry: e,
                             onDelete: () async {
+                              final messenger = ScaffoldMessenger.of(context);
                               final confirm = await _confirmDialog(
                                 context,
-                                'Tangtanga ang Entry',
-                                'Tangtangon ang "${e.productName}" (${formatCurrency(e.price)})?',
+                                'Delete Vale Entry',
+                                'Delete "${e.productName}" (${formatCurrency(e.price)}) and keep it in vale history?',
                               );
                               if (confirm == true) {
-                                await vm.deleteEntry(e.id);
+                                final ok = await vm.markEntryDeleted(e.id);
+                                if (!context.mounted) return;
+                                messenger.showSnackBar(SnackBar(
+                                  content: Text(ok
+                                      ? 'Vale deleted and moved to history.'
+                                      : 'Failed to delete vale. Please try again.'),
+                                  backgroundColor: ok
+                                      ? AppColors.success
+                                      : AppColors.danger,
+                                ));
                               }
                             },
                           );

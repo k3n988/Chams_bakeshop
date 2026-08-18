@@ -16,14 +16,21 @@ class BakerProductionViewModel extends ChangeNotifier {
   List<ProductionModel> _productions = [];
   List<ProductModel>    _products    = [];
   List<UserModel>       _helpers     = [];
+  List<UserModel>       _users       = [];
+  bool                  _allDataMode = false;
   bool                  _isLoading   = false;
 
   List<ProductionModel> get productions => _productions;
   List<ProductModel>    get products    => _products;
   List<UserModel>       get helpers     => _helpers;
+  List<UserModel>       get users       => _users;
   bool                  get isLoading   => _isLoading;
 
+  String userName(String id) =>
+      _users.where((u) => u.id == id).firstOrNull?.name ?? '?';
+
   Future<void> loadData(String masterBakerId) async {
+    _allDataMode = false;
     _isLoading = true;
     notifyListeners();
 
@@ -38,6 +45,35 @@ class BakerProductionViewModel extends ChangeNotifier {
         _db.getUsersByRole('helper')
             .then((v) => _helpers = v)
             .catchError((_) => _helpers = []),
+        _db.getAllUsers()
+            .then((v) => _users = v)
+            .catchError((_) => _users = []),
+      ]).timeout(const Duration(seconds: 15));
+    } catch (_) {}
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadAllData() async {
+    _allDataMode = true;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await Future.wait([
+        _db.getAllProductions()
+            .then((v) => _productions = v)
+            .catchError((_) => _productions = []),
+        _db.getAllProducts()
+            .then((v) => _products = v)
+            .catchError((_) => _products = []),
+        _db.getUsersByRole('helper')
+            .then((v) => _helpers = v)
+            .catchError((_) => _helpers = []),
+        _db.getAllUsers()
+            .then((v) => _users = v)
+            .catchError((_) => _users = []),
       ]).timeout(const Duration(seconds: 15));
     } catch (_) {}
 
@@ -76,7 +112,11 @@ class BakerProductionViewModel extends ChangeNotifier {
       await _db.deleteProduction(productionId);
       _productions.removeWhere((p) => p.id == productionId);
       notifyListeners();
-      await loadData(masterBakerId);
+      if (_allDataMode) {
+        await loadAllData();
+      } else if (masterBakerId.isNotEmpty) {
+        await loadData(masterBakerId);
+      }
       return true;
     } catch (_) {
       return false;

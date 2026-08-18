@@ -485,20 +485,57 @@ class SupabaseService {
     await _db.from('vale_entries').delete().eq('id', id);
   }
 
+  Future<void> markValeEntryDeleted(String id) async {
+    try {
+      await _db
+          .from('vale_entries')
+          .update({'is_settled': true, 'is_deleted': true}).eq('id', id);
+    } on PostgrestException catch (e) {
+      if (!e.message.toLowerCase().contains('is_deleted')) rethrow;
+
+      await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
+    }
+  }
+
   Future<void> updateValeEntryPrice(String id, double price) async {
     await _db.from('vale_entries').update({'price': price}).eq('id', id);
   }
 
   Future<void> settleValeEntry(String id) async {
-    await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
+    try {
+      await _db
+          .from('vale_entries')
+          .update({'is_settled': true, 'is_deleted': false}).eq('id', id);
+    } on PostgrestException catch (e) {
+      if (!e.message.toLowerCase().contains('is_deleted')) rethrow;
+
+      await _db.from('vale_entries').update({'is_settled': true}).eq('id', id);
+    }
   }
 
   Future<void> restoreValeEntry(String id) async {
-    await _db.from('vale_entries').update({'is_settled': false}).eq('id', id);
+    try {
+      await _db
+          .from('vale_entries')
+          .update({'is_settled': false, 'is_deleted': false}).eq('id', id);
+    } on PostgrestException catch (e) {
+      if (!e.message.toLowerCase().contains('is_deleted')) rethrow;
+
+      await _db.from('vale_entries').update({'is_settled': false}).eq('id', id);
+    }
   }
 
   Future<void> settleAllValeByUser(String userId) async {
-    await _db.from('vale_entries').update({'is_settled': true}).eq('user_id', userId);
+    try {
+      await _db.from('vale_entries').update(
+          {'is_settled': true, 'is_deleted': false}).eq('user_id', userId);
+    } on PostgrestException catch (e) {
+      if (!e.message.toLowerCase().contains('is_deleted')) rethrow;
+
+      await _db
+          .from('vale_entries')
+          .update({'is_settled': true}).eq('user_id', userId);
+    }
   }
 
   // ─── APP CONFIG ───────────────────────────────────────────────────────────

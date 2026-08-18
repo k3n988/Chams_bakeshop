@@ -11,6 +11,7 @@ class ValeEntry {
   final String date;
   final String createdBy;
   final bool   isSettled;
+  final bool   isDeleted;
 
   const ValeEntry({
     required this.id,
@@ -20,12 +21,14 @@ class ValeEntry {
     required this.date,
     required this.createdBy,
     required this.isSettled,
+    this.isDeleted = false,
   });
 
   factory ValeEntry.fromMap(Map<String, dynamic> m) {
     final rawPrice = m['price'];
     final rawDate = m['date'];
     final rawSettled = m['is_settled'];
+    final rawDeleted = m['is_deleted'];
 
     return ValeEntry(
       id: m['id']?.toString() ?? '',
@@ -41,6 +44,9 @@ class ValeEntry {
       isSettled: rawSettled is bool
           ? rawSettled
           : rawSettled?.toString().toLowerCase() == 'true',
+      isDeleted: rawDeleted is bool
+          ? rawDeleted
+          : rawDeleted?.toString().toLowerCase() == 'true',
     );
   }
 }
@@ -55,11 +61,13 @@ class AdminValeViewModel extends ChangeNotifier {
   final Map<String, Set<String>> _paidUserIdsByWeek = {};
   bool   _isLoading = false;
   String? _error;
+  String? _lastActionError;
 
   List<UserModel>  get users     => _users;
   List<ValeEntry>  get entries   => _entries;
   bool             get isLoading => _isLoading;
   String?          get error     => _error;
+  String?          get lastActionError => _lastActionError;
 
   /// All non-admin users
   List<UserModel> get nonAdminUsers =>
@@ -173,17 +181,20 @@ class AdminValeViewModel extends ChangeNotifier {
 
   Future<bool> deleteEntry(String id) async {
     try {
+      _lastActionError = null;
       await _db.deleteValeEntry(id);
       _entries.removeWhere((e) => e.id == id);
       notifyListeners();
       return true;
-    } catch (_) {
+    } catch (e) {
+      _lastActionError = e.toString();
       return false;
     }
   }
 
   Future<bool> settleEntry(String id) async {
     try {
+      _lastActionError = null;
       await _db.settleValeEntry(id);
       final idx = _entries.indexWhere((e) => e.id == id);
       if (idx != -1) {
@@ -195,17 +206,45 @@ class AdminValeViewModel extends ChangeNotifier {
           date:        _entries[idx].date,
           createdBy:   _entries[idx].createdBy,
           isSettled:   true,
+          isDeleted:   false,
         );
       }
       notifyListeners();
       return true;
-    } catch (_) {
+    } catch (e) {
+      _lastActionError = e.toString();
+      return false;
+    }
+  }
+
+  Future<bool> markEntryDeleted(String id) async {
+    try {
+      _lastActionError = null;
+      await _db.markValeEntryDeleted(id);
+      final idx = _entries.indexWhere((e) => e.id == id);
+      if (idx != -1) {
+        _entries[idx] = ValeEntry(
+          id:          _entries[idx].id,
+          userId:      _entries[idx].userId,
+          productName: _entries[idx].productName,
+          price:       _entries[idx].price,
+          date:        _entries[idx].date,
+          createdBy:   _entries[idx].createdBy,
+          isSettled:   true,
+          isDeleted:   true,
+        );
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _lastActionError = e.toString();
       return false;
     }
   }
 
   Future<bool> restoreEntry(String id) async {
     try {
+      _lastActionError = null;
       await _db.restoreValeEntry(id);
       final idx = _entries.indexWhere((e) => e.id == id);
       if (idx != -1) {
@@ -217,11 +256,13 @@ class AdminValeViewModel extends ChangeNotifier {
           date:        _entries[idx].date,
           createdBy:   _entries[idx].createdBy,
           isSettled:   false,
+          isDeleted:   false,
         );
       }
       notifyListeners();
       return true;
-    } catch (_) {
+    } catch (e) {
+      _lastActionError = e.toString();
       return false;
     }
   }

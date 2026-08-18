@@ -484,26 +484,6 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
           // ── Header ───────────────────────────────────────
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF7A00).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.storefront_outlined, color: Color(0xFFFF7A00), size: 22),
-            ),
-            const SizedBox(width: 12),
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Seller Payroll',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1A1A), letterSpacing: -0.3)),
-              Text('Admin records remittance',
-                  style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-            ]),
-          ]),
-          const SizedBox(height: 16),
-
           // ── Day navigator ─────────────────────────────────
           _DayNav(
             displayDate: _displayDate,

@@ -193,6 +193,9 @@ class DatabaseService {
 
   Future<void> deleteValeEntry(String id) => _supa.deleteValeEntry(id);
 
+  Future<void> markValeEntryDeleted(String id) =>
+      _supa.markValeEntryDeleted(id);
+
   Future<void> updateValeEntryPrice(String id, double price) =>
       _supa.updateValeEntryPrice(id, price);
 
