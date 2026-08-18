@@ -112,11 +112,13 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
       final bundles = prods.fold(0, (s, p) => s + p.bundleCount);
       final gross = bundles * 4.0;
 
-      if (bundles <= 0 || gross <= 0) continue;
-      if ((payroll?.valeDeduction ?? 0) > 0) continue;
+      if (bundles <= 0 || gross <= 0 || payroll?.isPaid == true) continue;
 
-      final totalVale = valeVM.userTotal(packerId);
-      if (totalVale <= 0) continue;
+      final weekStart = DateTime.tryParse(_weekStartStr);
+      final totalVale = weekStart == null
+          ? valeVM.userTotal(packerId)
+          : valeVM.userTotalForWeek(packerId, weekStart);
+      if (((payroll?.valeDeduction ?? 0) - totalVale).abs() < 0.01) continue;
 
       await _service.upsertPayroll(
         packerId:      packerId,
@@ -151,7 +153,11 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
     final prods       = _prodData[packer.id] ?? [];
     final bundles     = prods.fold(0, (s, p) => s + p.bundleCount);
     final gross       = bundles * 4.0;
-    final totalVale   = context.read<AdminValeViewModel>().userTotal(packer.id);
+    final weekStart   = DateTime.tryParse(_weekStartStr);
+    final valeVM      = context.read<AdminValeViewModel>();
+    final totalVale   = weekStart == null
+        ? valeVM.userTotal(packer.id)
+        : valeVM.userTotalForWeek(packer.id, weekStart);
     final currentVale = existing?.valeDeduction ?? 0.0;
     final valeCtrl    =
         TextEditingController(
@@ -359,8 +365,14 @@ class _PackerPayrollTabState extends State<PackerPayrollTab> {
                   netSalary:     net,
                   isPaid:        true,
                 );
-                await valeVM.consumeAmountForUser(
-                    packer.id, vale > gross ? gross : vale);
+                final weekStart = DateTime.tryParse(_weekStartStr);
+                if (weekStart == null) {
+                  await valeVM.consumeAmountForUser(
+                      packer.id, vale > gross ? gross : vale);
+                } else {
+                  await valeVM.consumeAmountForUserForWeek(
+                      packer.id, vale > gross ? gross : vale, weekStart);
+                }
                 await _load();
                 if (mounted) {
                   messenger.showSnackBar(SnackBar(

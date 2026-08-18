@@ -165,7 +165,10 @@ class _BakerHelperPayrollTabState
     bool anyChanged = false;
 
     for (final entry in payVM.entries) {
-      final valeTotal = valeVM.userTotal(entry.userId);
+      final weekStart = DateTime.tryParse(payVM.weekStart);
+      final valeTotal = weekStart == null
+          ? valeVM.userTotal(entry.userId)
+          : valeVM.userTotalForWeek(entry.userId, weekStart);
 
       // Already correct; nothing to do.
       if ((entry.valeDeduction - valeTotal).abs() < 0.01) continue;
@@ -216,13 +219,21 @@ class _BakerHelperPayrollTabState
     required String adminId,
   }) async {
     if (entry.finalSalary >= 0) {
-      return valeVM.consumeAmountForUser(
-          entry.userId, _coveredValeAmount(entry));
+      final weekStart = DateTime.tryParse(payVM.weekStart);
+      if (weekStart == null) {
+        return valeVM.consumeAmountForUser(
+            entry.userId, _coveredValeAmount(entry));
+      }
+      return valeVM.consumeAmountForUserForWeek(
+          entry.userId, _coveredValeAmount(entry), weekStart);
     }
 
     final resto = -entry.finalSalary;
-    final consumed =
-        await valeVM.consumeAmountForUser(entry.userId, entry.valeDeduction);
+    final weekStart = DateTime.tryParse(payVM.weekStart);
+    final consumed = weekStart == null
+        ? await valeVM.consumeAmountForUser(entry.userId, entry.valeDeduction)
+        : await valeVM.consumeAmountForUserForWeek(
+            entry.userId, entry.valeDeduction, weekStart);
     if (!consumed) return false;
 
     return valeVM.addEntry(

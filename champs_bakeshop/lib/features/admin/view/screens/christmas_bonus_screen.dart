@@ -251,26 +251,8 @@ class _ChristmasBonusBodyState extends State<_ChristmasBonusBody>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFC62828).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text('🎄', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 10),
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Christmas Bonus',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            Text('Track holiday bonuses per worker',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w400)),
-          ]),
-        ]),
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 12),
@@ -430,30 +412,6 @@ class _MonthBonusTabState extends State<_MonthBonusTab> {
           ),
           const SizedBox(height: 16),
 
-          // ── Info banner ───────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: AppColors.info.withValues(alpha: 0.2)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.info_outline,
-                  size: 16, color: AppColors.info),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Production bonuses are auto-added when baker saves production. '
-                  'You can also add manual entries below.',
-                  style: TextStyle(fontSize: 11, color: AppColors.info),
-                ),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-
           // ── Add bonus button ──────────────────────────────
           SizedBox(
             width: double.infinity,
@@ -494,7 +452,7 @@ class _MonthBonusTabState extends State<_MonthBonusTab> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _SectionLabel('BONUS ENTRIES — $monthName $year'),
+                _SectionLabel('BONUS ENTRIES - $monthName $year'),
                 // ✅ Date filter button
                 GestureDetector(
                   onTap: () => _pickDate(context),
@@ -711,7 +669,11 @@ class _MonthBonusTabState extends State<_MonthBonusTab> {
                 color: const Color(0xFFC62828).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('🎄', style: TextStyle(fontSize: 18)),
+              child: const Icon(
+                Icons.card_giftcard_outlined,
+                size: 18,
+                color: Color(0xFFC62828),
+              ),
             ),
             const SizedBox(width: 12),
             const Text('Add Bonus Entry',
@@ -731,12 +693,11 @@ class _MonthBonusTabState extends State<_MonthBonusTab> {
                 isExpanded: true,
                 decoration: _inputDec(hint: 'Select worker'),
                 items: workers.map((w) {
-                  final roleLabel = w.role == 'master_baker'
-                      ? '👨‍🍳 Baker'
-                      : '🧑‍🍳 Helper';
+                  final roleLabel =
+                      w.role == 'master_baker' ? 'Baker' : 'Helper';
                   return DropdownMenuItem(
                     value: w.id,
-                    child: Text('$roleLabel — ${w.name}',
+                    child: Text('$roleLabel - ${w.name}',
                         style: const TextStyle(fontSize: 13)),
                   );
                 }).toList(),
@@ -1095,7 +1056,19 @@ class _MonthHeroCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text('🎄', style: TextStyle(fontSize: 38)),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.card_giftcard_outlined,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -1206,7 +1179,7 @@ class _WorkerSummaryCard extends StatelessWidget {
         ),
         if (bakers.isNotEmpty) ...[
           _RoleHeader(
-              label: '👨‍🍳  Master Bakers',
+              label: 'Master Bakers',
               color: AppColors.masterBaker),
           ...bakers.map((w) => _WorkerRow(
                 worker:  w,
@@ -1215,7 +1188,7 @@ class _WorkerSummaryCard extends StatelessWidget {
               )),
         ],
         if (helpers.isNotEmpty) ...[
-          _RoleHeader(label: '🧑‍🍳  Helpers', color: AppColors.info),
+          _RoleHeader(label: 'Helpers', color: AppColors.info),
           ...helpers.map((w) => _WorkerRow(
                 worker:  w,
                 amount:  vm.workerMonthTotal(w.id, month, year),
@@ -1315,7 +1288,7 @@ class _WorkerRow extends StatelessWidget {
             ]),
           ),
           Text(
-            amount > 0 ? formatCurrency(amount) : '—',
+            amount > 0 ? formatCurrency(amount) : '-',
             style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
@@ -1344,7 +1317,7 @@ class _BonusEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBaker   = entry.role == 'master_baker';
     final roleColor = isBaker ? AppColors.masterBaker : AppColors.info;
-    final roleLabel = isBaker ? '👨‍🍳 Baker' : '🧑‍🍳 Helper';
+    final roleLabel = isBaker ? 'Baker' : 'Helper';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1436,20 +1409,6 @@ class _BonusEntryCard extends StatelessWidget {
               Text(entry.date,
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textHint)),
-              if (entry.note != null) ...[
-                const SizedBox(width: 6),
-                const Text('•',
-                    style: TextStyle(color: AppColors.textHint)),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(entry.note!,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontStyle: FontStyle.italic),
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ],
             ]),
           ]),
         ),
@@ -1515,7 +1474,11 @@ class _EmptyState extends StatelessWidget {
               color: const Color(0xFFC62828).withValues(alpha: 0.06),
               shape: BoxShape.circle,
             ),
-            child: const Text('🎁', style: TextStyle(fontSize: 36)),
+            child: const Icon(
+              Icons.card_giftcard_outlined,
+              size: 36,
+              color: Color(0xFFC62828),
+            ),
           ),
           const SizedBox(height: 16),
           Text('No bonus entries for $monthName',

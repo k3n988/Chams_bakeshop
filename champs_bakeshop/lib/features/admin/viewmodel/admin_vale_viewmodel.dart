@@ -22,15 +22,27 @@ class ValeEntry {
     required this.isSettled,
   });
 
-  factory ValeEntry.fromMap(Map<String, dynamic> m) => ValeEntry(
-    id:          m['id'] as String,
-    userId:      m['user_id'] as String,
-    productName: m['product_name'] as String,
-    price:       (m['price'] as num).toDouble(),
-    date:        m['date'] as String,
-    createdBy:   m['created_by'] as String? ?? '',
-    isSettled:   (m['is_settled'] as bool?) ?? false,
-  );
+  factory ValeEntry.fromMap(Map<String, dynamic> m) {
+    final rawPrice = m['price'];
+    final rawDate = m['date'];
+    final rawSettled = m['is_settled'];
+
+    return ValeEntry(
+      id: m['id']?.toString() ?? '',
+      userId: m['user_id']?.toString() ?? '',
+      productName: m['product_name']?.toString() ?? '',
+      price: rawPrice is num
+          ? rawPrice.toDouble()
+          : double.tryParse(rawPrice?.toString() ?? '') ?? 0,
+      date: rawDate is DateTime
+          ? rawDate.toIso8601String().substring(0, 10)
+          : rawDate?.toString() ?? '',
+      createdBy: m['created_by']?.toString() ?? '',
+      isSettled: rawSettled is bool
+          ? rawSettled
+          : rawSettled?.toString().toLowerCase() == 'true',
+    );
+  }
 }
 
 class AdminValeViewModel extends ChangeNotifier {
@@ -62,6 +74,10 @@ class AdminValeViewModel extends ChangeNotifier {
       .where((e) => e.userId == userId)
       .fold(0.0, (s, e) => s + e.price);
 
+  double userTotalForWeek(String userId, DateTime weekStart) =>
+      userEntriesForWeek(userId, weekStart)
+          .fold(0.0, (s, e) => s + e.price);
+
   /// Grand total of all unsettled vale
   double get grandTotal =>
       activeEntries.fold(0.0, (s, e) => s + e.price);
@@ -74,6 +90,19 @@ class AdminValeViewModel extends ChangeNotifier {
       .where((e) => e.userId == userId)
       .toList()
     ..sort((a, b) => b.date.compareTo(a.date));
+
+  List<ValeEntry> userEntriesForWeek(String userId, DateTime weekStart) {
+    final start = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    final end = start.add(const Duration(days: 6));
+
+    return userEntries(userId).where((entry) {
+      final parsed = DateTime.tryParse(entry.date);
+      if (parsed == null) return false;
+      final day = DateTime(parsed.year, parsed.month, parsed.day);
+      return !day.isBefore(start) && !day.isAfter(end);
+    }).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
 
   Future<void> load() async {
     _isLoading = true;
@@ -197,9 +226,15 @@ class AdminValeViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> settleAllForUser(String userId) async {
+  Future<bool> settleAllForUser(String userId, {DateTime? weekStart}) async {
     try {
-      await _db.settleAllValeByUser(userId);
+      if (weekStart == null) {
+        await _db.settleAllValeByUser(userId);
+      } else {
+        for (final entry in userEntriesForWeek(userId, weekStart)) {
+          await _db.settleValeEntry(entry.id);
+        }
+      }
       await load();
       return true;
     } catch (_) {
@@ -208,9 +243,27 @@ class AdminValeViewModel extends ChangeNotifier {
   }
 
   Future<bool> consumeAmountForUser(String userId, double amount) async {
+    return consumeAmountForUserEntries(userEntries(userId), amount);
+  }
+
+  Future<bool> consumeAmountForUserForWeek(
+    String userId,
+    double amount,
+    DateTime weekStart,
+  ) async {
+    return consumeAmountForUserEntries(
+      userEntriesForWeek(userId, weekStart),
+      amount,
+    );
+  }
+
+  Future<bool> consumeAmountForUserEntries(
+    List<ValeEntry> entries,
+    double amount,
+  ) async {
     if (amount <= 0) return true;
     try {
-      final active = userEntries(userId)
+      final active = entries
         ..sort((a, b) => a.date.compareTo(b.date));
       var remaining = amount;
 

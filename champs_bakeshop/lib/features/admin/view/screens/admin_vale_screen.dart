@@ -1550,7 +1550,10 @@ class _UserValeSheet extends StatelessWidget {
                               ));
                               return;
                             }
-                            final ok = await vm.settleAllForUser(userId);
+                            final ok = await vm.settleAllForUser(
+                              userId,
+                              weekStart: weekStart,
+                            );
                             if (context.mounted) {
                               messenger.showSnackBar(
                                 SnackBar(
