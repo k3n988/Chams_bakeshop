@@ -308,6 +308,9 @@ class _BakerProductionInputScreenState
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BakerProductionViewModel>();
+    final currentUser = context.watch<AuthViewModel>().currentUser;
+    final showHistoryButton =
+        widget.adminMode || (currentUser?.isSellerBaker ?? false);
     final adminUserVM =
         widget.adminMode ? context.watch<AdminUserViewModel>() : null;
     final masterBakers = adminUserVM?.masterBakers ?? const [];
@@ -336,9 +339,16 @@ class _BakerProductionInputScreenState
                           color: AppColors.text,
                           letterSpacing: -0.5)),
                 ),
-                if (widget.adminMode)
+                if (showHistoryButton)
                   OutlinedButton.icon(
                     onPressed: () {
+                      if (!widget.adminMode &&
+                          currentUser != null &&
+                          currentUser.isSellerBaker) {
+                        context
+                            .read<BakerProductionViewModel>()
+                            .loadData(currentUser.id);
+                      }
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => Scaffold(
@@ -349,9 +359,9 @@ class _BakerProductionInputScreenState
                               elevation: 0,
                               surfaceTintColor: Colors.white,
                             ),
-                            body: const BakerHistoryScreen(
+                            body: BakerHistoryScreen(
                               showHeader: false,
-                              adminMode: true,
+                              adminMode: widget.adminMode,
                             ),
                           ),
                         ),

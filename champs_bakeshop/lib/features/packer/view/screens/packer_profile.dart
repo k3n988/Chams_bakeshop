@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/widgets/vale_profile_widgets.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/packer_salary_viewmodel.dart';
 import '../../../auth/view/login_screen.dart';
@@ -136,6 +137,15 @@ class _PackerProfileScreenState extends State<PackerProfileScreen> {
     ));
   }
 
+  void _showMyVale() {
+    final user = context.read<AuthViewModel>().currentUser!;
+    showMyValeSheet(
+      context: context,
+      userId: user.id,
+      userName: user.name,
+    );
+  }
+
   void _confirmLogout() {
     showDialog(
       context: context,
@@ -203,6 +213,12 @@ class _PackerProfileScreenState extends State<PackerProfileScreen> {
 
         // ── How it works ─────────────────────────────────────
         const _HowItWorksCard(),
+        const SizedBox(height: 16),
+
+        ValeProfileButton(
+          onTap: _showMyVale,
+          accentColor: AppColors.packer,
+        ),
         const SizedBox(height: 16),
 
         // ── All packers report ────────────────────────────────

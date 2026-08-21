@@ -942,7 +942,7 @@ class _PackerProgressBar extends StatelessWidget {
     final progress = totalCount > 0 ? paidCount / totalCount : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color:        color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
@@ -951,7 +951,7 @@ class _PackerProgressBar extends StatelessWidget {
       child: Column(children: [
         Row(children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color:        color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -963,7 +963,7 @@ class _PackerProgressBar extends StatelessWidget {
               color: color, size: 18,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -974,7 +974,7 @@ class _PackerProgressBar extends StatelessWidget {
                       : '$unpaidCount unpaid',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize:   13,
+                      fontSize:   12,
                       color:      color),
                 ),
                 Text('$paidCount of $totalCount paid',
@@ -985,14 +985,14 @@ class _PackerProgressBar extends StatelessWidget {
             ),
           ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value:           progress,
             backgroundColor: color.withValues(alpha: 0.15),
             valueColor:      AlwaysStoppedAnimation<Color>(color),
-            minHeight:       5,
+            minHeight:       4,
           ),
         ),
       ]),

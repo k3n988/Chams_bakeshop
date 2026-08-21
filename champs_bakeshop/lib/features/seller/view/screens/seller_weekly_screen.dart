@@ -20,12 +20,6 @@ class SellerWeeklyScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const _PageHeader(
-            title: 'Weekly Summary',
-            subtitle: 'Remittance for your selected week',
-          ),
-          const SizedBox(height: 16),
-
           // ── Week navigator ───────────────────────────────
           _WeekNav(
             weekStart: vm.weekStart, weekEnd: vm.weekEnd,

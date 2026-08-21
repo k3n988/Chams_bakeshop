@@ -420,22 +420,7 @@ class _HelperWeeklyScreenState extends State<HelperWeeklyScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Weekly Salary',
-                        style: TextStyle(
-                            fontSize:     20,
-                            fontWeight:   FontWeight.w900,
-                            color:        AppColors.text,
-                            letterSpacing: -0.5)),
-                    SizedBox(height: 2),
-                    Text('Summary for your selected week',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color:    AppColors.textHint)),
-                  ],
-                ),
+                const Spacer(),
                 if (!isThisWeek)
                   GestureDetector(
                     onTap: _goToCurrentWeek,

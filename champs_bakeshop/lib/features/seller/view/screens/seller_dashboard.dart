@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
-import '../../../master_baker/view/screens/baker_production_input_screen.dart';
+import '../../../master_baker/view/screens/baker_salary_screen.dart';
 import '../../viewmodel/seller_session_viewmodel.dart';
 import 'seller_daily_screen.dart';
+import 'seller_salary_screen.dart';
 import 'seller_weekly_screen.dart';
 import 'seller_profile.dart';
 import 'seller_session_input.dart';
@@ -45,17 +46,13 @@ class _SellerDashboardState extends State<SellerDashboard> {
         activeIcon: Icon(Icons.home),
         label: 'Home'),
     BottomNavigationBarItem(
-        icon: Icon(Icons.receipt_long_outlined),
-        activeIcon: Icon(Icons.receipt_long),
-        label: 'Daily'),
-    BottomNavigationBarItem(
-        icon: Icon(Icons.calendar_view_week_outlined),
-        activeIcon: Icon(Icons.calendar_view_week),
-        label: 'Weekly'),
+        icon: Icon(Icons.point_of_sale_outlined),
+        activeIcon: Icon(Icons.point_of_sale),
+        label: 'Seller Salary'),
     BottomNavigationBarItem(
         icon: Icon(Icons.bakery_dining_outlined),
         activeIcon: Icon(Icons.bakery_dining),
-        label: 'Production'),
+        label: 'Baker Salary'),
     BottomNavigationBarItem(
         icon: Icon(Icons.person_outline),
         activeIcon: Icon(Icons.person),
@@ -78,9 +75,10 @@ class _SellerDashboardState extends State<SellerDashboard> {
 
     final pages = [
       _SellerHomePage(user: user),
-      const SellerDailyScreen(),
-      const SellerWeeklyScreen(),
-      if (hasProductionNav) const BakerProductionInputScreen(),
+      if (hasProductionNav) const SellerSalaryScreen(),
+      if (hasProductionNav) const BakerSalaryScreen(),
+      if (!hasProductionNav) const SellerDailyScreen(),
+      if (!hasProductionNav) const SellerWeeklyScreen(),
       const SellerProfileScreen(),
     ];
     final navItems = hasProductionNav ? _sellerBakerNavItems : _sellerNavItems;

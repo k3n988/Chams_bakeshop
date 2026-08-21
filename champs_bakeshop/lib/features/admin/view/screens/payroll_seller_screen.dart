@@ -475,6 +475,14 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
       }
     }
 
+    final payableSellers = sellers
+        .where((s) => (_sessions[s.id] ?? []).isNotEmpty)
+        .toList();
+    final paidCount = payableSellers
+        .where((s) => _paidSellerIds.contains(s.id))
+        .length;
+    final unpaidCount = payableSellers.length - paidCount;
+
     return RefreshIndicator(
       color: AppColors.seller,
       onRefresh: _load,
@@ -501,6 +509,14 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
           else if (sellers.isEmpty)
             const _EmptyCard(message: 'No sellers found')
           else ...[
+            if (payableSellers.isNotEmpty) ...[
+              _SellerPaymentSummary(
+                paidCount: paidCount,
+                totalCount: payableSellers.length,
+                unpaidCount: unpaidCount,
+              ),
+              const SizedBox(height: 12),
+            ],
             ...sellers.map((seller) {
               final sessions     = _sessions[seller.id]    ?? [];
               final remits       = _remittances[seller.id] ?? [];
@@ -531,6 +547,84 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
 // ══════════════════════════════════════════════════════════════
 //  DAY NAVIGATOR
 // ══════════════════════════════════════════════════════════════
+class _SellerPaymentSummary extends StatelessWidget {
+  final int paidCount;
+  final int totalCount;
+  final int unpaidCount;
+
+  const _SellerPaymentSummary({
+    required this.paidCount,
+    required this.totalCount,
+    required this.unpaidCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final allPaid = paidCount == totalCount && totalCount > 0;
+    final color = allPaid ? AppColors.success : AppColors.seller;
+    final progress = totalCount == 0 ? 0.0 : paidCount / totalCount;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(
+                  allPaid
+                      ? Icons.check_circle_outline
+                      : Icons.payments_outlined,
+                  color: color,
+                  size: 17,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  allPaid ? 'All sellers paid!' : '$unpaidCount unpaid',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: color,
+                  ),
+                ),
+              ),
+              Text(
+                '$paidCount of $totalCount paid',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textHint,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DayNav extends StatelessWidget {
   final String        displayDate;
   final bool          isToday;

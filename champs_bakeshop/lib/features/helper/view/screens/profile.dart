@@ -81,7 +81,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Persistence ───────────────────────────────────────
   Future<void> _loadSavedData() async {
     final prefs     = await SharedPreferences.getInstance();
-    final photoPath = prefs.getString('${_photoKey}_${widget.userId}');
+    final authVm    = context.read<AuthViewModel>();
+    final photoPath =
+        prefs.getString('${_photoKey}_${widget.userId}') ??
+        authVm.localPhotoPath;
     final savedName = prefs.getString('${_nameKey}_${widget.userId}');
     final unlocked  =
         prefs.getBool('$_kBonusUnlockedKey${widget.userId}') ?? false;
@@ -93,6 +96,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         _displayName = savedName;
       }
     });
+    if (photoPath != null &&
+        photoPath.isNotEmpty &&
+        authVm.localPhotoPath != photoPath) {
+      await authVm.setLocalPhoto(photoPath);
+    }
   }
 
   Future<void> _savePhotoPath(String? path) async {

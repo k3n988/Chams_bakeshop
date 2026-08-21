@@ -565,22 +565,7 @@ class _HelperDailyScreenState extends State<HelperDailyScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Daily Salary',
-                        style: TextStyle(
-                            fontSize:     20,
-                            fontWeight:   FontWeight.w900,
-                            color:        AppColors.text,
-                            letterSpacing: -0.5)),
-                    SizedBox(height: 2),
-                    Text('Earnings per production day',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color:    AppColors.textHint)),
-                  ],
-                ),
+                const Spacer(),
                 if (!_isToday) ...[
                   GestureDetector(
                     onTap: () {

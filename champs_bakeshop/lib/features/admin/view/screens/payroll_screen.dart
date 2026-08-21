@@ -454,7 +454,10 @@ class _BakerHelperPayrollTabState
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (_) => _PayrollTableSheet(entries: entries),
+      builder: (_) => _PayrollTableSheet(
+        entries: entries,
+        onMarkPaid: _confirmMarkPaid,
+      ),
     );
   }
 
@@ -689,8 +692,23 @@ class _BakerHelperPayrollTabState
 
     final sortedEntries = [...payVM.entries]
       ..sort((a, b) {
-        if (a.isPaid == b.isPaid) return 0;
-        return a.isPaid ? 1 : -1;
+        int roleRank(String role) {
+          final normalized = role.toLowerCase();
+          if (normalized == 'master_baker' || normalized == 'baker') {
+            return 0;
+          }
+          if (normalized == 'helper') return 1;
+          return 2;
+        }
+
+        final roleOrder = roleRank(a.role).compareTo(roleRank(b.role));
+        if (roleOrder != 0) return roleOrder;
+
+        final salaryOrder = b.finalSalary.compareTo(a.finalSalary);
+        if (salaryOrder != 0) return salaryOrder;
+
+        if (a.isPaid != b.isPaid) return a.isPaid ? 1 : -1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
 
     final unpaidEntries =
@@ -770,9 +788,6 @@ class _BakerHelperPayrollTabState
             _PaymentProgressBar(
               paidCount:   paidCount,
               totalCount:  sortedEntries.length,
-              unpaid:      unpaidEntries,
-              isPaying:    payVM.isPaying,
-              onPayAll:    () => _confirmMarkAllPaid(unpaidEntries),
               accentColor: AppColors.primary,
             ),
             const SizedBox(height: 16),
@@ -987,8 +1002,12 @@ class _TableViewButton extends StatelessWidget {
 
 class _PayrollTableSheet extends StatelessWidget {
   final List<PayrollEntry> entries;
+  final void Function(PayrollEntry entry) onMarkPaid;
 
-  const _PayrollTableSheet({required this.entries});
+  const _PayrollTableSheet({
+    required this.entries,
+    required this.onMarkPaid,
+  });
 
   String _firstName(String name) {
     final trimmed = name.trim();
@@ -1082,6 +1101,7 @@ class _PayrollTableSheet extends StatelessWidget {
                         numeric: true,
                         label: Text('Final Amount'),
                       ),
+                      DataColumn(label: Text('Action')),
                     ],
                     rows: entries.map((entry) {
                       final totalAmount =
@@ -1107,6 +1127,42 @@ class _PayrollTableSheet extends StatelessWidget {
                                 : AppColors.success,
                           ),
                         )),
+                        DataCell(
+                          entry.isPaid
+                              ? const Text(
+                                  'Paid',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.danger,
+                                  ),
+                                )
+                              : FilledButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    onMarkPaid(entry);
+                                  },
+                                  icon: const Icon(
+                                    Icons.check_circle_outline,
+                                    size: 14,
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.success,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: const Size(0, 32),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    textStyle: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  label: const Text('Mark Paid'),
+                                ),
+                        ),
                       ]);
                     }).toList(),
                   ),
@@ -1207,16 +1263,10 @@ class _TotalPayrollBanner extends StatelessWidget {
 class _PaymentProgressBar extends StatelessWidget {
   final int           paidCount;
   final int           totalCount;
-  final List<dynamic> unpaid;
-  final bool          isPaying;
-  final VoidCallback  onPayAll;
   final Color         accentColor;
   const _PaymentProgressBar({
     required this.paidCount,
     required this.totalCount,
-    required this.unpaid,
-    required this.isPaying,
-    required this.onPayAll,
     required this.accentColor,
   });
 
@@ -1228,7 +1278,7 @@ class _PaymentProgressBar extends StatelessWidget {
         totalCount > 0 ? paidCount / totalCount : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color:        color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
@@ -1237,7 +1287,7 @@ class _PaymentProgressBar extends StatelessWidget {
       child: Column(children: [
         Row(children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color:        color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -1249,7 +1299,7 @@ class _PaymentProgressBar extends StatelessWidget {
               color: color, size: 18,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1260,7 +1310,7 @@ class _PaymentProgressBar extends StatelessWidget {
                       : '${totalCount - paidCount} unpaid',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize:   13,
+                      fontSize:   12,
                       color:      color),
                 ),
                 Text('$paidCount of $totalCount paid',
@@ -1270,28 +1320,15 @@ class _PaymentProgressBar extends StatelessWidget {
               ],
             ),
           ),
-          if (!allPaid)
-            FilledButton(
-              onPressed: isPaying ? null : onPayAll,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.success,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 8),
-                textStyle: const TextStyle(
-                    fontSize:   12,
-                    fontWeight: FontWeight.w700),
-              ),
-              child: const Text('Pay All'),
-            ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value:           progress,
             backgroundColor: color.withValues(alpha: 0.15),
             valueColor:      AlwaysStoppedAnimation<Color>(color),
-            minHeight:       5,
+            minHeight:       4,
           ),
         ),
       ]),

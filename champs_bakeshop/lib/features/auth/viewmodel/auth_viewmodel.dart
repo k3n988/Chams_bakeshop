@@ -11,6 +11,7 @@ const _kUserEmail    = 'session_user_email';
 const _kUserPassword = 'session_user_password';
 const _kUserRole     = 'session_user_role';
 const _kUserPhoto    = 'session_user_photo';
+const _kProfilePhoto = 'profile_photo_path';
 
 class AuthViewModel extends ChangeNotifier {
   final DatabaseService _db;
@@ -34,14 +35,26 @@ class AuthViewModel extends ChangeNotifier {
     final id    = prefs.getString(_kUserId);
     if (id == null) return false;
 
-    _currentUser = UserModel(
-      id:       id,
-      name:     prefs.getString(_kUserName)     ?? '',
-      email:    prefs.getString(_kUserEmail)    ?? '',
-      password: prefs.getString(_kUserPassword) ?? '',
-      role:     prefs.getString(_kUserRole)     ?? '',
-    );
-    _localPhotoPath = prefs.getString(_kUserPhoto);
+    // Sessions are local to each device. Refresh the user record when the
+    // app starts so one device never invalidates another device's session.
+    try {
+      final remoteUser = await _db.getUserById(id);
+      if (remoteUser == null) {
+        await _clearSession();
+        return false;
+      }
+      _currentUser = remoteUser;
+    } catch (_) {
+      // Keep the local session available when the device is temporarily offline.
+      _currentUser = UserModel(
+        id:       id,
+        name:     prefs.getString(_kUserName)  ?? '',
+        email:    prefs.getString(_kUserEmail) ?? '',
+        password: '',
+        role:     prefs.getString(_kUserRole)  ?? '',
+      );
+    }
+    _localPhotoPath = _photoPathForUser(prefs, id);
     notifyListeners();
     return true;
   }
@@ -69,7 +82,7 @@ class AuthViewModel extends ChangeNotifier {
       await _saveSession(user);
       // load persisted photo for this user
       final prefs = await SharedPreferences.getInstance();
-      _localPhotoPath = prefs.getString('${_kUserPhoto}_${user.id}');
+      _localPhotoPath = _photoPathForUser(prefs, user.id);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -127,6 +140,7 @@ class AuthViewModel extends ChangeNotifier {
     _localPhotoPath = path;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${_kUserPhoto}_${_currentUser!.id}', path);
+    await prefs.setString('${_kProfilePhoto}_${_currentUser!.id}', path);
     notifyListeners();
   }
 
@@ -135,6 +149,7 @@ class AuthViewModel extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (_currentUser != null) {
       await prefs.remove('${_kUserPhoto}_${_currentUser!.id}');
+      await prefs.remove('${_kProfilePhoto}_${_currentUser!.id}');
     }
     notifyListeners();
   }
@@ -145,8 +160,8 @@ class AuthViewModel extends ChangeNotifier {
     await prefs.setString(_kUserId,       user.id);
     await prefs.setString(_kUserName,     user.name);
     await prefs.setString(_kUserEmail,    user.email);
-    await prefs.setString(_kUserPassword, user.password);
     await prefs.setString(_kUserRole,     user.role);
+    await prefs.remove(_kUserPassword);
   }
 
   Future<void> _clearSession() async {
@@ -157,4 +172,8 @@ class AuthViewModel extends ChangeNotifier {
     await prefs.remove(_kUserPassword);
     await prefs.remove(_kUserRole);
   }
+
+  String? _photoPathForUser(SharedPreferences prefs, String userId) =>
+      prefs.getString('${_kUserPhoto}_$userId') ??
+      prefs.getString('${_kProfilePhoto}_$userId');
 }

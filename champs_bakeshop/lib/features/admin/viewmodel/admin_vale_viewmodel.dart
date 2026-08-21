@@ -192,6 +192,33 @@ class AdminValeViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateEntryPrice(String id, double price) async {
+    if (price <= 0) return false;
+    try {
+      _lastActionError = null;
+      await _db.updateValeEntryPrice(id, price);
+      final idx = _entries.indexWhere((e) => e.id == id);
+      if (idx != -1) {
+        final entry = _entries[idx];
+        _entries[idx] = ValeEntry(
+          id: entry.id,
+          userId: entry.userId,
+          productName: entry.productName,
+          price: price,
+          date: entry.date,
+          createdBy: entry.createdBy,
+          isSettled: entry.isSettled,
+          isDeleted: entry.isDeleted,
+        );
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _lastActionError = e.toString();
+      return false;
+    }
+  }
+
   Future<bool> settleEntry(String id) async {
     try {
       _lastActionError = null;

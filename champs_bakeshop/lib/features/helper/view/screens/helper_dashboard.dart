@@ -172,6 +172,7 @@ class _DashboardAppBar extends StatelessWidget
           child: hasPhoto
               ? Image.file(
                   File(photoPath),
+                  key: ValueKey(photoPath),
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _DashboardAvatarFallback(
                     userName: userName,

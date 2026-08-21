@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/widgets/vale_profile_widgets.dart';
 
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/seller_remittance_viewmodel.dart';
@@ -164,6 +165,15 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     );
   }
 
+  void _showMyVale() {
+    final user = context.read<AuthViewModel>().currentUser!;
+    showMyValeSheet(
+      context: context,
+      userId: user.id,
+      userName: user.name,
+    );
+  }
+
   void _confirmLogout() {
     showDialog(
       context: context,
@@ -232,6 +242,12 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         // ── Info card ────────────────────────────────────────
         _InfoCard(),
         const SizedBox(height: 24),
+
+        ValeProfileButton(
+          onTap: _showMyVale,
+          accentColor: AppColors.seller,
+        ),
+        const SizedBox(height: 16),
 
         // ── Logout ───────────────────────────────────────────
         SizedBox(

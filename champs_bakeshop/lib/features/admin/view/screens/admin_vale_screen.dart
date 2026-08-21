@@ -23,6 +23,18 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   late DateTime _selectedWeekStart = _startOfWeek(DateTime.now());
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final vm = context.read<AdminValeViewModel>();
+      if (vm.users.isEmpty && !vm.isLoading) {
+        vm.load();
+      }
+    });
+  }
+
   static DateTime _startOfWeek(DateTime date) {
     final day = DateTime(date.year, date.month, date.day);
     return day.subtract(Duration(days: day.weekday - 1));
@@ -563,7 +575,56 @@ class _AdminValeScreenState extends State<AdminValeScreen> {
                   ),
 
                   // ── User Cards ──────────────────────────────────────────
-                  users.isEmpty
+                  vm.error != null
+                      ? SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.cloud_off_outlined,
+                                    size: 48,
+                                    color: AppColors.danger,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Unable to load Vale data',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Check your connection and try again.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  OutlinedButton.icon(
+                                    onPressed: () => context
+                                        .read<AdminValeViewModel>()
+                                        .load(),
+                                    icon: const Icon(Icons.refresh, size: 17),
+                                    label: const Text('Retry'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _kOrange,
+                                      side: const BorderSide(color: _kOrange),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                  : users.isEmpty
                       ? SliverFillRemaining(
                           child: Center(
                             child: Column(
@@ -1569,6 +1630,7 @@ class _UserValeSheet extends StatelessWidget {
                           final e = entries[i];
                           return _EntryRow(
                             entry: e,
+                            onEdit: () => _showEditValeDialog(context, e, vm),
                             onDelete: () async {
                               final messenger = ScaffoldMessenger.of(context);
                               final confirm = await _confirmDialog(
@@ -1906,11 +1968,117 @@ void _showAddValeDialog(
 
 // ─── Entry Row ───────────────────────────────────────────────────────────────
 
+class _EditValeDialog extends StatefulWidget {
+  final double initialAmount;
+
+  const _EditValeDialog({required this.initialAmount});
+
+  @override
+  State<_EditValeDialog> createState() => _EditValeDialogState();
+}
+
+class _EditValeDialogState extends State<_EditValeDialog> {
+  late final TextEditingController _amountController;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(
+      text: widget.initialAmount.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final value = double.tryParse(_amountController.text.trim());
+    if (value == null || value <= 0) {
+      setState(() => _errorText = 'Enter an amount greater than 0.');
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Edit Vale Amount',
+        style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.text),
+      ),
+      content: TextField(
+        controller: _amountController,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: 'Amount',
+          prefixIcon: const Icon(Icons.payments_outlined),
+          errorText: _errorText,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: _kOrange),
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _showEditValeDialog(
+  BuildContext context,
+  ValeEntry entry,
+  AdminValeViewModel vm,
+) async {
+  final amount = await showDialog<double>(
+    context: context,
+    builder: (_) => _EditValeDialog(initialAmount: entry.price),
+  );
+
+  if (amount == null || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  if (!await hasInternet()) {
+    messenger.showSnackBar(const SnackBar(
+      content: Text(kNoInternetMsg),
+      backgroundColor: AppColors.danger,
+    ));
+    return;
+  }
+
+  final ok = await vm.updateEntryPrice(entry.id, amount);
+  if (!context.mounted) return;
+  messenger.showSnackBar(SnackBar(
+    content: Text(ok ? 'Vale amount updated.' : 'Failed to update vale.'),
+    backgroundColor: ok ? AppColors.success : AppColors.danger,
+  ));
+}
+
 class _EntryRow extends StatelessWidget {
   final ValeEntry entry;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
-  const _EntryRow({required this.entry, required this.onDelete});
+  const _EntryRow({
+    required this.entry,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1985,6 +2153,15 @@ class _EntryRow extends StatelessWidget {
                 color: AppColors.danger,
               ),
             ),
+            if (onEdit != null)
+              IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined,
+                    size: 18, color: _kOrange),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                tooltip: 'Edit vale',
+              ),
             if (onDelete != null) ...[
               const SizedBox(width: 4),
               IconButton(

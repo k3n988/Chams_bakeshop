@@ -93,12 +93,6 @@ class _SellerDailyScreenState extends State<SellerDailyScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const _PageHeader(
-            title: 'Daily Records',
-            subtitle: 'Your pandesal sales per day',
-          ),
-          const SizedBox(height: 16),
-
           // ── Day navigator ────────────────────────────────
           _DayNav(
             displayDate: _displayDate,

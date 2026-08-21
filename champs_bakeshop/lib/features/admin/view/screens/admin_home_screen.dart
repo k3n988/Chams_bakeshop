@@ -94,9 +94,9 @@ class AdminHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Staff breakdown ─────────────────────────────
-            const _SectionLabel('STAFF BREAKDOWN'),
+            const _SectionLabel('PACKED THIS WEEK - BY PRODUCT'),
             const SizedBox(height: 12),
-            _StaffBreakdownCard(userVM: userVM),
+            _PackedThisWeekCard(prodVM: prodVM),
             const SizedBox(height: 20),
 
             // ── Payroll status ──────────────────────────────
@@ -122,11 +122,6 @@ class AdminHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Packed this week ────────────────────────────
-            const _SectionLabel('PACKED THIS WEEK — BY PRODUCT'),
-            const SizedBox(height: 12),
-            _PackedTodayCard(prodVM: prodVM),
-            const SizedBox(height: 20),
-
           ],
         ),
       ),
@@ -1023,6 +1018,141 @@ class _DonutPainter extends CustomPainter {
 }
 
 // ── Packed today card ─────────────────────────────────────────
+class _PackedThisWeekCard extends StatefulWidget {
+  final AdminProductionViewModel prodVM;
+  const _PackedThisWeekCard({required this.prodVM});
+
+  @override
+  State<_PackedThisWeekCard> createState() => _PackedThisWeekCardState();
+}
+
+class _PackedThisWeekCardState extends State<_PackedThisWeekCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = widget.prodVM.weekPackedByProduct.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final total = widget.prodVM.weekTotalBundles;
+    const colors = [
+      Color(0xFF4C55D9),
+      Color(0xFFFFA000),
+      Color(0xFF19B86B),
+      Color(0xFF20A9D8),
+      Color(0xFFE95478),
+      Color(0xFF8B63D9),
+    ];
+    final segments = [
+      for (var i = 0; i < entries.length; i++)
+        _Segment(entries[i].key, entries[i].value, '', colors[i % colors.length]),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: widget.prodVM.isLoading
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            )
+          : entries.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Text(
+                      'No packing recorded this week.',
+                      style: TextStyle(fontSize: 13, color: AppColors.textHint),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 142,
+                          height: 142,
+                          child: AnimatedBuilder(
+                            animation: _controller,
+                            builder: (_, __) => CustomPaint(
+                              painter: _DonutPainter(
+                                segments: segments,
+                                total: total,
+                                progress: _controller.value,
+                                strokeWidth: 22,
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Total', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                    Text('$total', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.text)),
+                                    const Text('bundles', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              for (final segment in segments) ...[
+                                _LegendRow(seg: segment, total: total),
+                                const SizedBox(height: 10),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Packed this week', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.text)),
+                        Text('$total bundles', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                      ],
+                    ),
+                  ],
+                ),
+    );
+  }
+}
+
 class _PackedTodayCard extends StatelessWidget {
   final AdminProductionViewModel prodVM;
   const _PackedTodayCard({required this.prodVM});

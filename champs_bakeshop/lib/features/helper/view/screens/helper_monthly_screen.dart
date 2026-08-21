@@ -266,22 +266,7 @@ class _HelperMonthlyScreenState extends State<HelperMonthlyScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Monthly Summary',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.text,
-                            letterSpacing: -0.5)),
-                    SizedBox(height: 2),
-                    Text('Earnings overview per month',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint)),
-                  ],
-                ),
+                const Spacer(),
                 if (!_isCurrentMonth)
                   GestureDetector(
                     onTap: () {
