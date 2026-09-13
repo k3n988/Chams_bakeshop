@@ -203,10 +203,25 @@ class SellerSessionViewModel extends ChangeNotifier {
     required SessionType sessionType,
     String?              date,        // if null → uses today
   }) async {
+    if (sellerId.trim().isEmpty || plantsaCount < 0 || subraPieces < 0 ||
+        (plantsaCount == 0 && subraPieces == 0)) {
+      _error = 'Enter a valid plantsa or subra quantity.';
+      notifyListeners();
+      return false;
+    }
+
+    final now = DateTime.now();
+    final dateStr = date ?? now.toIso8601String().substring(0, 10);
+    final parsedDate = DateTime.tryParse(dateStr);
+    final today = DateTime(now.year, now.month, now.day);
+    if (parsedDate == null || parsedDate.isAfter(today)) {
+      _error = 'Sessions can only be recorded for today or an earlier date.';
+      notifyListeners();
+      return false;
+    }
+
     _setLoading(true);
     try {
-      final now     = DateTime.now();
-      final dateStr = date ?? now.toIso8601String().substring(0, 10);
       final tsStr   = now.toIso8601String();
       final typeStr = sessionType == SessionType.morning ? 'morning' : 'afternoon';
 
@@ -271,6 +286,12 @@ class SellerSessionViewModel extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (returnPieces < 0 || returnPieces > session.totalPiecesTaken ||
+        actualRemittance < 0 || salary < 0) {
+      _error = 'Enter valid remittance details.';
+      notifyListeners();
+      return false;
+    }
 
     _setLoading(true);
     try {
@@ -283,6 +304,7 @@ class SellerSessionViewModel extends ChangeNotifier {
         totalPiecesTaken:   session.totalPiecesTaken,
         expectedRemittance: session.expectedRemittance,
         salary:             salary,
+        gasDeduction:       0,
         remittedAt:         DateTime.now().toIso8601String(),
       );
 
@@ -320,6 +342,12 @@ class SellerSessionViewModel extends ChangeNotifier {
         : _afternoonRemittance;
 
     if (existing == null) return false;
+    if (returnPieces < 0 || returnPieces > existing.totalPiecesTaken ||
+        actualRemittance < 0 || salary < 0) {
+      _error = 'Enter valid remittance details.';
+      notifyListeners();
+      return false;
+    }
 
     _setLoading(true);
     try {
@@ -329,6 +357,7 @@ class SellerSessionViewModel extends ChangeNotifier {
         actualRemittance: actualRemittance,
         totalPiecesTaken: existing.totalPiecesTaken,
         salary:           salary,
+        gasDeduction:     0,
       );
 
       if (updated != null) {

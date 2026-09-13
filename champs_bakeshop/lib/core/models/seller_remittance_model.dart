@@ -15,6 +15,7 @@ class SellerRemittanceModel {
 
   // ── Salary (5% or 15% of adjusted remittance, set by admin) ─
   final double salary;
+  final double gasDeduction;
 
   // ── Computed ───────────────────────────────────────────────
   /// Pieces actually sold
@@ -44,6 +45,7 @@ class SellerRemittanceModel {
     required this.remittedAt,
     required this.createdAt,
     this.salary = 0.0,   // ← defaults to 0 so old records don't crash
+    this.gasDeduction = 0.0,
   });
 
   // ── Serialization ──────────────────────────────────────────
@@ -58,6 +60,7 @@ class SellerRemittanceModel {
       totalPiecesTaken:    (json['total_pieces_taken'] as num).toInt(),
       expectedRemittance:  (json['expected_remittance'] as num).toDouble(),
       salary:              (json['salary'] as num?)?.toDouble() ?? 0.0,
+      gasDeduction:        (json['gas_deduction'] as num?)?.toDouble() ?? 0.0,
       remittedAt:          json['remitted_at'] as String,
       createdAt:           DateTime.parse(json['created_at'] as String),
     );
@@ -73,6 +76,7 @@ class SellerRemittanceModel {
         'total_pieces_taken':  totalPiecesTaken,
         'expected_remittance': expectedRemittance,
         'salary':              salary,
+        'gas_deduction':       gasDeduction,
         'remitted_at':         remittedAt,
         'created_at':          createdAt.toIso8601String(),
       };
@@ -86,6 +90,7 @@ class SellerRemittanceModel {
         'total_pieces_taken':  totalPiecesTaken,
         'expected_remittance': expectedRemittance,
         'salary':              salary,
+        'gas_deduction':       gasDeduction,
         'remitted_at':         remittedAt,
       };
 
@@ -99,6 +104,7 @@ class SellerRemittanceModel {
     int?      totalPiecesTaken,
     double?   expectedRemittance,
     double?   salary,
+    double?   gasDeduction,
     String?   remittedAt,
     DateTime? createdAt,
   }) {
@@ -112,6 +118,7 @@ class SellerRemittanceModel {
       totalPiecesTaken:    totalPiecesTaken    ?? this.totalPiecesTaken,
       expectedRemittance:  expectedRemittance  ?? this.expectedRemittance,
       salary:              salary              ?? this.salary,
+      gasDeduction:        gasDeduction        ?? this.gasDeduction,
       remittedAt:          remittedAt          ?? this.remittedAt,
       createdAt:           createdAt           ?? this.createdAt,
     );

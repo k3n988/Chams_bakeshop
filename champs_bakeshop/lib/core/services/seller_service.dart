@@ -7,6 +7,10 @@ class SellerService {
 
   static const _sessionTable    = 'seller_sessions';
   static const _remittanceTable = 'seller_remittances';
+  static const _paymentTable    = 'seller_payroll_payments';
+
+  bool _isMissingPaymentTable(Object error) =>
+      error is PostgrestException && error.code == 'PGRST205';
 
   // ════════════════════════════════════════════════════════════
   //  SESSION
@@ -21,6 +25,13 @@ class SellerService {
     required String takenOutAt,
     String sessionType = 'morning',   // 'morning' | 'afternoon'
   }) async {
+    if (sellerId.trim().isEmpty ||
+        plantsaCount < 0 ||
+        subraPieces < 0 ||
+        plantsaCount == 0 && subraPieces == 0 ||
+        !const {'morning', 'afternoon'}.contains(sessionType)) {
+      throw ArgumentError('Invalid seller session details.');
+    }
     try {
       final data = await _db
           .from(_sessionTable)
@@ -130,8 +141,20 @@ class SellerService {
     required String sessionId,
     required int    plantsaCount,
     required int    subraPieces,
+    required bool   isAdmin,
   }) async {
+    if (!isAdmin) {
+      throw StateError('Only an admin can edit a pending seller session.');
+    }
+    if (plantsaCount < 0 || subraPieces < 0 ||
+        (plantsaCount == 0 && subraPieces == 0)) {
+      throw ArgumentError('Invalid seller session details.');
+    }
     try {
+      final remittance = await getRemittanceBySession(sessionId: sessionId);
+      if (remittance != null) {
+        throw StateError('A remitted seller session can no longer be edited.');
+      }
       final data = await _db
           .from(_sessionTable)
           .update({
@@ -210,8 +233,14 @@ class SellerService {
     required int    totalPiecesTaken,
     required double expectedRemittance,
     required double salary, // 👈 ADDED SALARY HERE
+    required double gasDeduction,
     required String remittedAt,
   }) async {
+    if (returnPieces < 0 || actualRemittance < 0 || totalPiecesTaken < 0 ||
+        expectedRemittance < 0 || salary < 0 || gasDeduction < 0 ||
+        returnPieces > totalPiecesTaken) {
+      throw ArgumentError('Invalid remittance details.');
+    }
     try {
       final data = await _db
           .from(_remittanceTable)
@@ -224,6 +253,7 @@ class SellerService {
             'total_pieces_taken':  totalPiecesTaken,
             'expected_remittance': expectedRemittance,
             'salary':              salary, // 👈 ADDED TO SUPABASE INSERT
+            'gas_deduction':       gasDeduction,
             'remitted_at':         remittedAt,
           })
           .select()
@@ -244,7 +274,12 @@ class SellerService {
     required double actualRemittance,
     required int    totalPiecesTaken,
     required double salary, // 👈 ADDED SALARY HERE
+    required double gasDeduction,
   }) async {
+    if (returnPieces < 0 || actualRemittance < 0 || totalPiecesTaken < 0 ||
+        salary < 0 || gasDeduction < 0 || returnPieces > totalPiecesTaken) {
+      throw ArgumentError('Invalid remittance details.');
+    }
     try {
       final data = await _db
           .from(_remittanceTable)
@@ -252,6 +287,7 @@ class SellerService {
             'return_pieces':     returnPieces,
             'actual_remittance': actualRemittance,
             'salary':            salary, // 👈 ADDED TO SUPABASE UPDATE
+            'gas_deduction':     gasDeduction,
           })
           .eq('id', remittanceId)
           .select()
@@ -266,6 +302,52 @@ class SellerService {
   // ════════════════════════════════════════════════════════════
   //  COMBINED DAILY VIEW
   // ════════════════════════════════════════════════════════════
+
+  Future<Set<String>> getPaidSellerIdsForDate(String date) async {
+    try {
+      final data = await _db
+          .from(_paymentTable)
+          .select('seller_id')
+          .eq('date', date);
+      return (data as List)
+          .map((row) => row['seller_id'] as String)
+          .toSet();
+    } catch (e) {
+      if (_isMissingPaymentTable(e)) return {};
+      throw Exception('Failed to load seller payment status: $e');
+    }
+  }
+
+  Future<void> markSellerPaid({
+    required String sellerId,
+    required String date,
+  }) async {
+    try {
+      await _db.from(_paymentTable).upsert({
+        'seller_id': sellerId,
+        'date': date,
+        'paid_at': DateTime.now().toIso8601String(),
+        'paid_by': _db.auth.currentUser?.id,
+      }, onConflict: 'seller_id,date');
+    } catch (e) {
+      throw Exception('Failed to mark seller as paid: $e');
+    }
+  }
+
+  Future<void> clearSellerPaid({
+    required String sellerId,
+    required String date,
+  }) async {
+    try {
+      await _db.from(_paymentTable)
+          .delete()
+          .eq('seller_id', sellerId)
+          .eq('date', date);
+    } catch (e) {
+      if (_isMissingPaymentTable(e)) return;
+      throw Exception('Failed to reset seller payment status: $e');
+    }
+  }
 
   Future<Map<String, dynamic>> getDailyRecord({
     required String sellerId,

@@ -61,7 +61,7 @@ class _SellerRemitScreenState extends State<SellerRemitScreen> {
     final uid       = context.read<AuthViewModel>().currentUser!.id;
     final messenger = ScaffoldMessenger.of(context);
 
-    if (_remittedCtrl.text.trim().isEmpty || _actualRemittance <= 0) {
+    if (_remittedCtrl.text.trim().isEmpty || _actualRemittance < 0) {
       messenger.showSnackBar(const SnackBar(
         content: Text('Please enter a valid amount remitted'),
         backgroundColor: AppColors.danger,

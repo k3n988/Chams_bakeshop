@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../../../core/models/user_model.dart';
@@ -100,12 +99,19 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         );
       }));
 
-      // Load persisted paid state for this date
-      final prefs = await SharedPreferences.getInstance();
+      final storedPaidIds = await _service.getPaidSellerIdsForDate(_dateStr);
       _paidSellerIds.clear();
       for (final s in sellers) {
-        if (prefs.getBool('seller_paid_${s.id}_$_dateStr') == true) {
+        final sessions = newSessions[s.id] ?? const <SellerSessionModel>[];
+        final remittances =
+            newRemittances[s.id] ?? const <SellerRemittanceModel>[];
+        final allSessionsRemitted = sessions.isNotEmpty &&
+            sessions.every((session) =>
+                remittances.any((remit) => remit.sessionId == session.id));
+        if (storedPaidIds.contains(s.id) && allSessionsRemitted) {
           _paidSellerIds.add(s.id);
+        } else if (storedPaidIds.contains(s.id)) {
+          await _service.clearSellerPaid(sellerId: s.id, date: _dateStr);
         }
       }
 
@@ -183,7 +189,20 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         text: existing != null
             ? existing.actualRemittance.toStringAsFixed(0)
             : '');
-    double selectedPct = 0.05;
+    final gasCtrl = TextEditingController(
+        text: existing != null
+            ? existing.gasDeduction.toStringAsFixed(2)
+            : '0');
+    final existingBase = existing == null
+        ? 0.0
+        : (existing.totalPiecesTaken - existing.returnPieces).clamp(
+            0, existing.totalPiecesTaken) * 5.0;
+    final existingGrossSalary =
+        (existing?.salary ?? 0) + (existing?.gasDeduction ?? 0);
+    double selectedPct = existingBase > 0 &&
+            (existingGrossSalary / existingBase) >= 0.10
+        ? 0.15
+        : 0.05;
 
     showDialog(
       context: context,
@@ -194,8 +213,15 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
           final total = session.totalPiecesTaken;
           final sold = (total - returnPieces).clamp(0, total);
           final adjusted = sold * 5.0;
-          final variance = actualCash - adjusted;
-          final salary = adjusted * selectedPct;
+          final gasDeduction = double.tryParse(gasCtrl.text) ?? 0.0;
+          final shouldRemit = (adjusted - gasDeduction)
+              .clamp(0.0, double.infinity)
+              .toDouble();
+          final variance = actualCash - shouldRemit;
+          final grossSalary = adjusted * selectedPct;
+          final salary = (grossSalary - gasDeduction)
+              .clamp(0.0, double.infinity)
+              .toDouble();
           final vColor = variance >= 0 ? AppColors.success : AppColors.danger;
 
           return AlertDialog(
@@ -277,6 +303,32 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                           color: AppColors.warning, width: 1.5),
                     ),
                     helperText: 'Sold: $sold pcs ($total − $returnPieces)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Gas deduction
+                TextField(
+                  controller: gasCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                  ],
+                  onChanged: (_) => setDlg(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Gas Deduction per Session',
+                    helperText:
+                        'Deducted from should remit and session salary.',
+                    prefixIcon: const Icon(Icons.local_gas_station_outlined,
+                        color: AppColors.warning),
+                    suffixText: '₱',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppColors.warning, width: 1.5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -369,7 +421,7 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                               Text('Should remit ($sold × ₱5)',
                                   style: const TextStyle(
                                       fontSize: 11, color: AppColors.textHint)),
-                              Text(formatCurrency(adjusted),
+                              Text(formatCurrency(shouldRemit),
                                   style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
@@ -404,10 +456,31 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                 style:
                     FilledButton.styleFrom(backgroundColor: AppColors.seller),
                 onPressed: () async {
-                  if (cashCtrl.text.trim().isEmpty) return;
+                  final msg = ScaffoldMessenger.of(context);
+                  if (cashCtrl.text.trim().isEmpty) {
+                    msg.showSnackBar(const SnackBar(
+                      content: Text('Enter the actual cash remitted.'),
+                      backgroundColor: AppColors.danger,
+                    ));
+                    return;
+                  }
                   final retPcs = int.tryParse(returnCtrl.text) ?? 0;
                   final cash = double.tryParse(cashCtrl.text) ?? 0.0;
-                  final msg = ScaffoldMessenger.of(context);
+                  if (retPcs < 0 || retPcs > session.totalPiecesTaken) {
+                    msg.showSnackBar(SnackBar(
+                      content: Text(
+                          'Returned pieces must be between 0 and ${session.totalPiecesTaken}.'),
+                      backgroundColor: AppColors.danger,
+                    ));
+                    return;
+                  }
+                  if (cash < 0 || gasDeduction < 0) {
+                    msg.showSnackBar(const SnackBar(
+                      content: Text('Cash and gas deduction cannot be negative.'),
+                      backgroundColor: AppColors.danger,
+                    ));
+                    return;
+                  }
                   try {
                     if (existing != null) {
                       await _service.updateRemittance(
@@ -416,6 +489,7 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                         actualRemittance: cash,
                         totalPiecesTaken: session.totalPiecesTaken,
                         salary: salary,
+                        gasDeduction: gasDeduction,
                       );
                     } else {
                       await _service.createRemittance(
@@ -427,6 +501,7 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                         totalPiecesTaken: session.totalPiecesTaken,
                         expectedRemittance: session.expectedRemittance,
                         salary: salary,
+                        gasDeduction: gasDeduction,
                         remittedAt: DateTime.now().toIso8601String(),
                       );
                     }
@@ -535,13 +610,48 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
             label: const Text('Confirm Paid'),
             style: FilledButton.styleFrom(backgroundColor: AppColors.success),
             onPressed: () async {
-              Navigator.pop(ctx);
-              // Persist to SharedPreferences so it survives refreshes
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('seller_paid_${seller.id}_$_dateStr', true);
+              final messenger = ScaffoldMessenger.of(context);
+              final sessions = await _service.getSessionsByRange(
+                sellerId: seller.id,
+                fromDate: _dateStr,
+                toDate: _dateStr,
+              );
+              final remittances = await _service.getRemittancesByRange(
+                sellerId: seller.id,
+                fromDate: _dateStr,
+                toDate: _dateStr,
+              );
+              final complete = sessions.isNotEmpty && sessions.every(
+                  (session) => remittances.any(
+                      (remittance) => remittance.sessionId == session.id));
+              if (!complete) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                await _load();
+                if (!mounted) return;
+                messenger.showSnackBar(const SnackBar(
+                  content: Text(
+                      'Complete every seller session before marking paid.'),
+                  backgroundColor: AppColors.warning,
+                ));
+                return;
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              try {
+                await _service.markSellerPaid(
+                  sellerId: seller.id,
+                  date: _dateStr,
+                );
+              } catch (e) {
+                if (!mounted) return;
+                messenger.showSnackBar(SnackBar(
+                  content: Text('Unable to mark paid: $e'),
+                  backgroundColor: AppColors.danger,
+                ));
+                return;
+              }
               if (!mounted) return;
               setState(() => _paidSellerIds.add(seller.id));
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              messenger.showSnackBar(SnackBar(
                 content: Text('${seller.name} marked as paid! ✅'),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
@@ -576,8 +686,17 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
 
     final payableSellers =
         sellers.where((s) => (_sessions[s.id] ?? []).isNotEmpty).toList();
+    bool isSellerPaid(String sellerId) {
+      final sessions = _sessions[sellerId] ?? const <SellerSessionModel>[];
+      final remittances =
+          _remittances[sellerId] ?? const <SellerRemittanceModel>[];
+      final allRemitted = sessions.isNotEmpty && sessions.every((session) =>
+          remittances.any((remit) => remit.sessionId == session.id));
+      return _paidSellerIds.contains(sellerId) && allRemitted;
+    }
+
     final paidCount =
-        payableSellers.where((s) => _paidSellerIds.contains(s.id)).length;
+        payableSellers.where((s) => isSellerPaid(s.id)).length;
     final unpaidCount = payableSellers.length - paidCount;
 
     return RefreshIndicator(
@@ -625,7 +744,7 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
             ...sellers.map((seller) {
               final sessions = _sessions[seller.id] ?? [];
               final remits = _remittances[seller.id] ?? [];
-              final isPaid = _paidSellerIds.contains(seller.id);
+              final isPaid = isSellerPaid(seller.id);
               final sellerTotal =
                   remits.fold(0.0, (s, r) => s + r.actualRemittance);
               final sellerSalary = remits.fold(0.0, (s, r) => s + r.salary);
@@ -817,6 +936,7 @@ class _SellerPayoutTableSheet extends StatelessWidget {
       'rate' => '${rate.toStringAsFixed(0)}%',
       'return' => '${remit.returnPieces} pcs',
       'cash' => formatCurrency(remit.actualRemittance),
+      'gas' => formatCurrency(remit.gasDeduction),
       _ => formatCurrency(remit.salary),
     };
     return Text(text,
@@ -844,7 +964,7 @@ class _SellerPayoutTableSheet extends StatelessWidget {
                       const TextStyle(fontSize: 11, color: AppColors.textHint)),
             ]),
             const SizedBox(height: 4),
-            const Text('Per-session rate, returns, cash remittance, and payout',
+            const Text('Per-session rate, returns, gas, cash remittance, and payout',
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             const SizedBox(height: 14),
             if (sellers.isEmpty)
@@ -869,10 +989,12 @@ class _SellerPayoutTableSheet extends StatelessWidget {
                       DataColumn(label: Text('M Rate')),
                       DataColumn(label: Text('M Return')),
                       DataColumn(label: Text('M Cash')),
+                      DataColumn(label: Text('M Gas')),
                       DataColumn(label: Text('M Payout')),
                       DataColumn(label: Text('A Rate')),
                       DataColumn(label: Text('A Return')),
                       DataColumn(label: Text('A Cash')),
+                      DataColumn(label: Text('A Gas')),
                       DataColumn(label: Text('A Payout')),
                       DataColumn(label: Text('Total payout')),
                       DataColumn(label: Text('Status')),
@@ -896,10 +1018,12 @@ class _SellerPayoutTableSheet extends StatelessWidget {
                         DataCell(_sessionValueCell(seller.id, 'morning', 'rate')),
                         DataCell(_sessionValueCell(seller.id, 'morning', 'return')),
                         DataCell(_sessionValueCell(seller.id, 'morning', 'cash')),
+                        DataCell(_sessionValueCell(seller.id, 'morning', 'gas')),
                         DataCell(_payoutCell(seller.id, 'morning')),
                         DataCell(_sessionValueCell(seller.id, 'afternoon', 'rate')),
                         DataCell(_sessionValueCell(seller.id, 'afternoon', 'return')),
                         DataCell(_sessionValueCell(seller.id, 'afternoon', 'cash')),
+                        DataCell(_sessionValueCell(seller.id, 'afternoon', 'gas')),
                         DataCell(_payoutCell(seller.id, 'afternoon')),
                         DataCell(Text(formatCurrency(total),
                             style:
@@ -1347,6 +1471,13 @@ class _SessionRemitRow extends StatelessWidget {
                         fontWeight: FontWeight.w600),
                   ),
                   // ── Per-session salary ────────────────────
+                  Text(
+                    'Gas deduction: ${formatCurrency(remit!.gasDeduction)}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w600),
+                  ),
                   if (remit!.salary > 0)
                     Text(
                       'Salary: ${formatCurrency(remit!.salary)}',

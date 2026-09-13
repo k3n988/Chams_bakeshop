@@ -12,6 +12,7 @@ import 'manage_products_screen.dart' as products_screen;
 import 'christmas_bonus_screen.dart' as bonus_screen;
 import 'admin_vale_screen.dart';
 import '../../../master_baker/view/screens/baker_production_input_screen.dart';
+import 'admin_seller_session_screen.dart';
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -199,6 +200,17 @@ class AdminDrawer extends StatelessWidget {
                 onTap: () => _openPage(
                   context,
                   const BakerProductionInputScreen(adminMode: true),
+                ),
+              ),
+
+              _DrawerItem(
+                icon:       Icons.storefront_outlined,
+                color:      AppColors.seller,
+                label:      'Seller Sessions',
+                subtitle:   'Add morning or afternoon session',
+                onTap: () => _openPage(
+                  context,
+                  const AdminSellerSessionScreen(),
                 ),
               ),
 

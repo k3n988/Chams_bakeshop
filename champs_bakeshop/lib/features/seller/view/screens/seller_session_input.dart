@@ -3,17 +3,25 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
+import '../../../../core/models/seller_session_model.dart';
+import '../../../../core/services/seller_service.dart';
 import '../../../auth/viewmodel/auth_viewmodel.dart';
 import '../../viewmodel/seller_session_viewmodel.dart';
 
 class SellerSessionInputScreen extends StatefulWidget {
   final SessionType sessionType;
   final String?     date; // pass null = use today
+  final String?     sellerId;
+  final String?     sellerName;
+  final SellerSessionModel? editableSession;
 
   const SellerSessionInputScreen({
     super.key,
     required this.sessionType,
     this.date,
+    this.sellerId,
+    this.sellerName,
+    this.editableSession,
   });
 
   @override
@@ -25,6 +33,7 @@ class _SellerSessionInputScreenState
     extends State<SellerSessionInputScreen> {
   final _plantsaCtrl = TextEditingController();
   final _subraCtrl   = TextEditingController();
+  bool _isSaving = false;
 
   static const int    _piecesPerPlantsa = AppConstants.sellerPiecesPerPlantsa;
   static const double _pricePerPiece    = AppConstants.sellerPricePerPiece;
@@ -37,11 +46,16 @@ class _SellerSessionInputScreenState
       _expectedRemittance * AppConstants.sellerSalaryRate;
 
   bool   get _isMorning => widget.sessionType == SessionType.morning;
+  bool get _isEditing => widget.editableSession != null;
 
-  // Effective date shown in header
-  String get _effectiveDate {
-    if (widget.date != null) return widget.date!;
-    return DateTime.now().toIso8601String().substring(0, 10);
+  @override
+  void initState() {
+    super.initState();
+    final session = widget.editableSession;
+    if (session != null) {
+      _plantsaCtrl.text = session.plantsaCount.toString();
+      _subraCtrl.text = session.subraPieces.toString();
+    }
   }
 
   @override
@@ -62,20 +76,51 @@ class _SellerSessionInputScreenState
     }
 
     final vm        = context.read<SellerSessionViewModel>();
-    final uid       = context.read<AuthViewModel>().currentUser!.id;
+    final currentUser = context.read<AuthViewModel>().currentUser;
+    final uid       = widget.sellerId ??
+        currentUser!.id;
     final messenger = ScaffoldMessenger.of(context);
 
-    final ok = await vm.createSession(
-      sellerId:     uid,
-      plantsaCount: _plantsa,
-      subraPieces:  _subra,
-      sessionType:  widget.sessionType,
-      date:         widget.date, // pass selected date
-    );
+    if (_isEditing && currentUser?.isAdmin != true) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Only an admin can edit a pending seller session.'),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    bool ok = false;
+    String? saveError;
+    try {
+      if (_isEditing) {
+        await SellerService().updateSession(
+          sessionId: widget.editableSession!.id,
+          plantsaCount: _plantsa,
+          subraPieces: _subra,
+          isAdmin: currentUser!.isAdmin,
+        );
+        ok = true;
+      } else {
+        ok = await vm.createSession(
+          sellerId: uid,
+          plantsaCount: _plantsa,
+          subraPieces: _subra,
+          sessionType: widget.sessionType,
+          date: widget.date,
+        );
+      }
+    } catch (e) {
+      saveError = e.toString();
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
 
     if (ok && mounted) {
       messenger.showSnackBar(SnackBar(
-        content: Text(_isMorning
+        content: Text(_isEditing
+            ? 'Session updated successfully.'
+            : _isMorning
             ? 'Morning session started! Good luck selling 🥖'
             : 'Afternoon session started! Good luck selling 🥖'),
         backgroundColor: AppColors.success,
@@ -83,7 +128,7 @@ class _SellerSessionInputScreenState
       Navigator.pop(context);
     } else if (mounted) {
       messenger.showSnackBar(SnackBar(
-        content: Text(vm.error ?? 'Failed to start session. Try again.'),
+        content: Text(saveError ?? vm.error ?? 'Failed to save session. Try again.'),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -101,10 +146,6 @@ class _SellerSessionInputScreenState
         _isMorning ? AppColors.seller : AppColors.warning;
     final sessionLabel =
         _isMorning ? 'Morning Session' : 'Afternoon Session';
-    final sessionIcon  = _isMorning
-        ? Icons.wb_sunny_outlined
-        : Icons.wb_twilight_outlined;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4F0),
       appBar: AppBar(
@@ -115,7 +156,11 @@ class _SellerSessionInputScreenState
               size: 18, color: AppColors.text),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(sessionLabel,
+        title: Text(_isEditing
+            ? 'Edit $sessionLabel'
+            : widget.sellerName == null
+                ? sessionLabel
+            : '$sessionLabel — ${widget.sellerName}',
             style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -127,14 +172,6 @@ class _SellerSessionInputScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Date header ──────────────────────────────────
-            _DateHeader(
-              dateLabel:    _effectiveDate,
-              sessionLabel: sessionLabel,
-              icon:         sessionIcon,
-              color:        primaryColor,
-            ),
-            const SizedBox(height: 20),
-
             // ── Info card ────────────────────────────────────
             _InfoCard(
               icon:  Icons.info_outline,
@@ -211,7 +248,7 @@ class _SellerSessionInputScreenState
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: vm.isLoading ? null : _submit,
+                onPressed: vm.isLoading || _isSaving ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
@@ -222,9 +259,11 @@ class _SellerSessionInputScreenState
                     ? const CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5)
                     : Text(
-                        _isMorning
-                            ? 'Start Morning Selling'
-                            : 'Start Afternoon Selling',
+                        _isEditing
+                            ? 'Save Session Changes'
+                            : _isMorning
+                                ? 'Start Morning Selling'
+                                : 'Start Afternoon Selling',
                         style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -356,45 +395,6 @@ class _CalcRow extends StatelessWidget {
                       isBold ? FontWeight.w800 : FontWeight.w500)),
         ],
       );
-}
-
-class _DateHeader extends StatelessWidget {
-  final String   dateLabel;
-  final String   sessionLabel;
-  final IconData icon;
-  final Color    color;
-  const _DateHeader({
-    required this.dateLabel,
-    required this.sessionLabel,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) => Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(sessionLabel,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.text)),
-            Text(dateLabel,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary)),
-          ],
-        ),
-      ]);
 }
 
 class _InfoCard extends StatelessWidget {
