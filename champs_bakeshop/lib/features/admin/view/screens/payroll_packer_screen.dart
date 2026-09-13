@@ -606,9 +606,7 @@ class _PackerWeekNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: isCurrentWeek
-              ? AppColors.packer.withValues(alpha: 0.05)
-              : Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isCurrentWeek

@@ -370,7 +370,33 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       counts[u.role] = (counts[u.role] ?? 0) + 1;
     }
 
-    return RefreshIndicator(
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBFCFE),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('User Management',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
+                color: AppColors.text)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: () => _showDialog(context),
+              icon: const Icon(Icons.add, size: 17),
+              label: const Text('Add User'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFF8C00),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
       color: const Color(0xFFFF8C00),
       onRefresh: () async {
         await context
@@ -385,28 +411,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header ────────────────────────────────────
-            SectionHeader(
-              title: 'User Management',
-              subtitle: 'Manage bakery staff accounts',
-              trailing: FilledButton.icon(
-                onPressed: () => _showDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add User'),
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xFFFF8C00),
-                  shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // ── Staff summary ──────────────────────────────
-            _StaffSummaryRow(counts: counts),
-            const SizedBox(height: 16),
-
             // ── Role filter chips ──────────────────────────
             SizedBox(
               height: 36,
@@ -508,11 +513,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                         _showDialog(context, user: u),
                     onDelete: () =>
                         _confirmDelete(context, u),
-                  )),
+                   )),
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -666,24 +672,28 @@ class _UserCard extends StatelessWidget {
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
                   children: [
-                Text(displayName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: AppColors.text)),
-                if (displayName != user.name) ...[
-                  const SizedBox(height: 1),
-                  Text(user.name,
-                      style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textHint,
-                          fontStyle: FontStyle.italic)),
-                ],
-                const SizedBox(height: 3),
-                Text(user.email,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary)),
+                Row(children: [
+                  Flexible(
+                    flex: 2,
+                    child: Text(displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: AppColors.text)),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 3,
+                    child: Text(user.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary)),
+                  ),
+                ]),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(

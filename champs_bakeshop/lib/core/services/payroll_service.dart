@@ -1,15 +1,12 @@
 import '../models/product_model.dart';
 import '../models/production_model.dart';
 import '../models/payroll_model.dart';
-import '../utils/constants.dart';
 import 'supabase_service.dart';
 
 class PayrollService {
   final SupabaseService _db;
 
   PayrollService(this._db);
-
-  static const double incentivePerSack = 100.0;
 
   static bool isIncentiveExemptProduct(ProductModel product) {
     final name = product.name.trim().toLowerCase();
@@ -20,7 +17,7 @@ class PayrollService {
       ProductionModel production, List<ProductModel> products) {
     double totalValue = 0;
     double totalBonusAmount = 0;
-    double totalEffectiveSacks = 0;
+    double bakerIncentiveAmount = 0;
     int totalSacks = 0;
     int totalExtraKg = 0;
 
@@ -32,7 +29,8 @@ class PayrollService {
         totalValue += product.pricePerSack * effective;
         totalBonusAmount += product.bonusPerSack * effective;
         if (!isIncentiveExemptProduct(product)) {
-          totalEffectiveSacks += effective;
+          bakerIncentiveAmount +=
+              product.masterBakerIncentivePerSack * effective;
         }
         totalSacks += item.sacks;
         totalExtraKg += item.extraKg;
@@ -43,7 +41,7 @@ class PayrollService {
         production.totalWorkers > 0 ? production.totalWorkers : 1;
     final salaryPerWorker = totalValue / totalWorkers;
     final bonusPerWorker = totalBonusAmount / totalWorkers;
-    final bakerIncentive = totalEffectiveSacks * incentivePerSack;
+    final bakerIncentive = bakerIncentiveAmount;
 
     return DailySalaryResult(
       totalValue: totalValue,
@@ -74,7 +72,7 @@ class PayrollService {
       final calc = computeDaily(prod, products);
       final allIds = [prod.masterBakerId, ...prod.helperIds];
       final ovenHelperId = prod.ovenHelperId;
-      const ovenDeductionPerDay = AppConstants.helperOvenDeductionPerDay;
+      final ovenDeductionPerDay = prod.ovenRate;
       final nonOvenHelperCount = ovenHelperId == null
           ? 0
           : prod.helperIds.where((id) => id != ovenHelperId).length;

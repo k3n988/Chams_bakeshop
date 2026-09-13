@@ -43,7 +43,9 @@ class _ProductionReportsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
+    return ColoredBox(
+      color: const Color(0xFFFBFCFE),
+      child: Column(children: [
       Container(
         color: Colors.white,
         child: Column(children: [
@@ -74,7 +76,8 @@ class _ProductionReportsScreenState
           ],
         ),
       ),
-    ]);
+      ]),
+    );
   }
 }
 
@@ -447,7 +450,7 @@ class _BakedReportsTabState extends State<_BakedReportsTab> {
     final weeks = _getWeeksInMonth();
 
     return ColoredBox(
-      color: const Color(0xFFF8F7F5),
+      color: const Color(0xFFFBFCFE),
       child: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async =>

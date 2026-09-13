@@ -121,7 +121,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F4F0),
       drawer: const AdminDrawer(),
 
       appBar: AppBar(
@@ -133,12 +133,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: AppColors.primary
-                  .withValues(alpha: 0.08),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.menu,
-                color: AppColors.primary, size: 20),
+                color: Colors.black, size: 20),
           ),
           onPressed: () =>
               _scaffoldKey.currentState?.openDrawer(),
@@ -191,14 +190,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ],
         ),
-        child: NavigationBar(
+        child: NavigationBarTheme(
+          data: const NavigationBarThemeData(
+            iconTheme: WidgetStatePropertyAll(
+                IconThemeData(color: Colors.black)),
+            labelTextStyle: WidgetStatePropertyAll(
+                TextStyle(color: Colors.black, fontSize: 12)),
+          ),
+          child: NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: (i) =>
               setState(() => _index = i),
           backgroundColor: Colors.white,
           elevation: 0,
           indicatorColor:
-              AppColors.primary.withValues(alpha: 0.1),
+              AppColors.primary.withValues(alpha: 0.10),
           labelBehavior:
               NavigationDestinationLabelBehavior
                   .alwaysShow,
@@ -224,6 +230,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     color: AppColors.helper),
                 label: 'Batch'),
           ],
+          ),
         ),
       ),
     );

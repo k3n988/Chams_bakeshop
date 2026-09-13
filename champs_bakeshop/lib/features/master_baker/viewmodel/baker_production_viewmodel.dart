@@ -130,7 +130,7 @@ class BakerProductionViewModel extends ChangeNotifier {
       List<ProductionItem> items, int helperCount) {
     double totalValue          = 0;
     double totalBonusAmount    = 0;
-    double totalEffectiveSacks = 0;
+    double bakerIncentiveAmount = 0;
     int    totalSacks          = 0;
     int    totalExtraKg        = 0;
 
@@ -142,7 +142,8 @@ class BakerProductionViewModel extends ChangeNotifier {
         totalValue          += product.pricePerSack * eff;
         totalBonusAmount    += product.bonusPerSack * eff;
         if (!PayrollService.isIncentiveExemptProduct(product)) {
-          totalEffectiveSacks += eff;
+          bakerIncentiveAmount +=
+              product.masterBakerIncentivePerSack * eff;
         }
         totalSacks          += item.sacks;
         totalExtraKg        += item.extraKg;
@@ -154,8 +155,7 @@ class BakerProductionViewModel extends ChangeNotifier {
         totalWorkers > 0 ? totalValue / totalWorkers : 0.0;
     final bonusPerWorker =
         totalWorkers > 0 ? totalBonusAmount / totalWorkers : 0.0;
-    final bakerIncentive =
-        totalEffectiveSacks * PayrollService.incentivePerSack;
+    final bakerIncentive = bakerIncentiveAmount;
 
     return DailySalaryResult(
       totalValue:      totalValue,
@@ -174,6 +174,7 @@ class BakerProductionViewModel extends ChangeNotifier {
     required List<String>         helperIds,
     required List<ProductionItem> items,
     String?                       ovenHelperId,
+    double ovenRate = 15.0,
   }) async {
     try {
       final exists =
@@ -190,6 +191,7 @@ class BakerProductionViewModel extends ChangeNotifier {
         helperIds:       helperIds,
         items:           items,
         ovenHelperId:    ovenHelperId,
+        ovenRate:        ovenRate,
         totalValue:      computed.totalValue,
         totalSacks:      computed.totalSacks,
         totalExtraKg:    computed.totalExtraKg,

@@ -29,6 +29,7 @@ class AdminProductViewModel extends ChangeNotifier {
     required String name,
     required double pricePerSack,
     double bonusPerSack = 0,
+    double masterBakerIncentivePerSack = 0,
   }) async {
     try {
       final product = ProductModel(
@@ -36,6 +37,7 @@ class AdminProductViewModel extends ChangeNotifier {
         name: name.trim(),
         pricePerSack: pricePerSack,
         bonusPerSack: bonusPerSack,
+        masterBakerIncentivePerSack: masterBakerIncentivePerSack,
       );
       await _db.insertProduct(product);
       await loadProducts();

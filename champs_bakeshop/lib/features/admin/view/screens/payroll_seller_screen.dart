@@ -25,10 +25,10 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
 
   // Default to today
   DateTime _selectedDate = DateTime.now();
-  bool     _isLoading    = false;
-  String?  _error;
+  bool _isLoading = false;
+  String? _error;
 
-  Map<String, List<SellerSessionModel>>    _sessions    = {};
+  Map<String, List<SellerSessionModel>> _sessions = {};
   Map<String, List<SellerRemittanceModel>> _remittances = {};
 
   // Tracks which sellers are marked paid for the selected date
@@ -52,8 +52,19 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
 
   String get _displayDate {
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final d = _selectedDate;
@@ -62,7 +73,10 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
 
   // ── Data loading ───────────────────────────────────────────
   Future<void> _load() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final sellers = context
           .read<AdminUserViewModel>()
@@ -70,15 +84,19 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
           .where((u) => u.isSeller)
           .toList();
 
-      final newSessions    = <String, List<SellerSessionModel>>{};
+      final newSessions = <String, List<SellerSessionModel>>{};
       final newRemittances = <String, List<SellerRemittanceModel>>{};
 
       await Future.wait(sellers.map((s) async {
         newSessions[s.id] = await _service.getSessionsByRange(
-          sellerId: s.id, fromDate: _dateStr, toDate: _dateStr,
+          sellerId: s.id,
+          fromDate: _dateStr,
+          toDate: _dateStr,
         );
         newRemittances[s.id] = await _service.getRemittancesByRange(
-          sellerId: s.id, fromDate: _dateStr, toDate: _dateStr,
+          sellerId: s.id,
+          fromDate: _dateStr,
+          toDate: _dateStr,
         );
       }));
 
@@ -92,12 +110,15 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
       }
 
       setState(() {
-        _sessions    = newSessions;
+        _sessions = newSessions;
         _remittances = newRemittances;
-        _isLoading   = false;
+        _isLoading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _isLoading = false; });
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
@@ -111,16 +132,16 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
   // ── Calendar picker — defaults to today ───────────────────
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
-      context:     context,
+      context: context,
       initialDate: _selectedDate,
-      firstDate:   DateTime(2024),
-      lastDate:    DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary:   Color(0xFFFF7A00),
+            primary: Color(0xFFFF7A00),
             onPrimary: Colors.white,
-            surface:   Colors.white,
+            surface: Colors.white,
           ),
         ),
         child: child!,
@@ -133,16 +154,35 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
   }
 
   // ── Remittance dialog ──────────────────────────────────────
+  void _showSellerTable(List<UserModel> sellers) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) => _SellerPayoutTableSheet(
+        date: _displayDate,
+        sellers: sellers,
+        sessions: _sessions,
+        remittances: _remittances,
+        paidSellerIds: _paidSellerIds,
+      ),
+    );
+  }
+
   void _showRemittanceDialog(
-    UserModel              seller,
-    SellerSessionModel     session,
+    UserModel seller,
+    SellerSessionModel session,
     SellerRemittanceModel? existing,
   ) {
-    final returnCtrl = TextEditingController(
-        text: existing?.returnPieces.toString() ?? '0');
+    final returnCtrl =
+        TextEditingController(text: existing?.returnPieces.toString() ?? '0');
     final cashCtrl = TextEditingController(
         text: existing != null
-            ? existing.actualRemittance.toStringAsFixed(0) : '');
+            ? existing.actualRemittance.toStringAsFixed(0)
+            : '');
     double selectedPct = 0.05;
 
     showDialog(
@@ -150,16 +190,17 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) {
           final returnPieces = int.tryParse(returnCtrl.text) ?? 0;
-          final actualCash   = double.tryParse(cashCtrl.text) ?? 0.0;
-          final total        = session.totalPiecesTaken;
-          final sold         = (total - returnPieces).clamp(0, total);
-          final adjusted     = sold * 5.0;
-          final variance     = actualCash - adjusted;
-          final salary       = adjusted * selectedPct;
-          final vColor       = variance >= 0 ? AppColors.success : AppColors.danger;
+          final actualCash = double.tryParse(cashCtrl.text) ?? 0.0;
+          final total = session.totalPiecesTaken;
+          final sold = (total - returnPieces).clamp(0, total);
+          final adjusted = sold * 5.0;
+          final variance = actualCash - adjusted;
+          final salary = adjusted * selectedPct;
+          final vColor = variance >= 0 ? AppColors.success : AppColors.danger;
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             title: Row(children: [
               Container(
@@ -169,20 +210,29 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  session.isMorning ? Icons.wb_sunny_outlined : Icons.wb_twilight_outlined,
-                  color: AppColors.seller, size: 20,
+                  session.isMorning
+                      ? Icons.wb_sunny_outlined
+                      : Icons.wb_twilight_outlined,
+                  color: AppColors.seller,
+                  size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  '${session.isMorning ? 'Morning' : 'Afternoon'} Remittance',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-                Text(seller.name,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w400)),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(
+                      '${session.isMorning ? 'Morning' : 'Afternoon'} Remittance',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    Text(seller.name,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                            fontWeight: FontWeight.w400)),
+                  ])),
             ]),
             content: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -216,12 +266,15 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                   onChanged: (_) => setDlg(() {}),
                   decoration: InputDecoration(
                     labelText: 'Returned Pieces',
-                    prefixIcon: const Icon(Icons.undo_outlined, color: AppColors.warning),
+                    prefixIcon: const Icon(Icons.undo_outlined,
+                        color: AppColors.warning),
                     suffixText: 'pcs',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.warning, width: 1.5),
+                      borderSide: const BorderSide(
+                          color: AppColors.warning, width: 1.5),
                     ),
                     helperText: 'Sold: $sold pcs ($total − $returnPieces)',
                   ),
@@ -230,32 +283,40 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                 // Actual cash
                 TextField(
                   controller: cashCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                   ],
                   onChanged: (_) => setDlg(() {}),
                   decoration: InputDecoration(
                     labelText: 'Actual Cash Remitted',
-                    prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.success),
+                    prefixIcon: const Icon(Icons.payments_outlined,
+                        color: AppColors.success),
                     suffixText: '₱',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.success, width: 1.5),
+                      borderSide: const BorderSide(
+                          color: AppColors.success, width: 1.5),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 // 5% / 15% selector
                 Row(children: [
-                  Expanded(child: _PctBtn(
-                    label: '5% Salary', selected: selectedPct == 0.05,
+                  Expanded(
+                      child: _PctBtn(
+                    label: '5% Salary',
+                    selected: selectedPct == 0.05,
                     onTap: () => setDlg(() => selectedPct = 0.05),
                   )),
                   const SizedBox(width: 10),
-                  Expanded(child: _PctBtn(
-                    label: '15% Salary', selected: selectedPct == 0.15,
+                  Expanded(
+                      child: _PctBtn(
+                    label: '15% Salary',
+                    selected: selectedPct == 0.15,
                     onTap: () => setDlg(() => selectedPct = 0.15),
                   )),
                 ]),
@@ -266,19 +327,29 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                   decoration: BoxDecoration(
                     color: AppColors.seller.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.seller.withValues(alpha: 0.25)),
+                    border: Border.all(
+                        color: AppColors.seller.withValues(alpha: 0.25)),
                   ),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Session Salary (${(selectedPct * 100).toInt()}%)',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                      Text(formatCurrency(salary),
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.seller)),
-                    ]),
-                    const Icon(Icons.account_balance_wallet_outlined,
-                        size: 24, color: AppColors.seller),
-                  ]),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                  'Session Salary (${(selectedPct * 100).toInt()}%)',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary)),
+                              Text(formatCurrency(salary),
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.seller)),
+                            ]),
+                        const Icon(Icons.account_balance_wallet_outlined,
+                            size: 24, color: AppColors.seller),
+                      ]),
                 ),
                 const SizedBox(height: 12),
                 // Variance
@@ -289,59 +360,74 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: vColor.withValues(alpha: 0.20)),
                   ),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Should remit ($sold × ₱5)',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
-                      Text(formatCurrency(adjusted),
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.text)),
-                    ]),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      Text(variance >= 0 ? 'Overpaid' : 'Short',
-                          style: TextStyle(fontSize: 11, color: vColor)),
-                      Text(
-                        variance >= 0
-                            ? '+${formatCurrency(variance)}'
-                            : formatCurrency(variance),
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700, color: vColor),
-                      ),
-                    ]),
-                  ]),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Should remit ($sold × ₱5)',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppColors.textHint)),
+                              Text(formatCurrency(adjusted),
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.text)),
+                            ]),
+                        Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(variance >= 0 ? 'Overpaid' : 'Short',
+                                  style:
+                                      TextStyle(fontSize: 11, color: vColor)),
+                              Text(
+                                variance >= 0
+                                    ? '+${formatCurrency(variance)}'
+                                    : formatCurrency(variance),
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: vColor),
+                              ),
+                            ]),
+                      ]),
                 ),
                 const SizedBox(height: 8),
               ]),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel')),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: AppColors.seller),
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.seller),
                 onPressed: () async {
                   if (cashCtrl.text.trim().isEmpty) return;
                   final retPcs = int.tryParse(returnCtrl.text) ?? 0;
-                  final cash   = double.tryParse(cashCtrl.text) ?? 0.0;
-                  final msg    = ScaffoldMessenger.of(context);
+                  final cash = double.tryParse(cashCtrl.text) ?? 0.0;
+                  final msg = ScaffoldMessenger.of(context);
                   try {
                     if (existing != null) {
                       await _service.updateRemittance(
-                        remittanceId:     existing.id,
-                        returnPieces:     retPcs,
+                        remittanceId: existing.id,
+                        returnPieces: retPcs,
                         actualRemittance: cash,
                         totalPiecesTaken: session.totalPiecesTaken,
-                        salary:           salary,
+                        salary: salary,
                       );
                     } else {
                       await _service.createRemittance(
-                        sellerId:           seller.id,
-                        sessionId:          session.id,
-                        date:               session.date,
-                        returnPieces:       retPcs,
-                        actualRemittance:   cash,
-                        totalPiecesTaken:   session.totalPiecesTaken,
+                        sellerId: seller.id,
+                        sessionId: session.id,
+                        date: session.date,
+                        returnPieces: retPcs,
+                        actualRemittance: cash,
+                        totalPiecesTaken: session.totalPiecesTaken,
                         expectedRemittance: session.expectedRemittance,
-                        salary:             salary,
-                        remittedAt:         DateTime.now().toIso8601String(),
+                        salary: salary,
+                        remittedAt: DateTime.now().toIso8601String(),
                       );
                     }
                     if (ctx.mounted) Navigator.pop(ctx);
@@ -351,7 +437,8 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                         content: const Text('Remittance saved! ✅'),
                         backgroundColor: AppColors.success,
                         behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         margin: const EdgeInsets.all(12),
                       ));
                     }
@@ -377,8 +464,8 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
   // ── Mark paid dialog ───────────────────────────────────────
   void _confirmSellerPaid(
     UserModel seller,
-    double    totalRemitted,
-    double    totalSalary,
+    double totalRemitted,
+    double totalSalary,
   ) {
     showDialog(
       context: context,
@@ -391,7 +478,8 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
               color: AppColors.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 20),
+            child: const Icon(Icons.check_circle_outline,
+                color: AppColors.success, size: 20),
           ),
           const SizedBox(width: 12),
           const Text('Confirm Payment',
@@ -407,31 +495,41 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: AppColors.success.withValues(alpha: 0.2)),
             ),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('Total Remitted',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 Text(formatCurrency(totalRemitted),
                     style: const TextStyle(
-                        fontWeight: FontWeight.w900, color: AppColors.success, fontSize: 18)),
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.success,
+                        fontSize: 18)),
               ]),
               if (totalSalary > 0) ...[
                 const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Total Salary',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  Text(formatCurrency(totalSalary),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w900, color: AppColors.seller, fontSize: 18)),
-                ]),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Salary',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text(formatCurrency(totalSalary),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.seller,
+                              fontSize: 18)),
+                    ]),
               ],
             ]),
           ),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton.icon(
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: const Text('Confirm Paid'),
@@ -447,7 +545,8 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
                 content: Text('${seller.name} marked as paid! ✅'),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 margin: const EdgeInsets.all(12),
               ));
             },
@@ -467,20 +566,18 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         .toList();
 
     double totalRemitted = 0;
-    double totalSalary   = 0;
+    double totalSalary = 0;
     for (final remits in _remittances.values) {
       for (final r in remits) {
         totalRemitted += r.actualRemittance;
-        totalSalary   += r.salary;
+        totalSalary += r.salary;
       }
     }
 
-    final payableSellers = sellers
-        .where((s) => (_sessions[s.id] ?? []).isNotEmpty)
-        .toList();
-    final paidCount = payableSellers
-        .where((s) => _paidSellerIds.contains(s.id))
-        .length;
+    final payableSellers =
+        sellers.where((s) => (_sessions[s.id] ?? []).isNotEmpty).toList();
+    final paidCount =
+        payableSellers.where((s) => _paidSellerIds.contains(s.id)).length;
     final unpaidCount = payableSellers.length - paidCount;
 
     return RefreshIndicator(
@@ -490,20 +587,28 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
           // ── Header ───────────────────────────────────────
           // ── Day navigator ─────────────────────────────────
-          _DayNav(
-            displayDate: _displayDate,
-            isToday:     _isToday,
-            onPrev:      () => _changeDate(-1),
-            onNext:      _isToday ? null : () => _changeDate(1),
-            onCalendar:  _pickDate,
-          ),
+          Row(children: [
+            Expanded(
+              child: _DayNav(
+                displayDate: _displayDate,
+                isToday: _isToday,
+                onPrev: () => _changeDate(-1),
+                onNext: _isToday ? null : () => _changeDate(1),
+                onCalendar: _pickDate,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _SellerTableViewButton(
+              onTap: () => _showSellerTable(sellers),
+            ),
+          ]),
           const SizedBox(height: 16),
 
           if (_isLoading)
-            const Center(child: CircularProgressIndicator(color: AppColors.seller))
+            const Center(
+                child: CircularProgressIndicator(color: AppColors.seller))
           else if (_error != null)
             _ErrCard(_error!)
           else if (sellers.isEmpty)
@@ -518,25 +623,28 @@ class _SellerPayrollTabState extends State<SellerPayrollTab> {
               const SizedBox(height: 12),
             ],
             ...sellers.map((seller) {
-              final sessions     = _sessions[seller.id]    ?? [];
-              final remits       = _remittances[seller.id] ?? [];
-              final isPaid       = _paidSellerIds.contains(seller.id);
-              final sellerTotal  = remits.fold(0.0, (s, r) => s + r.actualRemittance);
+              final sessions = _sessions[seller.id] ?? [];
+              final remits = _remittances[seller.id] ?? [];
+              final isPaid = _paidSellerIds.contains(seller.id);
+              final sellerTotal =
+                  remits.fold(0.0, (s, r) => s + r.actualRemittance);
               final sellerSalary = remits.fold(0.0, (s, r) => s + r.salary);
 
               return _SellerPayrollCard(
-                seller:      seller,
-                sessions:    sessions,
+                seller: seller,
+                sessions: sessions,
                 remittances: remits,
-                isPaid:      isPaid,
-                onRemit:     (session, existing) =>
+                isPaid: isPaid,
+                onRemit: (session, existing) =>
                     _showRemittanceDialog(seller, session, existing),
                 onPaid: sessions.isNotEmpty && sellerTotal > 0 && !isPaid
-                    ? () => _confirmSellerPaid(seller, sellerTotal, sellerSalary)
+                    ? () =>
+                        _confirmSellerPaid(seller, sellerTotal, sellerSalary)
                     : null,
               );
             }),
-            _TotalBanner(totalRemitted: totalRemitted, totalSalary: totalSalary),
+            _TotalBanner(
+                totalRemitted: totalRemitted, totalSalary: totalSalary),
           ],
         ]),
       ),
@@ -625,49 +733,263 @@ class _SellerPaymentSummary extends StatelessWidget {
   }
 }
 
+class _SellerTableViewButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _SellerTableViewButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.table_chart_outlined, size: 16),
+        label: const Text('Table'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.seller,
+          side: BorderSide(color: AppColors.seller.withValues(alpha: 0.35)),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+      );
+}
+
+class _SellerPayoutTableSheet extends StatelessWidget {
+  final String date;
+  final List<UserModel> sellers;
+  final Map<String, List<SellerSessionModel>> sessions;
+  final Map<String, List<SellerRemittanceModel>> remittances;
+  final Set<String> paidSellerIds;
+
+  const _SellerPayoutTableSheet({
+    required this.date,
+    required this.sellers,
+    required this.sessions,
+    required this.remittances,
+    required this.paidSellerIds,
+  });
+
+  SellerSessionModel? _session(String sellerId, String type) =>
+      sessions[sellerId]?.where((s) => s.sessionType == type).firstOrNull;
+
+  SellerRemittanceModel? _remit(String sellerId, SellerSessionModel? session) {
+    if (session == null) return null;
+    return remittances[sellerId]
+        ?.where((r) => r.sessionId == session.id)
+        .firstOrNull;
+  }
+
+  Widget _payoutCell(String sellerId, String type) {
+    final session = _session(sellerId, type);
+    final remit = _remit(sellerId, session);
+    if (session == null) {
+      return const Text('—', style: TextStyle(color: AppColors.textHint));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(remit == null ? 'Pending' : formatCurrency(remit.salary),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: remit == null ? AppColors.warning : AppColors.seller,
+          )),
+      Text(
+          remit == null
+              ? '${session.totalPiecesTaken} pcs'
+              : 'Cash ${formatCurrency(remit.actualRemittance)}',
+          style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+    ]);
+  }
+
+  Widget _sessionValueCell(String sellerId, String type, String value) {
+    final session = _session(sellerId, type);
+    final remit = _remit(sellerId, session);
+    if (session == null || remit == null) {
+      return Text(session == null ? '—' : 'Pending',
+          style: TextStyle(
+              fontSize: 11,
+              color: session == null ? AppColors.textHint : AppColors.warning));
+    }
+
+    final rate = remit.adjustedRemittance <= 0
+        ? 0
+        : (remit.salary / remit.adjustedRemittance) * 100;
+    final text = switch (value) {
+      'rate' => '${rate.toStringAsFixed(0)}%',
+      'return' => '${remit.returnPieces} pcs',
+      'cash' => formatCurrency(remit.actualRemittance),
+      _ => formatCurrency(remit.salary),
+    };
+    return Text(text,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: FractionallySizedBox(
+        heightFactor: 0.88,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.table_chart_outlined, color: AppColors.seller),
+              const SizedBox(width: 8),
+              const Expanded(
+                  child: Text('Seller Payout Table',
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w800))),
+              Text(date,
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textHint)),
+            ]),
+            const SizedBox(height: 4),
+            const Text('Per-session rate, returns, cash remittance, and payout',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            const SizedBox(height: 14),
+            if (sellers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('No sellers or payout data for this day yet.',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+              ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    DataTable(
+                    headingRowColor: WidgetStatePropertyAll(
+                        AppColors.seller.withValues(alpha: 0.08)),
+                    columnSpacing: 22,
+                    columns: const [
+                      DataColumn(label: Text('Seller')),
+                      DataColumn(label: Text('M Rate')),
+                      DataColumn(label: Text('M Return')),
+                      DataColumn(label: Text('M Cash')),
+                      DataColumn(label: Text('M Payout')),
+                      DataColumn(label: Text('A Rate')),
+                      DataColumn(label: Text('A Return')),
+                      DataColumn(label: Text('A Cash')),
+                      DataColumn(label: Text('A Payout')),
+                      DataColumn(label: Text('Total payout')),
+                      DataColumn(label: Text('Status')),
+                    ],
+                    rows: sellers.map((seller) {
+                      final morning =
+                          _remit(seller.id, _session(seller.id, 'morning'));
+                      final afternoon =
+                          _remit(seller.id, _session(seller.id, 'afternoon'));
+                      final total =
+                          (morning?.salary ?? 0) + (afternoon?.salary ?? 0);
+                      final hasSessions =
+                          (sessions[seller.id] ?? []).isNotEmpty;
+                      final complete = hasSessions &&
+                          (sessions[seller.id] ?? [])
+                              .every((s) => _remit(seller.id, s) != null);
+                      return DataRow(cells: [
+                        DataCell(Text(seller.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700))),
+                        DataCell(_sessionValueCell(seller.id, 'morning', 'rate')),
+                        DataCell(_sessionValueCell(seller.id, 'morning', 'return')),
+                        DataCell(_sessionValueCell(seller.id, 'morning', 'cash')),
+                        DataCell(_payoutCell(seller.id, 'morning')),
+                        DataCell(_sessionValueCell(seller.id, 'afternoon', 'rate')),
+                        DataCell(_sessionValueCell(seller.id, 'afternoon', 'return')),
+                        DataCell(_sessionValueCell(seller.id, 'afternoon', 'cash')),
+                        DataCell(_payoutCell(seller.id, 'afternoon')),
+                        DataCell(Text(formatCurrency(total),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w800))),
+                        DataCell(Text(
+                          paidSellerIds.contains(seller.id)
+                              ? 'PAID'
+                              : complete
+                                  ? 'Paid'
+                                  : hasSessions
+                                      ? 'Pending'
+                                      : 'No session',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: paidSellerIds.contains(seller.id)
+                                  ? AppColors.danger
+                                  : complete
+                                      ? AppColors.success
+                                      : AppColors.warning),
+                        )),
+                      ]);
+                    }).toList(),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 class _DayNav extends StatelessWidget {
-  final String        displayDate;
-  final bool          isToday;
-  final VoidCallback  onPrev;
+  final String displayDate;
+  final bool isToday;
+  final VoidCallback onPrev;
   final VoidCallback? onNext;
-  final VoidCallback  onCalendar;
+  final VoidCallback onCalendar;
 
   const _DayNav({
-    required this.displayDate, required this.isToday,
-    required this.onPrev, required this.onCalendar, this.onNext,
+    required this.displayDate,
+    required this.isToday,
+    required this.onPrev,
+    required this.onCalendar,
+    this.onNext,
   });
 
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: AppColors.seller.withValues(alpha: 0.05),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.seller.withValues(alpha: 0.20)),
         ),
         child: Row(children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            color: AppColors.seller, iconSize: 20, onPressed: onPrev,
+            color: AppColors.seller,
+            iconSize: 20,
+            onPressed: onPrev,
           ),
           Expanded(
             child: GestureDetector(
               onTap: onCalendar,
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              child:
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Icon(Icons.calendar_today_outlined,
                     size: 14, color: AppColors.seller.withValues(alpha: 0.8)),
                 const SizedBox(width: 6),
                 Text(displayDate,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryDark)),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AppColors.primaryDark)),
                 if (isToday) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                        color: AppColors.seller, borderRadius: BorderRadius.circular(4)),
+                        color: AppColors.seller,
+                        borderRadius: BorderRadius.circular(4)),
                     child: const Text('Today',
                         style: TextStyle(
-                            color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800)),
                   ),
                 ],
               ]),
@@ -678,7 +1000,8 @@ class _DayNav extends StatelessWidget {
                 color: onNext != null
                     ? AppColors.seller
                     : AppColors.seller.withValues(alpha: 0.25)),
-            iconSize: 20, onPressed: onNext,
+            iconSize: 20,
+            onPressed: onNext,
           ),
         ]),
       );
@@ -688,17 +1011,20 @@ class _DayNav extends StatelessWidget {
 //  SELLER PAYROLL CARD
 // ══════════════════════════════════════════════════════════════
 class _SellerPayrollCard extends StatelessWidget {
-  final UserModel                   seller;
-  final List<SellerSessionModel>    sessions;
+  final UserModel seller;
+  final List<SellerSessionModel> sessions;
   final List<SellerRemittanceModel> remittances;
-  final bool                        isPaid;
+  final bool isPaid;
   final Function(SellerSessionModel, SellerRemittanceModel?) onRemit;
-  final VoidCallback?               onPaid;
+  final VoidCallback? onPaid;
 
   const _SellerPayrollCard({
-    required this.seller, required this.sessions,
-    required this.remittances, required this.isPaid,
-    required this.onRemit, this.onPaid,
+    required this.seller,
+    required this.sessions,
+    required this.remittances,
+    required this.isPaid,
+    required this.onRemit,
+    this.onPaid,
   });
 
   SellerRemittanceModel? _remitFor(SellerSessionModel s) =>
@@ -706,10 +1032,13 @@ class _SellerPayrollCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalExpected = sessions.fold(0.0, (s, e) => s + e.expectedRemittance);
-    final totalRemitted = remittances.fold(0.0, (s, r) => s + r.actualRemittance);
-    final totalSalary   = remittances.fold(0.0, (s, r) => s + r.salary);
-    final allRemitted   = sessions.isNotEmpty && sessions.every((s) => _remitFor(s) != null);
+    final totalExpected =
+        sessions.fold(0.0, (s, e) => s + e.expectedRemittance);
+    final totalRemitted =
+        remittances.fold(0.0, (s, r) => s + r.actualRemittance);
+    final totalSalary = remittances.fold(0.0, (s, r) => s + r.salary);
+    final allRemitted =
+        sessions.isNotEmpty && sessions.every((s) => _remitFor(s) != null);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -717,87 +1046,110 @@ class _SellerPayrollCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: isPaid
-            ? Border.all(color: AppColors.danger.withValues(alpha: 0.4), width: 2)
+            ? Border.all(
+                color: AppColors.danger.withValues(alpha: 0.4), width: 2)
             : allRemitted
-                ? Border.all(color: AppColors.success.withValues(alpha: 0.3), width: 1.5)
+                ? Border.all(
+                    color: AppColors.success.withValues(alpha: 0.3), width: 1.5)
                 : null,
-        boxShadow: [BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20, offset: const Offset(0, 8))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
           // ── Seller header ────────────────────────────────
           Row(children: [
             Stack(children: [
               Container(
-                width: 44, height: 44,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: (isPaid ? AppColors.danger : AppColors.seller).withValues(alpha: 0.10),
+                  color: (isPaid ? AppColors.danger : AppColors.seller)
+                      .withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   seller.name.isNotEmpty ? seller.name[0].toUpperCase() : 'S',
                   style: TextStyle(
-                      fontWeight: FontWeight.w900, fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
                       color: isPaid ? AppColors.danger : AppColors.seller),
                 ),
               ),
               if (isPaid)
-                Positioned(right: 0, bottom: 0,
+                Positioned(
+                  right: 0,
+                  bottom: 0,
                   child: Container(
                     padding: const EdgeInsets.all(2),
                     decoration: const BoxDecoration(
                         color: AppColors.danger, shape: BoxShape.circle),
-                    child: const Icon(Icons.check, size: 10, color: Colors.white),
+                    child:
+                        const Icon(Icons.check, size: 10, color: Colors.white),
                   ),
                 ),
             ]),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(seller.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                const SizedBox(width: 6),
-                if (isPaid)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Row(children: [
+                    Text(seller.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(width: 6),
+                    if (isPaid)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('PAID',
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.danger)),
+                      ),
+                  ]),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.seller.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('Seller',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.seller)),
                     ),
-                    child: const Text('PAID',
-                        style: TextStyle(
-                            fontSize: 9, fontWeight: FontWeight.w800,
-                            color: AppColors.danger)),
-                  ),
-              ]),
-              const SizedBox(height: 3),
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.seller.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text('Seller',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                          color: AppColors.seller)),
-                ),
-                const SizedBox(width: 8),
-                Text('${sessions.length} sessions',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
-              ]),
-            ])),
+                    const SizedBox(width: 8),
+                    Text('${sessions.length} sessions',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textHint)),
+                  ]),
+                ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(formatCurrency(totalRemitted),
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1A1A1A))),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1A1A1A))),
               Text('of ${formatCurrency(totalExpected)}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppColors.textHint)),
             ]),
           ]),
 
@@ -813,7 +1165,8 @@ class _SellerPayrollCard extends StatelessWidget {
             ...sessions.map((session) {
               final remit = _remitFor(session);
               return _SessionRemitRow(
-                session: session, remit: remit,
+                session: session,
+                remit: remit,
                 onTap: () => onRemit(session, remit),
               );
             }),
@@ -822,25 +1175,33 @@ class _SellerPayrollCard extends StatelessWidget {
             if (remittances.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.seller.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.seller.withValues(alpha: 0.15)),
+                  border: Border.all(
+                      color: AppColors.seller.withValues(alpha: 0.15)),
                 ),
-                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Row(children: [
-                    Icon(Icons.account_balance_wallet_outlined,
-                        size: 14, color: AppColors.seller),
-                    SizedBox(width: 6),
-                    Text('Total Daily Salary',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary)),
-                  ]),
-                  Text(formatCurrency(totalSalary),
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.seller)),
-                ]),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(children: [
+                        Icon(Icons.account_balance_wallet_outlined,
+                            size: 14, color: AppColors.seller),
+                        SizedBox(width: 6),
+                        Text('Total Daily Salary',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary)),
+                      ]),
+                      Text(formatCurrency(totalSalary),
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.seller)),
+                    ]),
               ),
             ],
 
@@ -851,17 +1212,21 @@ class _SellerPayrollCard extends StatelessWidget {
               if (isPaid)
                 // RED "Paid" chip after confirming
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+                    border: Border.all(
+                        color: AppColors.danger.withValues(alpha: 0.35)),
                   ),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.check_circle, size: 15, color: AppColors.danger),
                     SizedBox(width: 6),
                     Text('Paid',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.danger)),
                   ]),
                 )
@@ -873,25 +1238,33 @@ class _SellerPayrollCard extends StatelessWidget {
                   label: const Text('Mark Paid'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.success,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 )
               else
                 // AMBER "Pending" badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+                    border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.25)),
                   ),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.pending_outlined, size: 14, color: AppColors.warning),
+                    Icon(Icons.pending_outlined,
+                        size: 14, color: AppColors.warning),
                     SizedBox(width: 6),
                     Text('Pending remittance',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.warning)),
                   ]),
                 ),
@@ -907,17 +1280,18 @@ class _SellerPayrollCard extends StatelessWidget {
 //  SESSION REMIT ROW  — shows salary per session
 // ══════════════════════════════════════════════════════════════
 class _SessionRemitRow extends StatelessWidget {
-  final SellerSessionModel     session;
+  final SellerSessionModel session;
   final SellerRemittanceModel? remit;
-  final VoidCallback           onTap;
+  final VoidCallback onTap;
 
-  const _SessionRemitRow({required this.session, required this.onTap, this.remit});
+  const _SessionRemitRow(
+      {required this.session, required this.onTap, this.remit});
 
   @override
   Widget build(BuildContext context) {
     final isMorning = session.isMorning;
-    final color     = isMorning ? AppColors.seller : AppColors.warning;
-    final hasRemit  = remit != null;
+    final color = isMorning ? AppColors.seller : AppColors.warning;
+    final hasRemit = remit != null;
 
     return GestureDetector(
       onTap: onTap,
@@ -943,54 +1317,71 @@ class _SessionRemitRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8)),
             child: Icon(
               isMorning ? Icons.wb_sunny_outlined : Icons.wb_twilight_outlined,
-              size: 16, color: color,
+              size: 16,
+              color: color,
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              '${isMorning ? 'Morning' : 'Afternoon'} — ${session.date}',
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.text),
-            ),
-            Text(
-              '${session.totalPiecesTaken} pcs · Exp: ${formatCurrency(session.expectedRemittance)}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-            ),
-            if (hasRemit) ...[
-              Text(
-                'Returned: ${remit!.returnPieces} · Cash: ${formatCurrency(remit!.actualRemittance)}',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
-              ),
-              // ── Per-session salary ────────────────────
-              if (remit!.salary > 0)
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Text(
-                  'Salary: ${formatCurrency(remit!.salary)}',
+                  '${isMorning ? 'Morning' : 'Afternoon'} — ${session.date}',
                   style: const TextStyle(
-                      fontSize: 11, color: AppColors.seller, fontWeight: FontWeight.w700),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text),
                 ),
-            ],
-          ])),
+                Text(
+                  '${session.totalPiecesTaken} pcs · Exp: ${formatCurrency(session.expectedRemittance)}',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSecondary),
+                ),
+                if (hasRemit) ...[
+                  Text(
+                    'Returned: ${remit!.returnPieces} · Cash: ${formatCurrency(remit!.actualRemittance)}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  // ── Per-session salary ────────────────────
+                  if (remit!.salary > 0)
+                    Text(
+                      'Salary: ${formatCurrency(remit!.salary)}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.seller,
+                          fontWeight: FontWeight.w700),
+                    ),
+                ],
+              ])),
           hasRemit
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text('✓ Done',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.success)),
                 )
               : Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text('Enter',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.primary)),
                 ),
         ]),
@@ -1014,31 +1405,44 @@ class _TotalBanner extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFF7A00), Color(0xFFFFA03A)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(
-            color: const Color(0xFFFF7A00).withValues(alpha: 0.3),
-            blurRadius: 14, offset: const Offset(0, 5),
-          )],
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF7A00).withValues(alpha: 0.3),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            )
+          ],
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        child:
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('TOTAL REMITTED',
-                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700,
-                    letterSpacing: 1, fontSize: 11)),
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    fontSize: 11)),
             SizedBox(height: 2),
             Text('Seller total today',
                 style: TextStyle(color: Colors.white60, fontSize: 11)),
           ]),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(formatCurrency(totalRemitted),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900,
-                    fontSize: 24, letterSpacing: -0.5)),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 24,
+                    letterSpacing: -0.5)),
             if (totalSalary > 0)
               Text('Salary: ${formatCurrency(totalSalary)}',
                   style: const TextStyle(
-                      color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
           ]),
         ]),
       );
@@ -1056,19 +1460,24 @@ class _DlgInfoRow extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary)),
           Text(value,
               style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.seller)),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.seller)),
         ],
       );
 }
 
 class _PctBtn extends StatelessWidget {
-  final String       label;
-  final bool         selected;
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
-  const _PctBtn({required this.label, required this.selected, required this.onTap});
+  const _PctBtn(
+      {required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -1080,13 +1489,16 @@ class _PctBtn extends StatelessWidget {
             color: selected ? AppColors.seller : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? AppColors.seller : AppColors.seller.withValues(alpha: 0.3),
+              color: selected
+                  ? AppColors.seller
+                  : AppColors.seller.withValues(alpha: 0.3),
             ),
           ),
           alignment: Alignment.center,
           child: Text(label,
               style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
                   color: selected ? Colors.white : AppColors.seller)),
         ),
       );
@@ -1118,14 +1530,16 @@ class _EmptyCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 48),
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(children: [
-          Icon(Icons.storefront_outlined, size: 40,
-              color: AppColors.seller.withValues(alpha: 0.3)),
+          Icon(Icons.storefront_outlined,
+              size: 40, color: AppColors.seller.withValues(alpha: 0.3)),
           const SizedBox(height: 10),
-          Text(message, style: const TextStyle(color: AppColors.textHint, fontSize: 14)),
+          Text(message,
+              style: const TextStyle(color: AppColors.textHint, fontSize: 14)),
         ]),
       );
 }
@@ -1142,9 +1556,11 @@ class _ErrCard extends StatelessWidget {
           border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
         ),
         child: Column(children: [
-          const Icon(Icons.cloud_off_outlined, size: 36, color: AppColors.danger),
+          const Icon(Icons.cloud_off_outlined,
+              size: 36, color: AppColors.danger),
           const SizedBox(height: 10),
-          Text(message, textAlign: TextAlign.center,
+          Text(message,
+              textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.danger, fontSize: 13)),
         ]),
       );

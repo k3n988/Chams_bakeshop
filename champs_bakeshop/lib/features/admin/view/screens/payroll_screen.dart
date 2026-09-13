@@ -48,7 +48,9 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
+    return ColoredBox(
+      color: const Color(0xFFFBFCFE),
+      child: Column(children: [
       Container(
         color: Colors.white,
         child: Column(children: [
@@ -79,7 +81,8 @@ class _AdminPayrollScreenState extends State<AdminPayrollScreen>
           ],
         ),
       ),
-    ]);
+      ]),
+    );
   }
 }
 
@@ -122,7 +125,6 @@ class _BakerHelperPayrollTabState
         prodVM.products,
         userVM.userNameMap,
         userVM.userRoleMap);
-    await _autoApplyValeDeductions();
   }
 
   Future<void> _load() async {
@@ -137,7 +139,6 @@ class _BakerHelperPayrollTabState
     await valeVM.load();
     await payVM.loadWeeklyPayroll(
         ws, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
-    await _autoApplyValeDeductions();
   }
 
   Future<void> _changeWeek(int dir) async {
@@ -150,7 +151,6 @@ class _BakerHelperPayrollTabState
     await valeVM.load();
     await payVM.changeWeek(
         dir, prodVM.products, userVM.userNameMap, userVM.userRoleMap);
-    await _autoApplyValeDeductions();
   }
 
   /// For every employee who worked this week and has outstanding vale,
@@ -250,14 +250,11 @@ class _BakerHelperPayrollTabState
     final autoOven  = isHelper ? entry.ovenDeduction : 0.0;
     final valeVM    = context.read<AdminValeViewModel>();
     final valeTotal = valeVM.userTotal(entry.userId);
-    final ovenCtrl  = TextEditingController(
-        text: entry.ovenDeduction.toStringAsFixed(0));
     final gasCtrl   = TextEditingController(
         text: entry.gasDeduction.toStringAsFixed(0));
-    // Auto-fill from vale records if no deduction has been manually saved yet
+    // Vale is entered manually for the selected payroll week.
     final valeCtrl  = TextEditingController(
-        text: (entry.valeDeduction > 0 ? entry.valeDeduction : valeTotal)
-            .toStringAsFixed(0));
+        text: entry.valeDeduction.toStringAsFixed(0));
     final wifiCtrl  = TextEditingController(
         text: entry.wifiDeduction.toStringAsFixed(0));
 
@@ -333,16 +330,6 @@ class _BakerHelperPayrollTabState
                 ]),
               ),
               const SizedBox(height: 12),
-              _DeducField(
-                controller: ovenCtrl,
-                label:   'Oven (₱)',
-                icon:    Icons.microwave_outlined,
-                enabled: isHelper,
-                hint:    autoOven.toStringAsFixed(0),
-                helper:  isHelper
-                    ? 'Leave 0 to use auto amount'
-                    : 'N/A for master baker',
-              ),
               const Divider(height: 24),
               _DeducField(
                   controller: gasCtrl,
@@ -365,7 +352,7 @@ class _BakerHelperPayrollTabState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Vale balance: ${formatCurrency(valeTotal)} — auto-filled. Edit to override.',
+                        'Outstanding Vale reference: ${formatCurrency(valeTotal)}. Enter the amount to deduct for this week below.',
                         style: const TextStyle(
                             fontSize: 11, color: AppColors.info),
                       ),
@@ -374,8 +361,9 @@ class _BakerHelperPayrollTabState
                 ),
               _DeducField(
                   controller: valeCtrl,
-                  label: 'Vale (₱)',
-                  icon:  Icons.money_outlined),
+                  label: 'Vale for this week (₱)',
+                  icon:  Icons.money_outlined,
+                  helper: 'This amount will be subtracted from final salary.'),
               const SizedBox(height: 12),
               _DeducField(
                   controller: wifiCtrl,
@@ -408,20 +396,29 @@ class _BakerHelperPayrollTabState
                 ));
                 return;
               }
-              final oven = double.tryParse(ovenCtrl.text) ?? 0;
               final gas = double.tryParse(gasCtrl.text) ?? 0;
               final requestedVale = double.tryParse(valeCtrl.text) ?? 0;
               final wifi = double.tryParse(wifiCtrl.text) ?? 0;
-              await payVM.saveDeduction(
+              final saved = await payVM.saveDeduction(
                 userId:    entry.userId,
                 weekStart: payVM.weekStart,
-                oven:  oven,
+                oven:  entry.ovenDeduction,
                 gas:   gas,
                 vale:  requestedVale,
                 wifi:  wifi,
               );
+              if (!saved) {
+                if (mounted) {
+                  messenger.showSnackBar(const SnackBar(
+                      content: Text('Unable to save Vale deduction.'),
+                      backgroundColor: AppColors.danger));
+                }
+                return;
+              }
               if (ctx.mounted) Navigator.pop(ctx);
-              _load();
+              // Wait for the fresh weekly query so the saved Vale cannot be
+              // replaced visually by the previous payroll snapshot.
+              await _load();
               if (mounted) {
                 messenger.showSnackBar(SnackBar(
                     content: const Text('Deductions saved!'),
@@ -440,13 +437,6 @@ class _BakerHelperPayrollTabState
   }
 
   void _showPayrollTable(List<PayrollEntry> entries) {
-    if (entries.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No payroll data to show.')),
-      );
-      return;
-    }
-
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -773,6 +763,7 @@ class _BakerHelperPayrollTabState
             _TableViewButton(
               onTap: () => _showPayrollTable(sortedEntries),
             ),
+            const SizedBox(width: 8),
           ],
           ),
           const SizedBox(height: 16),
@@ -872,9 +863,7 @@ class _WeekNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: isCurrentWeek
-              ? AppColors.primary.withValues(alpha: 0.05)
-              : Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isCurrentWeek
@@ -1067,6 +1056,12 @@ class _PayrollTableSheet extends StatelessWidget {
                 ),
               ]),
             ),
+            if (entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 4, 18, 12),
+                child: Text('No payroll data for this week yet.',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 controller: scrollController,
@@ -1094,6 +1089,7 @@ class _PayrollTableSheet extends StatelessWidget {
                         numeric: true,
                         label: Text('Total Amount'),
                       ),
+                      DataColumn(numeric: true, label: Text('Oven +/-')),
                       DataColumn(numeric: true, label: Text('WiFi')),
                       DataColumn(numeric: true, label: Text('Gas')),
                       DataColumn(numeric: true, label: Text('Vale')),
@@ -1106,6 +1102,8 @@ class _PayrollTableSheet extends StatelessWidget {
                     rows: entries.map((entry) {
                       final totalAmount =
                           entry.grossSalary + entry.ovenIncentive;
+                      final ovenAdjustment =
+                          entry.ovenIncentive - entry.ovenDeduction;
 
                       return DataRow(cells: [
                         DataCell(Text(
@@ -1115,6 +1113,19 @@ class _PayrollTableSheet extends StatelessWidget {
                           ),
                         )),
                         DataCell(Text(formatCurrency(totalAmount))),
+                        DataCell(Text(
+                          ovenAdjustment == 0
+                              ? '—'
+                              : ovenAdjustment > 0
+                                  ? '+${formatCurrency(ovenAdjustment)}'
+                                  : '-${formatCurrency(ovenAdjustment.abs())}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: ovenAdjustment > 0
+                                ? AppColors.success
+                                : AppColors.danger,
+                          ),
+                        )),
                         DataCell(Text(formatCurrency(entry.wifiDeduction))),
                         DataCell(Text(formatCurrency(entry.gasDeduction))),
                         DataCell(Text(formatCurrency(entry.valeDeduction))),

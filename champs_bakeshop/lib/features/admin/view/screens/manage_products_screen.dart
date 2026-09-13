@@ -15,6 +15,10 @@ class ManageProductsScreen extends StatelessWidget {
         text: product != null ? product.pricePerSack.toStringAsFixed(0) : '');
     final bonusCtrl = TextEditingController(
         text: product != null ? product.bonusPerSack.toStringAsFixed(0) : '');
+    final masterBakerIncentiveCtrl = TextEditingController(
+        text: product != null
+            ? product.masterBakerIncentivePerSack.toStringAsFixed(0)
+            : '');
     final isEdit = product != null;
 
     showDialog(
@@ -55,10 +59,22 @@ class ManageProductsScreen extends StatelessWidget {
             controller: bonusCtrl,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: ' Bonus per Sack (₱)',
+              labelText: 'Bonus per Sack (₱)',
               hintText: '32',
               prefixIcon: Icon(Icons.card_giftcard_outlined),
-              helperText: 'Added to helper and baker salary per sack produced',
+              helperText: 'Shared bonus for workers per sack produced',
+              helperStyle: TextStyle(fontSize: 11),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: masterBakerIncentiveCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Master Baker Incentive per Sack (₱)',
+              hintText: 'Enter amount',
+              prefixIcon: Icon(Icons.workspace_premium_outlined),
+              helperText: 'Added only to the master baker salary',
               helperStyle: TextStyle(fontSize: 11),
             ),
           ),
@@ -71,10 +87,17 @@ class ManageProductsScreen extends StatelessWidget {
             onPressed: () async {
               final price = double.tryParse(priceCtrl.text);
               final bonus = double.tryParse(bonusCtrl.text) ?? 0;
+              final masterBakerIncentive =
+                  double.tryParse(masterBakerIncentiveCtrl.text);
 
-              if (nameCtrl.text.trim().isEmpty || price == null || price <= 0) {
+              if (nameCtrl.text.trim().isEmpty ||
+                  price == null ||
+                  price <= 0 ||
+                  masterBakerIncentive == null ||
+                  masterBakerIncentive < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Product name and price are required'),
+                    content: Text(
+                        'Product name, price, and master baker incentive are required'),
                     backgroundColor: AppColors.danger));
                 return;
               }
@@ -87,11 +110,13 @@ class ManageProductsScreen extends StatelessWidget {
                       name: nameCtrl.text.trim(),
                       pricePerSack: price,
                       bonusPerSack: bonus,
+                      masterBakerIncentivePerSack: masterBakerIncentive,
                     ))
                   : await vm.addProduct(
                       name: nameCtrl.text.trim(),
                       pricePerSack: price,
                       bonusPerSack: bonus,
+                      masterBakerIncentivePerSack: masterBakerIncentive,
                     );
 
               if (ok && ctx.mounted) {
@@ -111,21 +136,42 @@ class ManageProductsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AdminProductViewModel>();
-    return SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBFCFE),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Products',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
+                color: AppColors.text)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: () => _showDialog(context),
+              icon: const Icon(Icons.add, size: 17),
+              label: const Text('Add Product'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFF8C00),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SectionHeader(
-          title: 'Products',
-          subtitle: 'Manage bakery products & pricing',
-          trailing: ElevatedButton.icon(
-              onPressed: () => _showDialog(context),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Product')),
-        ),
         if (vm.products.isEmpty)
           const EmptyState(message: 'No products yet')
         else
           ...vm.products.map((p) => Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.white,
+                shadowColor: Colors.black12,
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
                   contentPadding:
@@ -134,8 +180,9 @@ class ManageProductsScreen extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: const Center(
                         child: Text('🍞', style: TextStyle(fontSize: 22))),
@@ -152,10 +199,10 @@ class ManageProductsScreen extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             fontSize: 14),
                       ),
-                      // Show bonus badge only if set
-                      if (p.bonusPerSack > 0)
+                      // Show master baker incentive only if set
+                      if (p.masterBakerIncentivePerSack > 0)
                         Text(
-                          '+ ${formatCurrency(p.bonusPerSack)} baker bonus / sack',
+                          '+ ${formatCurrency(p.masterBakerIncentivePerSack)} master baker incentive / sack',
                           style: const TextStyle(
                               color: AppColors.masterBaker,
                               fontWeight: FontWeight.w600,
@@ -180,6 +227,7 @@ class ManageProductsScreen extends StatelessWidget {
                 ),
               )),
       ]),
+      ),
     );
   }
 }

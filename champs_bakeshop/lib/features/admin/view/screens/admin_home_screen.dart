@@ -25,7 +25,9 @@ class AdminHomeScreen extends StatelessWidget {
           context.read<AdminPayrollViewModel>().autoLoad(),
         ]);
 
-    return RefreshIndicator(
+    return ColoredBox(
+      color: const Color(0xFFFBFCFE),
+      child: RefreshIndicator(
       color: AppColors.primary,
       onRefresh: refresh,
       child: SingleChildScrollView(
@@ -124,6 +126,7 @@ class AdminHomeScreen extends StatelessWidget {
             // ── Packed this week ────────────────────────────
           ],
         ),
+      ),
       ),
     );
   }

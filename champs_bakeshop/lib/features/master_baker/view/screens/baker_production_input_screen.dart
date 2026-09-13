@@ -48,6 +48,7 @@ class _BakerProductionInputScreenState
   String? _selectedMasterBakerId;
   final Set<String> _selectedHelpers = {};
   String? _ovenHelperId;
+  final _ovenRateCtrl = TextEditingController(text: '15');
   final List<_ItemData> _items = [_ItemData()];
 
   @override
@@ -77,6 +78,7 @@ class _BakerProductionInputScreenState
     for (final item in _items) {
       item.dispose();
     }
+    _ovenRateCtrl.dispose();
     super.dispose();
   }
 
@@ -141,16 +143,17 @@ class _BakerProductionInputScreenState
 
   double _previewBakerIncentive(BakerProductionViewModel vm) {
     final productMap = {for (final p in vm.products) p.id: p};
-    double totalEffectiveSacks = 0;
+    double incentiveAmount = 0;
 
     for (final item in _validItems) {
       final product = productMap[item.productId];
       if (product == null) continue;
       if (PayrollService.isIncentiveExemptProduct(product)) continue;
-      totalEffectiveSacks += item.effectiveSacks;
+      incentiveAmount +=
+          product.masterBakerIncentivePerSack * item.effectiveSacks;
     }
 
-    return totalEffectiveSacks * PayrollService.incentivePerSack;
+    return incentiveAmount;
   }
 
   void _showSaveSuccessFeedback() {
@@ -172,15 +175,36 @@ class _BakerProductionInputScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                color: AppColors.masterBaker,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            child: const Text('OK',
+                style: TextStyle(
+                    color: AppColors.masterBaker,
+                    fontWeight: FontWeight.w800)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openHistory(AuthViewModel authVm) {
+    final currentUser = authVm.currentUser;
+    if (!widget.adminMode && currentUser != null && currentUser.isSellerBaker) {
+      context.read<BakerProductionViewModel>().loadData(currentUser.id);
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Baker History'),
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.text,
+            elevation: 0,
+            surfaceTintColor: Colors.white,
+          ),
+          body: BakerHistoryScreen(
+            showHeader: false,
+            adminMode: widget.adminMode,
+          ),
+        ),
       ),
     );
   }
@@ -241,6 +265,15 @@ class _BakerProductionInputScreenState
       return;
     }
 
+    final ovenRate = double.tryParse(_ovenRateCtrl.text.trim());
+    if (ovenRate == null || ovenRate < 0) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Enter a valid oven deduction/pay amount.'),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
+
     final result =
         await context.read<BakerProductionViewModel>().addProduction(
               date: _date,
@@ -248,6 +281,7 @@ class _BakerProductionInputScreenState
               helperIds: _selectedHelpers.toList(),
               items: _validItems,
               ovenHelperId: _ovenHelperId,
+              ovenRate: ovenRate,
             );
 
     if (!mounted) return;
@@ -305,9 +339,197 @@ class _BakerProductionInputScreenState
     }
   }
 
+  Widget _mobileProductsCard(BakerProductionViewModel vm) {
+    const ink = Color(0xFF414750);
+    const muted = Color(0xFF858A90);
+    const line = Color(0xFFE0E2E3);
+    const green = Color(0xFF55946B);
+    const paleGreen = Color(0xFFECF3EE);
+    const labelStyle = TextStyle(fontSize: 9, color: ink);
+    final outline = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: const BorderSide(color: line),
+    );
+
+    Widget fieldShell(Widget child) => Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: line),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+
+    Widget counterButton(_ItemData item, bool increase) => SizedBox(
+      width: 24,
+      height: 30,
+      child: Material(
+        color: paleGreen,
+        child: InkWell(
+          onTap: () => setState(() {
+            if (increase) {
+              item.sacks++;
+            } else if (item.sacks > 0) {
+              item.sacks--;
+            }
+            item.sacksCtrl.text = '${item.sacks}';
+          }),
+          child: Icon(increase ? Icons.add : Icons.remove,
+              size: 14, color: green),
+        ),
+      ),
+    );
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        inputDecorationTheme: InputDecorationTheme(
+          filled: false,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: line),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(width: 4, height: 19,
+                  decoration: BoxDecoration(color: green,
+                      borderRadius: BorderRadius.circular(3))),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('PRODUCTS PRODUCED',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7, color: ink))),
+              Material(
+                color: paleGreen,
+                borderRadius: BorderRadius.circular(6),
+                child: InkWell(
+                  onTap: _addItem,
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.add, size: 14, color: green),
+                      SizedBox(width: 6),
+                      Text('Add Item', style: TextStyle(fontSize: 10,
+                          fontWeight: FontWeight.w600, color: green)),
+                    ]),
+                  ),
+                ),
+              ),
+            ]),
+            const Padding(
+              padding: EdgeInsets.only(left: 14),
+              child: Text('Add the products and quantities produced in this batch.',
+                  style: TextStyle(fontSize: 9, color: muted)),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 9),
+              child: Divider(height: 1, thickness: 1, color: Color(0xFFF0F1F2)),
+            ),
+            Row(children: [
+              const Expanded(flex: 2, child: Text('Product', style: labelStyle)),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Sacks', style: labelStyle)),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('+ KG', style: labelStyle)),
+              if (_items.length > 1) const SizedBox(width: 28),
+            ]),
+            const SizedBox(height: 5),
+            ...List.generate(_items.length, (i) {
+              final item = _items[i];
+              return Padding(
+                padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                child: Row(children: [
+                  Expanded(flex: 2, child: fieldShell(
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: DropdownButtonHideUnderline(child: DropdownButton<String>(
+                        value: item.productId,
+                        isExpanded: true,
+                        isDense: true,
+                        icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: muted),
+                        style: const TextStyle(fontSize: 11, color: ink),
+                        hint: const Text('Select product', style: TextStyle(fontSize: 11, color: muted)),
+                        items: vm.products.map((p) => DropdownMenuItem(
+                          value: p.id, child: Text(p.name, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                        onChanged: (value) => setState(() => item.productId = value),
+                      )),
+                    ),
+                  )),
+                  const SizedBox(width: 12),
+                  Expanded(child: fieldShell(Row(children: [
+                    counterButton(item, false),
+                    const VerticalDivider(width: 1, thickness: 1, color: line),
+                    Expanded(child: TextField(
+                      controller: item.sacksCtrl,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ink),
+                      decoration: const InputDecoration(isCollapsed: true),
+                      onChanged: (value) => setState(() => item.sacks = int.tryParse(value) ?? 0),
+                    )),
+                    const VerticalDivider(width: 1, thickness: 1, color: line),
+                    counterButton(item, true),
+                  ]))),
+                  const SizedBox(width: 12),
+                  Expanded(child: SizedBox(height: 32, child: TextField(
+                    controller: item.kgCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(fontSize: 11, color: ink),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                      border: outline, enabledBorder: outline, focusedBorder: outline,
+                      suffixIconConstraints: const BoxConstraints(minWidth: 28, maxWidth: 28),
+                      suffixIcon: const Row(children: [
+                        SizedBox(height: 14, child: VerticalDivider(width: 1, color: line)),
+                        SizedBox(width: 7),
+                        Text('kg', style: TextStyle(fontSize: 9, color: muted)),
+                      ]),
+                    ),
+                    onChanged: (value) => setState(() {
+                      final parsed = int.tryParse(value) ?? 0;
+                      item.extraKg = parsed < 0 ? 0 : parsed;
+                    }),
+                  ))),
+                  if (_items.length > 1)
+                    SizedBox(width: 28, child: IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: 18,
+                      tooltip: 'Remove item',
+                      onPressed: () => _removeItem(i),
+                      icon: const Icon(Icons.remove_circle_outline, color: AppColors.danger),
+                    )),
+                ]),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BakerProductionViewModel>();
+    final compactProducts = MediaQuery.sizeOf(context).width <= 600;
     final currentUser = context.watch<AuthViewModel>().currentUser;
     final showHistoryButton =
         widget.adminMode || (currentUser?.isSellerBaker ?? false);
@@ -320,16 +542,17 @@ class _BakerProductionInputScreenState
     final salaryLabel =
         widget.adminMode ? 'Baker Salary (est.)' : 'Your Salary (est.)';
 
-    return ColoredBox(
+    final content = ColoredBox(
       color: Colors.white,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, compactProducts ? 4 : 20, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
             // ── Page Header ──────────────────────────────────────
-            Row(
+            if (!widget.adminMode)
+              Row(
               children: [
                 const Expanded(
                   child: Text('Add Production',
@@ -339,34 +562,9 @@ class _BakerProductionInputScreenState
                           color: AppColors.text,
                           letterSpacing: -0.5)),
                 ),
-                if (showHistoryButton)
+                      if (showHistoryButton)
                   OutlinedButton.icon(
-                    onPressed: () {
-                      if (!widget.adminMode &&
-                          currentUser != null &&
-                          currentUser.isSellerBaker) {
-                        context
-                            .read<BakerProductionViewModel>()
-                            .loadData(currentUser.id);
-                      }
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => Scaffold(
-                            appBar: AppBar(
-                              title: const Text('Baker History'),
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppColors.text,
-                              elevation: 0,
-                              surfaceTintColor: Colors.white,
-                            ),
-                            body: BakerHistoryScreen(
-                              showHeader: false,
-                              adminMode: widget.adminMode,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: () => _openHistory(context.read<AuthViewModel>()),
                     icon: const Icon(Icons.history_outlined, size: 18),
                     label: const Text('History'),
                     style: OutlinedButton.styleFrom(
@@ -385,11 +583,13 @@ class _BakerProductionInputScreenState
                   ),
               ],
             ),
-            const SizedBox(height: 3),
-            const Text('Record your daily bakery production',
-                style: TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
+            if (!widget.adminMode) ...[
+              const SizedBox(height: 3),
+              const Text('Record your daily bakery production',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary)),
+            ],
+            if (!widget.adminMode) const SizedBox(height: 20),
 
             // ── Date ─────────────────────────────────────────────
             _SectionCard(
@@ -482,8 +682,13 @@ class _BakerProductionInputScreenState
                     else
                       DropdownButtonFormField<String>(
                         initialValue: _selectedMasterBakerId,
+                        isDense: true,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           hintText: 'Select Master Baker',
+                          isDense: true,
+                          hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF858A90)),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           prefixIcon: const Icon(Icons.person_outline,
                               color: AppColors.masterBaker),
                           border: OutlineInputBorder(
@@ -504,7 +709,7 @@ class _BakerProductionInputScreenState
                           filled: true,
                           fillColor: Colors.white,
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 13),
+                              horizontal: 10, vertical: 8),
                         ),
                         items: masterBakers
                             .map((baker) => DropdownMenuItem(
@@ -585,6 +790,8 @@ class _BakerProductionInputScreenState
                       children: vm.helpers.map((h) {
                         final sel = _selectedHelpers.contains(h.id);
                         return FilterChip(
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           selected: sel,
                           label: Text(h.name),
                           labelStyle: TextStyle(
@@ -624,28 +831,20 @@ class _BakerProductionInputScreenState
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const _SectionLabel('WHO DID THE OVEN?'),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Exempt from ₱15 deduction',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.warning),
-                          ),
-                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Select the helper who cooked the tinpay. They will not be charged the oven deduction for this day.',
-                      style: TextStyle(
-                          fontSize: 11, color: AppColors.textHint),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _ovenRateCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Oven deduction / pay per helper (₱)',
+                        hintText: '15',
+                        prefixIcon: Icon(Icons.payments_outlined),
+                        helperText:
+                            'The oven helper receives this amount from each other helper.',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -710,6 +909,9 @@ class _BakerProductionInputScreenState
             if (_selectedHelpers.isNotEmpty) const SizedBox(height: 14),
 
             // ── Products ─────────────────────────────────────────
+            if (compactProducts)
+              _mobileProductsCard(vm)
+            else
             _SectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,38 +947,44 @@ class _BakerProductionInputScreenState
                       ),
                     ],
                   ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Add the products and quantities produced in this batch.',
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.textHint),
+                  ),
                   const SizedBox(height: 12),
 
                   // Column headers
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(children: [
-                      const Expanded(flex: 3, child: SizedBox()),
+                    child: Row(children: const [
                       Expanded(
                         flex: 2,
-                        child: Row(children: const [
-                          Expanded(
-                            child: Text('Sacks',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textHint,
-                                    letterSpacing: 0.4)),
-                          ),
-                          SizedBox(width: 6),
-                          Expanded(
-                            child: Text('+ KG',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textHint,
-                                    letterSpacing: 0.4)),
-                          ),
-                        ]),
+                        child: Text('Product',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textHint)),
                       ),
-                      const SizedBox(width: 40),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text('Sacks',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textHint)),
+                      ),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text('+ KG',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textHint)),
+                      ),
                     ]),
                   ),
 
@@ -790,8 +998,10 @@ class _BakerProductionInputScreenState
                           children: [
                             // Product dropdown
                             Expanded(
-                              flex: 3,
-                              child: DropdownButtonFormField<String>(
+                              flex: 2,
+                              child: SizedBox(
+                                height: compactProducts ? 32 : 48,
+                                child: DropdownButtonFormField<String>(
                                 initialValue: item.productId,
                                 isExpanded: true,
                                 decoration: InputDecoration(
@@ -799,10 +1009,11 @@ class _BakerProductionInputScreenState
                                   hintStyle: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textHint),
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 11),
+                                   contentPadding:
+                                       EdgeInsets.symmetric(
+                                           horizontal: 12,
+                                           vertical: compactProducts ? 0 : 4),
+                                   isDense: true,
                                   border: OutlineInputBorder(
                                     borderRadius:
                                         BorderRadius.circular(10),
@@ -827,7 +1038,7 @@ class _BakerProductionInputScreenState
                                     .map((p) => DropdownMenuItem(
                                           value: p.id,
                                           child: Text(
-                                            '${p.name} (${formatCurrency(p.pricePerSack)})',
+                                            p.name,
                                             style: const TextStyle(
                                                 fontSize: 12),
                                           ),
@@ -836,16 +1047,24 @@ class _BakerProductionInputScreenState
                                 onChanged: (v) => setState(
                                     () => item.productId = v),
                               ),
-                            ),
-                            const SizedBox(width: 8),
+                             ),
+                             ),
+                             const SizedBox(width: 6),
 
                             // Sacks counter
-                            SizedBox(
-                              width: 90,
-                              child: Row(children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: AppColors.border),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Row(children: [
                                 _CounterBtn(
                                   icon: Icons.remove,
                                   isLeft: true,
+                                  compact: compactProducts,
                                   onTap: () {
                                     if (item.sacks > 0) {
                                       setState(() {
@@ -858,43 +1077,21 @@ class _BakerProductionInputScreenState
                                 ),
                                 Expanded(
                                   child: SizedBox(
-                                    height: 38,
+                                    height: compactProducts ? 32 : 48,
                                     child: TextField(
                                       controller: item.sacksCtrl,
                                       keyboardType:
                                           TextInputType.number,
-                                      textAlign: TextAlign.center,
+                                    textAlign: TextAlign.center,
                                       style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight:
                                               FontWeight.w700),
-                                      decoration: InputDecoration(
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.zero,
-                                          borderSide: BorderSide(
-                                              color: AppColors.border),
-                                        ),
-                                        enabledBorder:
-                                            OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.zero,
-                                          borderSide: BorderSide(
-                                              color: AppColors.border),
-                                        ),
-                                        focusedBorder:
-                                            OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.zero,
-                                          borderSide:
-                                              const BorderSide(
-                                                  color: AppColors
-                                                      .masterBaker,
-                                                  width: 1.5),
-                                        ),
-                                        contentPadding: EdgeInsets.zero,
-                                        isDense: true,
-                                      ),
+                                       decoration: const InputDecoration(
+                                         border: InputBorder.none,
+                                         contentPadding: EdgeInsets.zero,
+                                         isDense: true,
+                                       ),
                                       onChanged: (v) => setState(() =>
                                           item.sacks =
                                               int.tryParse(v) ?? 0),
@@ -904,6 +1101,7 @@ class _BakerProductionInputScreenState
                                 _CounterBtn(
                                   icon: Icons.add,
                                   isLeft: false,
+                                  compact: compactProducts,
                                   onTap: () {
                                     setState(() {
                                       item.sacks++;
@@ -912,18 +1110,19 @@ class _BakerProductionInputScreenState
                                     });
                                   },
                                 ),
-                              ]),
+                                ]),
+                              ),
                             ),
                             const SizedBox(width: 6),
 
                             // KG input
                             Expanded(
                               child: SizedBox(
-                                height: 38,
+                                 height: compactProducts ? 32 : 48,
                                 child: TextField(
-                                  controller: item.kgCtrl,
+                                   controller: item.kgCtrl,
                                   keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
+                                    textAlign: TextAlign.left,
                                   style:
                                       const TextStyle(fontSize: 13),
                                   decoration: InputDecoration(
@@ -933,9 +1132,9 @@ class _BakerProductionInputScreenState
                                         fontSize: 10,
                                         color: AppColors.textHint),
                                     contentPadding:
-                                        const EdgeInsets.symmetric(
+                                        EdgeInsets.symmetric(
                                             horizontal: 6,
-                                            vertical: 8),
+                                            vertical: compactProducts ? 0 : 8),
                                     border: OutlineInputBorder(
                                       borderRadius:
                                           BorderRadius.circular(10),
@@ -963,8 +1162,8 @@ class _BakerProductionInputScreenState
                                         parsed < 0 ? 0 : parsed);
                                   },
                                 ),
-                              ),
-                            ),
+                                ),
+                               ),
 
                             // Delete
                             if (_items.length > 1) ...[
@@ -986,7 +1185,7 @@ class _BakerProductionInputScreenState
                                 ),
                               ),
                             ] else
-                              const SizedBox(width: 40),
+                              const SizedBox.shrink(),
                           ]),
                     );
                   }),
@@ -1136,10 +1335,33 @@ class _BakerProductionInputScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: widget.adminMode ? 0 : 12),
           ],
         ),
       ),
+    );
+
+    if (!widget.adminMode) return content;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
+        title: const Text('Master Baker Productions',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            tooltip: 'History',
+            icon: const Icon(Icons.history_outlined,
+                color: AppColors.masterBaker),
+            onPressed: () => _openHistory(context.read<AuthViewModel>()),
+          ),
+        ],
+      ),
+      body: content,
     );
   }
 }
@@ -1154,11 +1376,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E2E3)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -1178,19 +1400,19 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(children: [
         Container(
-          width: 3,
-          height: 13,
+          width: 4,
+          height: 19,
           decoration: BoxDecoration(
-            color: AppColors.masterBaker,
+            color: const Color(0xFF55946B),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Text(text,
             style: const TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textHint,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF414750),
                 letterSpacing: 0.8)),
       ]);
 }
@@ -1284,6 +1506,7 @@ class _ProductBreakdown extends StatelessWidget {
         ],
       ),
     );
+
   }
 }
 
@@ -1394,10 +1617,12 @@ class _CounterBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool isLeft;
+  final bool compact;
   const _CounterBtn(
       {required this.icon,
       required this.onTap,
-      required this.isLeft});
+      required this.isLeft,
+      this.compact = false});
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -1407,11 +1632,18 @@ class _CounterBtn extends StatelessWidget {
           right: isLeft ? Radius.zero : const Radius.circular(8),
         ),
         child: Container(
-          width: 28,
-          height: 38,
+          width: compact ? 24 : 32,
+          height: compact ? 32 : 48,
           decoration: BoxDecoration(
             color: AppColors.masterBaker.withValues(alpha: 0.06),
-            border: Border.all(color: AppColors.border),
+            border: Border(
+              right: isLeft
+                  ? const BorderSide(color: AppColors.border)
+                  : BorderSide.none,
+              left: isLeft
+                  ? BorderSide.none
+                  : const BorderSide(color: AppColors.border),
+            ),
             borderRadius: BorderRadius.horizontal(
               left: isLeft ? const Radius.circular(8) : Radius.zero,
               right: isLeft ? Radius.zero : const Radius.circular(8),

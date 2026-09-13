@@ -3,7 +3,6 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/payroll_service.dart';
 import '../../../../core/models/production_model.dart';
 import '../../../../core/models/product_model.dart';
-import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/helpers.dart';
 
 class HelperSalaryViewModel extends ChangeNotifier {
@@ -279,8 +278,9 @@ class HelperSalaryViewModel extends ChangeNotifier {
 
       _weeklyDaily.sort((a, b) => a.key.compareTo(b.key));
 
-      _ovenDeduction =
-          _daysWorked * AppConstants.helperOvenDeductionPerDay;
+      _ovenDeduction = productions
+          .where((p) => p.helperIds.contains(userId))
+          .fold<double>(0, (sum, p) => sum + p.ovenRate);
 
       final ded      = await _db.getDeduction(userId, _weekStart);
       _gasDeduction  = ded?.gas  ?? 0;
@@ -377,7 +377,8 @@ class HelperSalaryViewModel extends ChangeNotifier {
         }
 
         final days = weekProds.length;
-        final oven = days * AppConstants.helperOvenDeductionPerDay;
+        final oven = weekProds.fold<double>(
+            0, (sum, production) => sum + production.ovenRate);
         final ded  = dedMap[wsStr];
         final gas  = (ded?.gas  as double?) ?? 0.0;
         final vale = (ded?.vale as double?) ?? 0.0;

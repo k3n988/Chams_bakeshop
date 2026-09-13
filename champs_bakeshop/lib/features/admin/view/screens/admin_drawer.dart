@@ -144,12 +144,8 @@ class AdminDrawer extends StatelessWidget {
                 badgeColor: AppColors.masterBaker,
                 onTap: () => _openPage(
                   context,
-                  _Wrapped(
-                    title: 'User Management',
+                  users_screen.ManageUsersScreen(),
                     // ← explicit prefix, no ambiguity
-                    child:
-                        users_screen.ManageUsersScreen(),
-                  ),
                 ),
               ),
 
@@ -163,11 +159,7 @@ class AdminDrawer extends StatelessWidget {
                 badgeColor: AppColors.info,
                 onTap: () => _openPage(
                   context,
-                  _Wrapped(
-                    title: 'Products',
-                    child: products_screen
-                        .ManageProductsScreen(),
-                  ),
+                  products_screen.ManageProductsScreen(),
                 ),
               ),
 
@@ -180,7 +172,7 @@ class AdminDrawer extends StatelessWidget {
                   final total = vm.grandTotal;
                   return total > 0
                       ? '₱${total.toStringAsFixed(0)} total outstanding'
-                      : 'Store credit tracker';
+                      : 'Locked — add Vale in Payroll';
                 }(),
                 badgeColor: AppColors.danger,
                 badge: () {
@@ -206,12 +198,7 @@ class AdminDrawer extends StatelessWidget {
                 subtitle:   'Add production for master bakers',
                 onTap: () => _openPage(
                   context,
-                  _Wrapped(
-                    title: 'Master Baker Productions',
-                    child: const BakerProductionInputScreen(
-                      adminMode: true,
-                    ),
-                  ),
+                  const BakerProductionInputScreen(adminMode: true),
                 ),
               ),
 
@@ -393,7 +380,7 @@ class _DrawerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+        onTap: label == 'Vale' ? null : onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
               horizontal: 12, vertical: 4),
@@ -450,7 +437,7 @@ class _DrawerItem extends StatelessWidget {
                               badgeColor ?? color)),
                 ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right,
+              Icon(label == 'Vale' ? Icons.lock_outline : Icons.chevron_right,
                   size: 16,
                   color: AppColors.textHint),
             ]),

@@ -12,7 +12,10 @@ class AdminBatchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (ctx) => AdminBatchViewModel(ctx.read())..init(),
-      child: const _AdminBatchBody(),
+      child: const ColoredBox(
+        color: Color(0xFFFBFCFE),
+        child: _AdminBatchBody(),
+      ),
     );
   }
 }
@@ -233,7 +236,7 @@ class _SummaryChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(
               horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.07),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border:
                 Border.all(color: color.withValues(alpha: 0.18)),

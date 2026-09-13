@@ -9,6 +9,7 @@ check (
     'cashier',
     'master_baker',
     'helper',
+    'helper',
     'packer',
     'seller',
     'seller_baker'
